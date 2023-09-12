@@ -209,9 +209,12 @@ fun_format_output <- function(i,
             left_join(hh_size) %>%
             left_join(floor_cap) %>%
             left_join(emission_factors_embodied) %>%
-            mutate(floor_new_Mm2 = n_units_fuel * hh_size * floor_cap / stp / 1e6) %>% # Mm2/yr
-            mutate(mat_in_Mt = n_units_fuel * hh_size * floor_cap * mat_int / stp / 1e3 / 1e6) %>% # Mt/y
-            mutate(mat_in_tCO2 = mat_in_Mt * emission_factors_embodied * 1e6) %>% # tCO2/y
+            mutate(floor_new_Mm2 =
+                n_units_fuel * hh_size * floor_cap / stp / 1e6) %>% # Mm2/yr
+            mutate(mat_in_Mt =
+                n_units_fuel * hh_size * floor_cap * mat_int / stp / 1e3 / 1e6) %>% # Mt/y
+            mutate(mat_in_tCO2 =
+                mat_in_Mt * emission_factors_embodied * 1e6) %>% # tCO2/y
             group_by_at(c("region_bld", "year", "material")) %>%
             summarize(mat_in_Mt = sum(mat_in_Mt),
                       mat_in_tCO2 = sum(mat_in_tCO2)) %>%

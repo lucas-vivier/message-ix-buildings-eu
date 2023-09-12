@@ -14,8 +14,8 @@ options(dplyr.summarise.inform = FALSE)
 start_script_time <- Sys.time()
 rnd <- 5
 u_EJ_GWa <- 31.71
-inertia_wtp <- 4.3
 min_shr_fuel <- 0.01
+inertia_wtp <- 4.3
 
 rate_dem_target <- NULL
 

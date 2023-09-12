@@ -1,5 +1,5 @@
 scenario_id,scenario_name,income,energy_prices_projections,emission_factors,sub_ren_shell,sub_heat,carbon_tax,ban_fuel
-1,EU,,,,,,,
+1,EU,,,,,,medium,
 2,EU_carbon_tax,,,,,,medium,
 3,EU_carbon_tax_ambitious,,,,,,ambitious,
 4,EU_incentives_policies,,,,ambitious,medium,medium,

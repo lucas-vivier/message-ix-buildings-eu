@@ -129,6 +129,11 @@ run_scenario <- function(run,
 
   # Read carbon tax
   if (!is.null(d$carbon_tax)){
+    d$carbon_tax  <- d$carbon_tax  %>%
+      rowwise() %>%
+      mutate(fuel = list(c("oil", "gas", "coal"))) %>%
+      unnest(fuel)
+
     carbon_tax <- d$carbon_tax %>%
       left_join(emission_factors) %>%
       mutate(carbon_tax = 3.6 * carbon_tax * emission_factors / 1e6) %>%
@@ -314,12 +319,13 @@ run_scenario <- function(run,
     print(paste("Start scenario run", sector))
     parameters_renovation <- NULL
     parameters_heater <- NULL
+    carbon_revenue <- NULL
     bld_det_i <- bld_det_ini
     for (i in 2:length(yrs)) {
       print(paste("Start scenario run", sector, "for year", yrs[i]))
       stp <- yrs[i] - yrs[i - 1]
 
-      print(paste("Calculate energy demand intensities for space heating and cooling"))
+      print("Calculate energy demand intensities for space heating and cooling")
       lst_en_i <- fun_en_sim(
         sector,
         yrs,
@@ -351,7 +357,7 @@ run_scenario <- function(run,
       rm(lst_en_i)
 
       # Energy demand intensities - hot water
-      print(paste("Calculate energy demand intensities for hot water"))
+      print("Calculate energy demand intensities for hot water")
       en_hh_hw_scen <- fun_hw_resid(
         yrs, i,
         bld_cases_fuel,
@@ -362,7 +368,7 @@ run_scenario <- function(run,
       )
 
       # Market share - new construction options
-      print(paste("Calculate market share for new construction"))
+      print("Calculate market share for new construction")
       ms_new_i <- fun_ms_new_exogenous(
                     yrs,
                     i,
@@ -419,6 +425,65 @@ run_scenario <- function(run,
       }
       if (energy_efficiency == "endogenous") {
         print("2.1 Calculation of renovation rate")
+
+        budget_constraint <- NULL # carbon_revenue
+        sub <- NULL
+        if (!is.null(budget_constraint)) {
+          print("Endogenous subsidies to reach budget constraint")
+
+          objective_function <- function(x, budget_constraint) {
+
+            # From scalar value construct a data.frame with eneff and year
+            sub <- data.frame(sub_ren_shell = x,
+                              eneff_f = c("adv", "std"),
+                              year = yrs[i])
+
+            temp <- fun_ms_ren_shell_endogenous(yrs,
+                  i,
+                  bld_cases_fuel,
+                  cat$ct_bld_age,
+                  cat$ct_ren_eneff,
+                  d$hh_size,
+                  d$floor_cap,
+                  d$cost_invest_ren_shell,
+                  sub,
+                  en_hh_tot,
+                  d$lifetime_ren,
+                  discount_ren = d$discount_rate,
+                  parameters = parameters_renovation)
+
+            ren_det_i <- bld_det_i  %>%
+              left_join(temp$rate_ren_i, relationship = "many-to-many") %>%
+              filter(!is.na(rate_ren)) %>%
+              left_join(temp$ms_ren_i %>%
+                rename(eneff = eneff_i, fuel_heat = fuel_heat_i),
+                relationship = "many-to-many") %>%
+              mutate(
+                eneff_f = ifelse(is.na(ms_ren), eneff, eneff_f),
+                fuel_heat_f = ifelse(is.na(ms_ren), fuel_heat, fuel_heat_f)
+              ) %>%
+              mutate(ms_ren = ifelse(is.na(ms_ren), 0, ms_ren)) %>%
+              mutate(n_units_fuel =
+                round(n_units_fuel_exst * rate_ren * stp * ms_ren, rnd)) %>%
+              mutate(subsidies = n_units_fuel * sub_ren_hh)
+
+            rslt <- sum(ren_det_i$subsidies) * 1e3 / 1e9
+
+            return(rslt - budget_constraint)
+          }
+
+          root <- multiroot(objective_function, start = 0.5,
+            budget_constraint = budget_constraint, rtol = 1e-1)
+          print(paste0("Subsidies renovation shell: ",
+            round(root$root * 100, 0), "%"))
+          sub <- data.frame(sub_ren_shell = root$root,
+                  eneff_f = c("adv", "std"),
+                  year = yrs[i])
+
+        }
+        if (is.null(sub)) {
+          sub <- filter(d$sub_ren_shell, year == yrs[i])
+        }
         temp <- fun_ms_ren_shell_endogenous(yrs,
                           i,
                           bld_cases_fuel,
@@ -427,11 +492,12 @@ run_scenario <- function(run,
                           d$hh_size,
                           d$floor_cap,
                           d$cost_invest_ren_shell,
-                          d$sub_ren_shell,
+                          sub,
                           en_hh_tot,
                           d$lifetime_ren,
                           discount_ren = d$discount_rate,
                           parameters = parameters_renovation)
+    
       } else {
         temp <- fun_ms_ren_shell_exogenous(
                       yrs,
@@ -493,6 +559,68 @@ run_scenario <- function(run,
 
       if (energy_efficiency == "endogenous") {
         print("3.1 Calculate market share for fuel switches")
+
+        budget_constraint_heating <- NULL # carbon_revenue
+        sub <- NULL
+        if (!is.null(budget_constraint_heating)) {
+          print("Endogenous heater subsidies to reach budget constraint")
+
+          objective_function <- function(x, budget_constraint_heating) {
+            
+            # From scalar value construct a data.frame with eneff and year
+            sub <- data.frame(sub_heat = x,
+                              fuel_heat_f = "heat_pump",
+                              year = yrs[i])
+
+            ms_sw_i <- fun_ms_switch_heat_endogenous(yrs,
+                              i,
+                              bld_det_i,
+                              cat$ct_bld_age,
+                              d$ct_switch_heat,
+                              d$ct_fuel_excl_reg,
+                              d$cost_invest_heat,
+                              sub,
+                              en_hh_tot,
+                              d$ct_heat,
+                              d$ct_heat_new,
+                              d$discount_rate,
+                              lifetime_heat = 20,
+                              inertia = d$inertia,
+                              parameters = parameters_heater,
+                              ban_fuel = d$ban_fuel)
+
+            bld_det_i_sw <- bld_det_i %>%
+              # left_join(bld_fuel_switch) %>%
+              left_join(d$rate_switch_fuel_heat) %>%
+              left_join(ms_sw_i) %>%
+              # Fuel switches only over the minimum age of buildings
+              mutate(rate_switch_fuel_heat =
+                ifelse(year - yr_con > bld_age_min, rate_switch_fuel_heat * stp, 0)) %>%
+              mutate(rate_switch_fuel_heat =
+                ifelse(yr_con == yrs[i], 1, rate_switch_fuel_heat)) %>%
+              # Calculate n.units - after renovation
+              mutate(n_units_fuel =
+                round(n_units_fuel * rate_switch_fuel_heat * ms, rnd)) %>%
+              mutate(subsidies = n_units_fuel * sub_heat_hh)
+
+
+            rslt <- sum(bld_det_i_sw$subsidies) / 1e9
+
+            return(rslt - budget_constraint_heating)
+          }
+
+          root <- multiroot(objective_function, start = 0.5,
+            budget_constraint_heating = budget_constraint_heating, rtol = 1e-1)
+          print(paste0("Subsidies heater: ",
+            round(root$root * 100, 0), "%"))
+          sub <- data.frame(sub_heat = root$root,
+                            fuel_heat_f = "heat_pump",
+                            year = yrs[i])
+
+        }
+        if (is.null(sub)) {
+          sub <- filter(d$sub_heat, year == yrs[i])
+        }
         ms_sw_i <- fun_ms_switch_heat_endogenous(yrs,
                           i,
                           bld_det_i,
@@ -500,7 +628,7 @@ run_scenario <- function(run,
                           d$ct_switch_heat,
                           d$ct_fuel_excl_reg,
                           d$cost_invest_heat,
-                          d$sub_heat,
+                          sub,
                           en_hh_tot,
                           d$ct_heat,
                           d$ct_heat_new,
@@ -566,6 +694,19 @@ run_scenario <- function(run,
                               bld_det_i_sw = bld_det_i_sw,
                               shr_en = shr_en,
                               report_turnover = report_turnover)
+
+      # Calculating revenue carbon tax
+      carbon_revenue <- 0
+      if (!is.null(d$carbon_tax)) {
+      carbon_revenue <- d$carbon_tax %>%
+        filter(year == yrs[i]) %>%
+        left_join(report$agg_result %>%
+          filter(variable == "heat_tCO2") %>%
+          rename(fuel = resolution)) %>%
+        mutate(revenue = carbon_tax * value) %>%
+        filter(!is.na(revenue))
+      carbon_revenue <- sum(carbon_revenue$revenue) / 1e9
+      }
     }
   }
 

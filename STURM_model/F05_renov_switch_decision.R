@@ -225,7 +225,8 @@ fun_ms_ren_shell_endogenous <- function(yrs,
     summarise(rate_ren = sum(ms)) %>%
     ungroup() %>%
     rename(eneff = eneff_i) %>%
-    filter(!is.na(rate_ren))
+    filter(!is.na(rate_ren)) %>%
+    select(-c("cost_invest_hh", "sub_ren_hh"))
 
   # Update market shares - keep renovations only
   ms_ren_i <- ms_i %>%
