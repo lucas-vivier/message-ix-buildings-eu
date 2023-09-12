@@ -35,6 +35,7 @@ library(tidyr)
 #' @return report object
 fun_format_output <- function(i,
                               yrs,
+                              stp,
                               sector,
                               run,
                               bld_det_i,
@@ -51,7 +52,9 @@ fun_format_output <- function(i,
                               en_hh_hw_scen,
                               en_m2_hw_scen,
                               en_m2_others,
+                              mat_int,
                               emission_factors,
+                              emission_factors_embodied,
                               new_det_i = NULL,
                               ren_det_i = NULL,
                               bld_det_i_sw = NULL,
@@ -90,7 +93,10 @@ fun_format_output <- function(i,
                 energy_poverty_thres = sum(energy_poverty_thres),
                 heat_kWh = sum(heat_TJ) / 3.6 * 1e6,
                 heat_std_kWh = sum(heat_std_TJ) / 3.6 * 1e6,
+                heat_EJ = sum(heat_TJ) / 1e6,
+                hotwater_EJ = sum(hotwater_TJ) / 1e6,
                 heat_tCO2 = sum(heat_tCO2),
+                hotwater_tCO2 = sum(hotwater_tCO2),
                 cost_heat_EUR = sum(cost_energy_hh),
                 floor_m2 = sum(floor_Mm2) * 1e6
             ) %>%
@@ -98,7 +104,9 @@ fun_format_output <- function(i,
             rename(resolution = fuel_heat) %>%
             gather(variable, value, stock_building,
                 energy_poverty_thres,
-                heat_kWh, heat_std_kWh, heat_tCO2,
+                heat_kWh, heat_std_kWh, heat_EJ, 
+                hotwater_EJ,
+                heat_tCO2, hotwater_tCO2,
                 cost_heat_EUR, floor_m2)
 
         # Adding total values for all resolutions
@@ -120,17 +128,51 @@ fun_format_output <- function(i,
                 energy_poverty_thres = sum(energy_poverty_thres),
                 heat_kWh = sum(heat_TJ) / 3.6 * 1e6,
                 heat_std_kWh = sum(heat_std_TJ) / 3.6 * 1e6,
+                heat_EJ = sum(heat_TJ) / 1e6,
+                hotwater_EJ = sum(hotwater_TJ) / 1e6,
+                cool_EJ = sum(cool_TJ) / 1e6,
                 heat_tCO2 = sum(heat_tCO2),
+                hotwater_tCO2 = sum(hotwater_tCO2),
+                cool_tCO2 = sum(cool_tCO2),
                 cost_heat_EUR = sum(cost_energy_hh),
                 floor_m2 = sum(floor_Mm2) * 1e6
             ) %>%
             ungroup() %>%
             rename(resolution = efficiency) %>%
-            gather(variable, value, stock_building,
-                energy_poverty_thres,
-                heat_kWh, heat_std_kWh, heat_tCO2,
-                cost_heat_EUR, floor_m2)
-
+          gather(variable, value, stock_building,
+                 energy_poverty_thres,
+                 heat_kWh, heat_std_kWh, heat_EJ, 
+                 hotwater_EJ, cool_EJ,
+                 heat_tCO2, hotwater_tCO2, cool_tCO2,
+                 cost_heat_EUR, floor_m2)
+        temp <- bind_rows(temp, det_rows)
+        
+        # Adding results at building type level
+        det_rows <- en_stock_i %>%
+          group_by_at(c("region_bld", "year", "arch")) %>%
+          summarise(
+            stock_building = sum(stock_M) * 1e6,
+            energy_poverty_thres = sum(energy_poverty_thres),
+            heat_kWh = sum(heat_TJ) / 3.6 * 1e6,
+            heat_std_kWh = sum(heat_std_TJ) / 3.6 * 1e6,
+            heat_EJ = sum(heat_TJ) / 1e6,
+            hotwater_EJ = sum(hotwater_TJ) / 1e6,
+            cool_EJ = sum(cool_TJ) / 1e6,
+            heat_tCO2 = sum(heat_tCO2),
+            hotwater_tCO2 = sum(hotwater_tCO2),
+            cool_tCO2 = sum(cool_tCO2),
+            cost_heat_EUR = sum(cost_energy_hh),
+            floor_m2 = sum(floor_Mm2) * 1e6
+          ) %>%
+          ungroup() %>%
+          rename(resolution = arch) %>%
+          gather(variable, value, stock_building,
+                 energy_poverty_thres,
+                 heat_kWh, heat_std_kWh, heat_EJ, 
+                 hotwater_EJ, cool_EJ,
+                 heat_tCO2, hotwater_tCO2, cool_tCO2,
+                 cost_heat_EUR, floor_m2)
+        
         temp <- bind_rows(temp, det_rows)
 
         det_rows <- en_stock_i %>%
@@ -158,6 +200,34 @@ fun_format_output <- function(i,
             report_new <- bind_rows(report_new, total_new)
             temp <- bind_rows(temp, report_new)
 
+        }
+        
+        # Report material demand - Embodied emissions
+        if (!is.null(new_det_i) & "material" %in% report_var) {
+          report_mat_in <- new_det_i %>%
+            left_join(mat_int, relationship = "many-to-many") %>%
+            left_join(hh_size) %>%
+            left_join(floor_cap) %>%
+            left_join(emission_factors_embodied) %>%
+            mutate(floor_new_Mm2 = n_units_fuel * hh_size * floor_cap / stp / 1e6) %>% # Mm2/yr
+            mutate(mat_in_Mt = n_units_fuel * hh_size * floor_cap * mat_int / stp / 1e3 / 1e6) %>% # Mt/y
+            mutate(mat_in_tCO2 = mat_in_Mt * emission_factors_embodied * 1e6) %>% # tCO2/y
+            group_by_at(c("region_bld", "year", "material")) %>%
+            summarize(mat_in_Mt = sum(mat_in_Mt),
+                      mat_in_tCO2 = sum(mat_in_tCO2)) %>%
+            ungroup %>%
+            pivot_longer(cols = c(mat_in_Mt, mat_in_tCO2), names_to = "variable", values_to = "value") %>%
+            rename(resolution = material) %>%
+            arrange(variable,region_bld,resolution)
+            
+          report_mat_in <- report_mat_in %>%
+            bind_rows(report_mat_in %>%
+                        group_by(region_bld, year, variable) %>%
+                        summarise(value = sum(value)) %>%
+                        ungroup %>%
+                        mutate(resolution = "all"))
+          temp <- bind_rows(temp, report_mat_in)
+          
         }
 
         if (!is.null(report_turnover)) {
@@ -333,141 +403,141 @@ fun_format_output <- function(i,
 
     }
 
-    if ("material" %in% report_var) {
-        # Stock results - Material
-        bld_cases_eneff <- bld_cases_fuel %>%
-            select(-c(fuel_heat, fuel_cool)) %>%
-            distinct()
-
-        # Aggregate results at eneff level demolitions
-        dem_eneff_i <- dem_det_age_i %>%
-            group_by_at(setdiff(names(dem_det_age_i), c(
-                "bld_age", "fuel_heat", "fuel_cool",
-                "n_units_fuel_p", "n_dem", "n_empty"
-            ))) %>%
-            summarise(
-                n_dem = sum(n_dem)
-            ) %>%
-            ungroup()
-
-        # new constructions
-        new_eneff_i <- bind_rows(new_det_age_i, new_det_slum_age_i) %>%
-            group_by_at(setdiff(names(new_det_age_i), c(
-                "bld_age", "fuel_heat", "fuel_cool", "n_units_fuel"
-            ))) %>%
-            summarise(n_new = sum(n_units_fuel)) %>%
-            ungroup()
-
-        # stock
-        bld_eneff_i <- bld_det_i %>%
-            group_by_at(setdiff(names(bld_det_i), c(
-                "bld_age", "fuel_heat", "fuel_cool", "n_units_fuel"
-            ))) %>%
-            summarise(n_units = sum(n_units_fuel)) %>%
-            ungroup()
-
-        if (sector == "resid") {
-            # Calculate material stock
-            mat_stock_i <- bld_cases_eneff %>%
-                mutate(scenario = run) %>%
-                # mutate(ssp = ssp_r) %>%
-                mutate(year = yrs[i]) %>%
-                left_join(hh_size) %>%
-                left_join(floor_cap) %>%
-                left_join(bld_eneff_i) %>%
-                left_join(dem_eneff_i) %>%
-                left_join(new_eneff_i) %>%
-                mutate(
-                    n_units = ifelse(is.na(n_units), 0, n_units),
-                    n_new = ifelse(is.na(n_new), 0, n_new),
-                    n_dem = ifelse(is.na(n_dem), 0, n_dem)
-                ) %>%
-                filter(n_units + n_new + n_dem != 0) %>%
-                filter(mat != "sub") %>% # Exclude slums (no material intensity data)
-                left_join(mat_int) %>%
-                # filter(arch != "inf") %>% # Materials not calculated for slums
-                mutate(floor_tot_Mm2 = n_units * hh_size * floor_cap / 1e6) %>% # Mm2
-                mutate(floor_new_Mm2 = n_new * hh_size * floor_cap / stp / 1e6) %>% # Mm2/yr
-                mutate(floor_dem_Mm2 = n_dem * hh_size * floor_cap / stp / 1e6) %>% # Mm2/yr
-                mutate(mat_stock_Mt = n_units * hh_size * floor_cap * mat_int / 1e3 / 1e6) %>% # Mt/y
-                mutate(mat_demand_Mt = n_new * hh_size * floor_cap * mat_int / stp / 1e3 / 1e6) %>% # Mt/y
-                mutate(mat_scrap_Mt = n_dem * hh_size * floor_cap * mat_int / stp / 1e3 / 1e6) %>% # Mt/y
-                # Drop yr_con dimension
-                group_by_at(
-                    paste(c("region_gea", "region_bld",
-                        "urt", "clim", "inc_cl", "arch", "mat", "eneff", "material", "scenario",
-                        "year"
-                    ))) %>% 
-                summarise(
-                    floor_tot_Mm2 = sum(floor_tot_Mm2),
-                    floor_new_Mm2 = sum(floor_new_Mm2),
-                    floor_dem_Mm2 = sum(floor_dem_Mm2),
-                    # mat_int = weighted.mean(mat_int, floor_tot_Mm2),
-                    mat_stock_Mt = sum(mat_stock_Mt),
-                    mat_demand_Mt = sum(mat_demand_Mt),
-                    mat_scrap_Mt = sum(mat_scrap_Mt)
-                ) %>%
-                ungroup() %>%
-                mutate(mat_int = 1e3 * mat_stock_Mt / floor_tot_Mm2) # Recalculate average material intensity
-        } else {
-            mat_stock_i <- bld_cases_eneff %>%
-                mutate(scenario = run) %>%
-                # mutate(ssp = ssp_r) %>%
-                mutate(year = yrs[i]) %>%
-                # left_join(floor_cap) %>%
-                left_join(bld_eneff_i) %>%
-                left_join(dem_eneff_i) %>%
-                left_join(new_eneff_i) %>%
-                mutate(
-                    n_units = ifelse(is.na(n_units), 0, n_units),
-                    n_new = ifelse(is.na(n_new), 0, n_new),
-                    n_dem = ifelse(is.na(n_dem), 0, n_dem)
-                ) %>%
-                filter(n_units + n_new + n_dem != 0) %>%
-                left_join(mat_int) %>%
-                # filter(arch != "inf") %>% # Materials not calculated for slums
-                mutate(floor_tot_Mm2 = n_units / 1e6) %>% # Mm2
-                mutate(floor_new_Mm2 = n_new / stp / 1e6) %>% # Mm2/yr
-                mutate(floor_dem_Mm2 = n_dem / stp / 1e6) %>% # Mm2/yr
-                mutate(mat_stock_Mt = n_units * mat_int / 1e3 / 1e6) %>% # Mt
-                mutate(mat_demand_Mt = n_new * mat_int / stp / 1e3 / 1e6) %>% # Mt/y
-                mutate(mat_scrap_Mt = n_dem * mat_int / stp / 1e3 / 1e6) %>% # Mt/y
-                # Drop yr_con dimension
-                group_by_at(
-                    paste(c("region_gea", "region_bld",
-                        "urt", "clim", "inc_cl", "arch", "mat",
-                        "eneff", "material", "scenario",
-                        "year"
-                    ))) %>%
-                summarise(
-                    floor_tot_Mm2 = sum(floor_tot_Mm2),
-                    floor_new_Mm2 = sum(floor_new_Mm2),
-                    floor_dem_Mm2 = sum(floor_dem_Mm2),
-                    # mat_int = weighted.mean(mat_int, floor_tot_Mm2),
-                    mat_stock_Mt = sum(mat_stock_Mt),
-                    mat_demand_Mt = sum(mat_demand_Mt),
-                    mat_scrap_Mt = sum(mat_scrap_Mt)
-                ) %>%
-                ungroup() %>%
-                mutate(mat_int = 1e3 * mat_stock_Mt / floor_tot_Mm2) # Recalculate average material intensity
-        }
-
-        ## Stock results - Material - Add Cement
-
-        cement_content <- 0.15 ## Cement content in concrete
-
-        mat_stock_cem_i <- mat_stock_i %>%
-            filter(material == "concrete") %>%
-            mutate(material = "cement") %>%
-            mutate(
-                mat_stock_Mt = mat_stock_Mt * cement_content,
-                mat_demand_Mt = mat_demand_Mt * cement_content,
-                mat_scrap_Mt = mat_scrap_Mt * cement_content
-            )
-
-        mat_stock_i <- rbind(mat_stock_i, mat_stock_cem_i)
-        report$mat_stock <- bind_rows(report$mat_stock, mat_stock_i)
-    }
+    # if ("material" %in% report_var) {
+    #     # Stock results - Material
+    #     bld_cases_eneff <- bld_cases_fuel %>%
+    #         select(-c(fuel_heat, fuel_cool)) %>%
+    #         distinct()
+    # 
+    #     # Aggregate results at eneff level demolitions
+    #     dem_eneff_i <- dem_det_age_i %>%
+    #         group_by_at(setdiff(names(dem_det_age_i), c(
+    #             "bld_age", "fuel_heat", "fuel_cool",
+    #             "n_units_fuel_p", "n_dem", "n_empty"
+    #         ))) %>%
+    #         summarise(
+    #             n_dem = sum(n_dem)
+    #         ) %>%
+    #         ungroup()
+    # 
+    #     # new constructions
+    #     new_eneff_i <- bind_rows(new_det_age_i, new_det_slum_age_i) %>%
+    #         group_by_at(setdiff(names(new_det_age_i), c(
+    #             "bld_age", "fuel_heat", "fuel_cool", "n_units_fuel"
+    #         ))) %>%
+    #         summarise(n_new = sum(n_units_fuel)) %>%
+    #         ungroup()
+    # 
+    #     # stock
+    #     bld_eneff_i <- bld_det_i %>%
+    #         group_by_at(setdiff(names(bld_det_i), c(
+    #             "bld_age", "fuel_heat", "fuel_cool", "n_units_fuel"
+    #         ))) %>%
+    #         summarise(n_units = sum(n_units_fuel)) %>%
+    #         ungroup()
+    # 
+    #     if (sector == "resid") {
+    #         # Calculate material stock
+    #         mat_stock_i <- bld_cases_eneff %>%
+    #             mutate(scenario = run) %>%
+    #             # mutate(ssp = ssp_r) %>%
+    #             mutate(year = yrs[i]) %>%
+    #             left_join(hh_size) %>%
+    #             left_join(floor_cap) %>%
+    #             left_join(bld_eneff_i) %>%
+    #             left_join(dem_eneff_i) %>%
+    #             left_join(new_eneff_i) %>%
+    #             mutate(
+    #                 n_units = ifelse(is.na(n_units), 0, n_units),
+    #                 n_new = ifelse(is.na(n_new), 0, n_new),
+    #                 n_dem = ifelse(is.na(n_dem), 0, n_dem)
+    #             ) %>%
+    #             filter(n_units + n_new + n_dem != 0) %>%
+    #             filter(mat != "sub") %>% # Exclude slums (no material intensity data)
+    #             left_join(mat_int) %>%
+    #             # filter(arch != "inf") %>% # Materials not calculated for slums
+    #             mutate(floor_tot_Mm2 = n_units * hh_size * floor_cap / 1e6) %>% # Mm2
+    #             mutate(floor_new_Mm2 = n_new * hh_size * floor_cap / stp / 1e6) %>% # Mm2/yr
+    #             mutate(floor_dem_Mm2 = n_dem * hh_size * floor_cap / stp / 1e6) %>% # Mm2/yr
+    #             mutate(mat_stock_Mt = n_units * hh_size * floor_cap * mat_int / 1e3 / 1e6) %>% # Mt/y
+    #             mutate(mat_demand_Mt = n_new * hh_size * floor_cap * mat_int / stp / 1e3 / 1e6) %>% # Mt/y
+    #             mutate(mat_scrap_Mt = n_dem * hh_size * floor_cap * mat_int / stp / 1e3 / 1e6) %>% # Mt/y
+    #             # Drop yr_con dimension
+    #             group_by_at(
+    #                 paste(c("region_gea", "region_bld",
+    #                     "urt", "clim", "inc_cl", "arch", "mat", "eneff", "material", "scenario",
+    #                     "year"
+    #                 ))) %>% 
+    #             summarise(
+    #                 floor_tot_Mm2 = sum(floor_tot_Mm2),
+    #                 floor_new_Mm2 = sum(floor_new_Mm2),
+    #                 floor_dem_Mm2 = sum(floor_dem_Mm2),
+    #                 # mat_int = weighted.mean(mat_int, floor_tot_Mm2),
+    #                 mat_stock_Mt = sum(mat_stock_Mt),
+    #                 mat_demand_Mt = sum(mat_demand_Mt),
+    #                 mat_scrap_Mt = sum(mat_scrap_Mt)
+    #             ) %>%
+    #             ungroup() %>%
+    #             mutate(mat_int = 1e3 * mat_stock_Mt / floor_tot_Mm2) # Recalculate average material intensity
+    #     } else {
+    #         mat_stock_i <- bld_cases_eneff %>%
+    #             mutate(scenario = run) %>%
+    #             # mutate(ssp = ssp_r) %>%
+    #             mutate(year = yrs[i]) %>%
+    #             # left_join(floor_cap) %>%
+    #             left_join(bld_eneff_i) %>%
+    #             left_join(dem_eneff_i) %>%
+    #             left_join(new_eneff_i) %>%
+    #             mutate(
+    #                 n_units = ifelse(is.na(n_units), 0, n_units),
+    #                 n_new = ifelse(is.na(n_new), 0, n_new),
+    #                 n_dem = ifelse(is.na(n_dem), 0, n_dem)
+    #             ) %>%
+    #             filter(n_units + n_new + n_dem != 0) %>%
+    #             left_join(mat_int) %>%
+    #             # filter(arch != "inf") %>% # Materials not calculated for slums
+    #             mutate(floor_tot_Mm2 = n_units / 1e6) %>% # Mm2
+    #             mutate(floor_new_Mm2 = n_new / stp / 1e6) %>% # Mm2/yr
+    #             mutate(floor_dem_Mm2 = n_dem / stp / 1e6) %>% # Mm2/yr
+    #             mutate(mat_stock_Mt = n_units * mat_int / 1e3 / 1e6) %>% # Mt
+    #             mutate(mat_demand_Mt = n_new * mat_int / stp / 1e3 / 1e6) %>% # Mt/y
+    #             mutate(mat_scrap_Mt = n_dem * mat_int / stp / 1e3 / 1e6) %>% # Mt/y
+    #             # Drop yr_con dimension
+    #             group_by_at(
+    #                 paste(c("region_gea", "region_bld",
+    #                     "urt", "clim", "inc_cl", "arch", "mat",
+    #                     "eneff", "material", "scenario",
+    #                     "year"
+    #                 ))) %>%
+    #             summarise(
+    #                 floor_tot_Mm2 = sum(floor_tot_Mm2),
+    #                 floor_new_Mm2 = sum(floor_new_Mm2),
+    #                 floor_dem_Mm2 = sum(floor_dem_Mm2),
+    #                 # mat_int = weighted.mean(mat_int, floor_tot_Mm2),
+    #                 mat_stock_Mt = sum(mat_stock_Mt),
+    #                 mat_demand_Mt = sum(mat_demand_Mt),
+    #                 mat_scrap_Mt = sum(mat_scrap_Mt)
+    #             ) %>%
+    #             ungroup() %>%
+    #             mutate(mat_int = 1e3 * mat_stock_Mt / floor_tot_Mm2) # Recalculate average material intensity
+    #     }
+    # 
+    #     ## Stock results - Material - Add Cement
+    # 
+    #     cement_content <- 0.15 ## Cement content in concrete
+    # 
+    #     mat_stock_cem_i <- mat_stock_i %>%
+    #         filter(material == "concrete") %>%
+    #         mutate(material = "cement") %>%
+    #         mutate(
+    #             mat_stock_Mt = mat_stock_Mt * cement_content,
+    #             mat_demand_Mt = mat_demand_Mt * cement_content,
+    #             mat_scrap_Mt = mat_scrap_Mt * cement_content
+    #         )
+    # 
+    #     mat_stock_i <- rbind(mat_stock_i, mat_stock_cem_i)
+    #     report$mat_stock <- bind_rows(report$mat_stock, mat_stock_i)
+    # }
 
     if ("vintage" %in% report_var) {
         report$bld_eneff_age <- bind_rows(
@@ -617,10 +687,17 @@ fun_format_bld_stock_energy <- function(
             # Other uses not covered for residential
             mutate(other_uses_TJ = 0) %>%
             mutate(stock_M = n_units_fuel / 1e6) %>%
-            left_join(emission_factors) %>%
+            left_join(emission_factors %>% 
+                        rename(emission_factors_heat = emission_factors)) %>%
+            left_join(emission_factors %>% filter(fuel == "electricity") %>% select(-fuel) %>% 
+                        rename(emission_factors_cool = emission_factors)) %>%
             mutate(heat_tCO2 =
                 ifelse(fuel_heat == "v_no_heat", 0,
-                heat_TJ * emission_factors)) %>%
+                heat_TJ * emission_factors_heat)) %>%
+          mutate(hotwater_tCO2 =
+                   ifelse(fuel_heat == "v_no_heat", 0,
+                          hotwater_TJ * emission_factors_heat)) %>%
+          mutate(cool_tCO2 = cool_TJ * emission_factors_cool) %>%
             mutate(cost_energy_hh = ifelse(is.na(cost_energy_hh),
                 0, cost_energy_hh)) %>%
             filter(stock_M > 0 & !is.na(stock_M)) %>%
@@ -630,7 +707,7 @@ fun_format_bld_stock_energy <- function(
                 "scenario", "year", "stock_M", "floor_Mm2",
                 "heat_TJ", "heat_std_TJ", "cool_TJ", "cool_ac_TJ", "cool_fans_TJ",
                 "hotwater_TJ", "other_uses_TJ", "cost_energy_hh",
-                "heat_tCO2", "energy_poverty_median", "energy_poverty_thres",
+                "heat_tCO2","hotwater_tCO2", "cool_tCO2", "energy_poverty_median", "energy_poverty_thres",
                 "heating_intensity"
             )))
             
