@@ -1,8 +1,6 @@
-fuel_heat_f,value
-biomass_solid,0
-coal,0
-district_heat,0
-electricity,0
-heat_pump,0
-gas,0
-oil,0
+year,bld_age,fuel_heat_f,value
+2030,p5,gas,1
+2035,p5,gas,1
+2040,p5,gas,1
+2045,p5,gas,1
+2050,p5,gas,1

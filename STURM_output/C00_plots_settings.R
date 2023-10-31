@@ -51,6 +51,17 @@ rename_hh <- c("q1" = "Income 1st tertile",
 
 order_hh <- c("q1", "q2", "q3")
 
+rename_cost <- c(to_pay_renovation_cumsum = "Renovation",
+            to_pay_heater_cumsum = "Heating",
+            cost_energy = "Energy",
+            total_cost_hh = "Total")
+
+colors_cost <- c("Renovation" = "#ee6a6b",
+            "Heating" = "#62c5c0",
+            "Energy" = "#00589d",
+            "Total" = "grey30")
+
+order_cost <- c("Energy", "Renovation", "Heating", "Total")
 
 # Countries
 
@@ -68,6 +79,7 @@ rename_countries <- c(
   "C-WEU-AUT" = "Austria",
   "C-WEU-BEL" = "Belgium",
   "C-WEU-CYP" = "Cyprus",
+  "C-WEU-MLT" = "Malta",
   "C-WEU-DEU" = "Germany",
   "C-WEU-DNK" = "Denmark",
   "C-WEU-ESP" = "Spain",

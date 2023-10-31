@@ -168,6 +168,7 @@ fun_en_sim <- function(sector,
       shr_floor_heat = ifelse(shr_floor_heat > 0, 1, 0))
   }
 
+
   energy_det <- bld_cases_fuel %>%
     mutate(year = yrs[i]) %>%
     left_join(eff_cool) %>%

@@ -2,6 +2,7 @@
 STURM_output/figures/
 STURM_output/tables/
 STURM_output/results/
+STURM_output/results.zip
 STURM_output/ressources/
 
 STURM_model/test.R

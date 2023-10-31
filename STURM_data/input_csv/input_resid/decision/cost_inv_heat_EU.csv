@@ -1,8 +1,8 @@
 fuel_heat_f,value
-biomass_solid,5230
-coal,2470
-district_heat,2650
-electricity,5380
-heat_pump,7500
-gas,4340
-oil,5120
+biomass_solid,10460
+coal,4940
+district_heat,5300
+electricity,10760
+heat_pump,15000
+gas,8680
+oil,10240

@@ -55,6 +55,7 @@ fun_format_output <- function(i,
                               mat_int,
                               emission_factors,
                               emission_factors_embodied,
+                              income,
                               new_det_i = NULL,
                               ren_det_i = NULL,
                               bld_det_i_sw = NULL,
@@ -82,6 +83,8 @@ fun_format_output <- function(i,
             en_hh_hw_scen,
             emission_factors
         )
+        en_stock_i <- left_join(en_stock_i, income)
+
         report$en_stock <- bind_rows(report$en_stock, en_stock_i)
         
 
@@ -175,12 +178,19 @@ fun_format_output <- function(i,
         
         temp <- bind_rows(temp, det_rows)
 
+        # Adding results at income level
         det_rows <- en_stock_i %>%
             group_by_at(c("region_bld", "year", "inc_cl")) %>%
-            summarise(energy_poverty_thres = sum(energy_poverty_thres)) %>%
+            summarise(
+                stock_building = sum(stock_M) * 1e6,
+                energy_poverty_thres = sum(energy_poverty_thres),
+                cost_energy = sum(cost_energy_hh),
+                income = sum(income * stock_M) * 1e6,
+                ) %>%
             ungroup() %>%
             rename(resolution = inc_cl) %>%
-            gather(variable, value, energy_poverty_thres)
+            gather(variable, value, energy_poverty_thres,
+                cost_energy, income, stock_building)
 
         temp <- bind_rows(temp, det_rows)
 
@@ -338,13 +348,16 @@ fun_format_output <- function(i,
 
             # Renovation by income class
             det_rows <- ren_det_i %>%
+                mutate(to_pay = cost_invest_hh * n_units_fuel * 1e3) %>%
                 group_by_at(c("region_bld", "year", "inc_cl")) %>%
                 summarize(
-                    n_renovation = sum(n_units_fuel)) %>%
+                    n_renovation = sum(n_units_fuel),
+                    to_pay_renovation = sum(to_pay)
+                    ) %>%
                 ungroup() %>%
                 rename(resolution = inc_cl,
                     ) %>%
-                gather(variable, value, n_renovation)
+                gather(variable, value, n_renovation, to_pay_renovation)
             
             temp <- bind_rows(temp, det_rows)
  
@@ -389,6 +402,21 @@ fun_format_output <- function(i,
                 mutate(resolution = "all")
 
             temp <- bind_rows(det_rows, agg_rows)
+
+            # Switch by income class
+            det_rows <- bld_det_i_sw %>%
+                mutate(to_pay = cost_invest_heat * n_units_fuel) %>%
+                group_by_at(c("region_bld", "year", "inc_cl")) %>%
+                summarize(
+                    to_pay_heater = sum(to_pay)
+                    ) %>%
+                ungroup() %>%
+                rename(resolution = inc_cl,
+                    ) %>%
+                gather(variable, value, to_pay_heater)
+
+            temp <- bind_rows(temp, det_rows)
+
             
             agg <- temp %>%
                 group_by_at(c("year", "variable", "resolution")) %>%

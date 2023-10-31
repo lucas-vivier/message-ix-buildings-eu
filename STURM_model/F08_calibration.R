@@ -337,9 +337,110 @@ fun_calibration_switch_heat <- function(yrs,
                           path_out,
                           discount_heat,
                           lifetime_heat = 20,
-                          inertia = NULL) {
+                          inertia = NULL,
+                          emission_factors = NULL,
+                          min_switch_fuel = 0.05) {
     
     start_calibration <- Sys.time()
+
+    # print(filter(ms_switch_fuel, region_bld == "C-WEU-IRL"))
+    # Calculate market-share objectives
+    ms_switch_fuel <- bld_stock %>%
+        filter(!is.na(fuel_heat)) %>%
+        group_by_at(c("region_bld", "fuel_heat")) %>%
+        summarize(n_before = sum(n_units_fuel)) %>%
+        ungroup() %>%
+        group_by_at(c("region_bld")) %>%
+        mutate(ms_stock = n_before / sum(n_before)) %>%
+        ungroup() %>%
+        mutate(n_break_down = 1 / lifetime_heat * n_before) %>%
+        left_join(ms_switch_fuel_exo %>% rename(fuel_heat = fuel_heat_f)) %>%
+        # Minimum share of 5% for all segments
+        mutate(ms_switch_fuel_exo = ifelse(
+                !fuel_heat %in% c("heat_pump") &
+                (ms_switch_fuel_exo < min_switch_fuel),
+                0, ms_switch_fuel_exo)) %>%
+        group_by_at(c("region_bld")) %>%
+        mutate(ms_switch_fuel_exo =
+            ms_switch_fuel_exo / sum(ms_switch_fuel_exo)) %>%
+        ungroup() %>%
+        # Max increase of biomass
+        mutate(ms_switch_fuel_exo =
+            ifelse(fuel_heat == "biomass_solid" &
+            ms_switch_fuel_exo > ms_stock + 0.01,
+            ms_stock + 0.01, ms_switch_fuel_exo)) %>%
+        group_by_at(c("region_bld")) %>%
+        mutate(ms_switch_fuel_exo =
+            ms_switch_fuel_exo / sum(ms_switch_fuel_exo)) %>%
+        ungroup() %>%
+        # Oil and coal shares cannot increase
+        mutate(ms_switch_fuel_exo =
+            ifelse(fuel_heat %in% c("oil", "coal") &
+            ms_switch_fuel_exo > ms_stock,
+            ms_stock * 0.90, ms_switch_fuel_exo)) %>%
+        group_by_at(c("region_bld")) %>%
+        mutate(ms_switch_fuel_exo =
+            ms_switch_fuel_exo / sum(ms_switch_fuel_exo)) %>%
+        ungroup() %>%
+        # Heat pumps
+        #  should at least be equal to the existing market-share
+        mutate(ms_switch_fuel_exo =
+            ifelse(fuel_heat %in% c("heat_pump") &
+            ms_switch_fuel_exo < 1.02 * ms_stock,
+            ms_stock * 1.02, ms_switch_fuel_exo)) %>%
+        group_by_at(c("region_bld")) %>%
+        mutate(ms_switch_fuel_exo =
+            ms_switch_fuel_exo / sum(ms_switch_fuel_exo)) %>%
+        ungroup() %>%
+        select(c("region_bld", "fuel_heat", "ms_switch_fuel_exo")) %>%
+        rename(fuel_heat_f = fuel_heat)
+
+        if (FALSE) {
+            # Start something new
+            group_by_at(c("region_bld")) %>%
+            mutate(n_total = sum(n_before)) %>%
+            ungroup() %>%
+            mutate(n_after = n_total * ms_switch_fuel_exo) %>%
+            mutate(n_installation = n_after - n_before + n_break_down) %>%
+            mutate(n_installation =
+                ifelse(n_installation < 0, 0, n_installation)) %>%
+            group_by_at(c("region_bld")) %>%
+            mutate(sum_installation = sum(n_installation)) %>%
+            ungroup() %>%
+            mutate(n_replacement = n_total *  1 / lifetime_heat) %>%
+            mutate(ms = n_installation / sum_installation) %>%
+            select(c("region_bld", "fuel_heat", "ms")) %>%
+            rename(fuel_heat_f = fuel_heat, ms_switch_fuel_exo = ms)
+        }
+    
+
+
+    ms_switch_fuel_exo <- ms_switch_fuel
+
+    # simplification
+    if (TRUE) {
+
+        print("Manual adjustment to make calibration easier")
+        ms_switch_fuel_exo <- ms_switch_fuel_exo %>%
+            mutate(ms_switch_fuel_exo = ifelse(
+                (region_bld == "C-WEU-IRL") & (fuel_heat_f == "electricity"),
+                0, ms_switch_fuel_exo)) %>%
+            mutate(ms_switch_fuel_exo = ifelse(
+                (region_bld == "C-WEU-IRL") & (fuel_heat_f %in% c("coal", "oil")),
+                ms_switch_fuel_exo * 0.5, ms_switch_fuel_exo)) %>%
+            group_by_at(c("region_bld")) %>%
+            mutate(ms_switch_fuel_exo =
+                ms_switch_fuel_exo / sum(ms_switch_fuel_exo)) %>%
+            ungroup()
+    }
+
+    exclusion <- ms_switch_fuel_exo %>%
+        filter(ms_switch_fuel_exo == 0) %>%
+        mutate(ct_fuel_excl_reg = 1) %>%
+        select(-c("ms_switch_fuel_exo"))
+    
+    ct_fuel_excl_reg <- bind_rows(ct_fuel_excl_reg, exclusion) %>%
+        distinct()
 
     utility_heat_hh <- fun_utility_heat(yrs,
                         i,
@@ -353,7 +454,8 @@ fun_calibration_switch_heat <- function(yrs,
                         lifetime_heat,
                         discount_heat,
                         inertia = inertia,
-                        full = TRUE)
+                        full = TRUE,
+                        emission_factors = emission_factors)
 
     scaling_factor <- utility_heat_hh %>%
         group_by(region_bld) %>%
@@ -361,11 +463,11 @@ fun_calibration_switch_heat <- function(yrs,
                   max_value = max(utility_heat)) %>%
         mutate(scaling_factor = ifelse(max_value > 0,
             (4 - (-4)) / (max_value - min_value),
-            4 / abs(min_value))) %>%
+            1 / 10)) %>%
         select(-c("min_value", "max_value"))
 
     utility_heat_hh <- utility_heat_hh %>%
-        select(-c("yr_con", "sub_heat_hh")) %>%
+        select(-c("yr_con", "sub_heat_hh", "payback")) %>%
         left_join(scaling_factor) %>%
         mutate(utility_heat = utility_heat * scaling_factor)
 
@@ -529,7 +631,10 @@ fun_calibration_switch_heat <- function(yrs,
     print(paste("Time to run calibration:",
     round(Sys.time() - start_calibration, 0), "seconds."))
 
-    return(output)
+    return(list(
+        parameters_heater = output,
+        ct_fuel_excl_reg = ct_fuel_excl_reg)
+        )
 
 }
 

@@ -20,7 +20,7 @@ coal,gas,1
 coal,oil,1
 coal,district_heat,1
 coal,heat_pump,1
-gas,biomass_solid,1
+gas,biomass_solid,0
 gas,electricity,1
 gas,coal,1
 gas,gas,1
@@ -34,7 +34,7 @@ oil,gas,1
 oil,oil,1
 oil,district_heat,1
 oil,heat_pump,1
-district_heat,biomass_solid,1
+district_heat,biomass_solid,0
 district_heat,electricity,1
 district_heat,coal,0
 district_heat,gas,1

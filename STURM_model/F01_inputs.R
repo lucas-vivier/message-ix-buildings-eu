@@ -29,19 +29,28 @@ fun_inputs_csv <- function(path_in, file_inputs, file_scenarios, sector, run
   # IMPORT LIST OF SCENARIOS
   scenarios <- read_csv(paste0(path_in, file_scenarios), show_col_types = FALSE)
 
-  # Create vector of scenario-dependent parameters
+  # Create vector of scenario-dependent variables and parameters
   scen_pars <- names(scenarios)[!names(scenarios) %in%
     c("scenario_id", "scenario_name")]
 
-  # Scenario setup for scenario-dependent parameters
+  # Scenario setup for scenario-dependent variables
   scen_setup <- scenarios %>%
     filter(scenario_name == run) %>%
     select(-c(scenario_id, scenario_name)) %>%
+    mutate(across(everything(), as.character)) %>%
     pivot_longer(
       cols = all_of(scen_pars),
       names_to = "name_parameter",
       values_to = "scenario"
     )
+  
+  # Extract scenario-dependent parameters (name_parameter with _)
+  scen_param <- scen_setup %>%
+    filter(str_starts(name_parameter, "_")) %>%
+    filter(!is.na(scenario))
+
+  scen_setup <- scen_setup %>%
+    filter(!str_starts(name_parameter, "_"))
 
   # Input data: build vector of input file names for the current scenarios
   input <- input %>%
@@ -94,7 +103,7 @@ fun_inputs_csv <- function(path_in, file_inputs, file_scenarios, sector, run
   # Remove provisional inputs
   rm(input, scen_setup)
 
-  return(d)
+  return(list(d = d, scen_param = scen_param))
 }
 
 
@@ -398,7 +407,7 @@ parse_share_fuels <- function(d,
                               cat,
                               min_shr_fuel = 0.01,
                               min_switch_fuel = 0.05) {
-    # Preparation shr_fuel_heat_base
+  # Preparation shr_fuel_heat_base
   d$shr_fuel_heat_base <- d$shr_fuel_heat_base %>%
     mutate(shr_fuel_heat_base = ifelse((fuel_heat != "heat_pump")
       & (shr_fuel_heat_base < min_shr_fuel), 0, shr_fuel_heat_base)) %>%
@@ -423,46 +432,60 @@ parse_share_fuels <- function(d,
   cat$ct_fuel <- cat$ct_fuel %>%
     filter(fuel_heat %in% unique(d$shr_fuel_heat_base$fuel_heat))
 
-  # Formatting market-shares switch fuels to keep consistency
-  d$ms_switch_fuel_exo <- d$ms_switch_fuel_exo %>%
-    # Manual exclusion
-    mutate(ms_switch_fuel_exo = ifelse(
-      (region_bld == "C-EEU-ROU" & fuel_heat_f == "coal"),
-      0, ms_switch_fuel_exo)) %>%
-    # Remove fuel if market-share is too low (except heat_pump)
-    mutate(ms_switch_fuel_exo = ifelse(
-      !fuel_heat_f %in% c("heat_pump") & (ms_switch_fuel_exo < min_switch_fuel),
-      0, ms_switch_fuel_exo)) %>%
-    # Join with existing market-shares
-    rename(fuel_heat = fuel_heat_f) %>%
-    bind_rows(hp_missing_rows %>%
-      rename(ms_switch_fuel_exo = shr_fuel_heat_base)) %>%
-    left_join(d$shr_fuel_heat_base) %>%
-    # Remove fuel if it doesn't exist (except heat_pump)
-    mutate(ms_switch_fuel_exo =
-      ifelse((shr_fuel_heat_base == 0 | is.na(shr_fuel_heat_base))
-      & !(fuel_heat %in% c("heat_pump")),
-      0, ms_switch_fuel_exo)) %>%
-    # Oil and coal shares cannot increase
-    mutate(ms_switch_fuel_exo =
-      ifelse(fuel_heat %in% c("oil", "coal") &
-        ms_switch_fuel_exo > shr_fuel_heat_base,
-        shr_fuel_heat_base, ms_switch_fuel_exo)) %>%
-    # Heat pumps
-    #  should at least be equal to the existing market-share
-    mutate(ms_switch_fuel_exo =
-      ifelse(fuel_heat %in% c("heat_pump") &
-        ms_switch_fuel_exo < shr_fuel_heat_base,
-        shr_fuel_heat_base, ms_switch_fuel_exo)) %>%
-    mutate(ms_switch_fuel_exo = ifelse(is.na(ms_switch_fuel_exo),
-      0, ms_switch_fuel_exo)) %>%
-    group_by_at("region_bld") %>%
-    mutate(ms_switch_fuel_exo =
-      ms_switch_fuel_exo / sum(ms_switch_fuel_exo)) %>%
-    ungroup() %>%
-    rename(fuel_heat_f = fuel_heat) %>%
-    select(-shr_fuel_heat_base)
-  
+  if (FALSE) {
+    # Formatting market-shares switch fuels to keep consistency
+    d$ms_switch_fuel_exo <- d$ms_switch_fuel_exo %>%
+      filter(ms_switch_fuel_exo > 0) %>%
+      # Manual exclusion
+      mutate(ms_switch_fuel_exo = ifelse(
+        (region_bld == "C-EEU-ROU" & fuel_heat_f == "coal"),
+        0, ms_switch_fuel_exo)) %>%
+      # Remove fuel if market-share is too low (except heat_pump)
+      mutate(ms_switch_fuel_exo = ifelse(
+        !fuel_heat_f %in% c("heat_pump") & (ms_switch_fuel_exo < min_switch_fuel),
+        0, ms_switch_fuel_exo)) %>%
+      # Join with existing market-shares
+      rename(fuel_heat = fuel_heat_f) %>%
+      bind_rows(hp_missing_rows %>%
+        rename(ms_switch_fuel_exo = shr_fuel_heat_base)) %>%
+      left_join(d$shr_fuel_heat_base) %>%
+      # Remove fuel if it doesn't exist (except heat_pump)
+      mutate(ms_switch_fuel_exo =
+        ifelse((shr_fuel_heat_base == 0 | is.na(shr_fuel_heat_base))
+        & !(fuel_heat %in% c("heat_pump")),
+        0, ms_switch_fuel_exo)) %>%
+      # Oil and coal shares cannot increase
+      mutate(ms_switch_fuel_exo =
+        ifelse(fuel_heat %in% c("oil", "coal") &
+          ms_switch_fuel_exo > shr_fuel_heat_base,
+          shr_fuel_heat_base, ms_switch_fuel_exo)) %>%
+      # Heat pumps
+      #  should at least be equal to the existing market-share
+      mutate(ms_switch_fuel_exo =
+        ifelse(fuel_heat %in% c("heat_pump") &
+          ms_switch_fuel_exo < shr_fuel_heat_base,
+          shr_fuel_heat_base, ms_switch_fuel_exo)) %>%
+      mutate(ms_switch_fuel_exo = ifelse(is.na(ms_switch_fuel_exo),
+        0, ms_switch_fuel_exo)) %>%
+      group_by_at("region_bld") %>%
+      mutate(ms_switch_fuel_exo =
+        ms_switch_fuel_exo / sum(ms_switch_fuel_exo)) %>%
+      ungroup() %>%
+      rename(fuel_heat_f = fuel_heat) %>%
+      select(-shr_fuel_heat_base)
+  } else {
+    d$ms_switch_fuel_exo <- d$ms_switch_fuel_exo %>%
+        filter(!((fuel_heat_f == "heat_pump") & (ms_switch_fuel_exo == 0))) %>%
+        bind_rows(hp_missing_rows %>%
+          rename(
+            ms_switch_fuel_exo = shr_fuel_heat_base,
+            fuel_heat_f = fuel_heat)) %>%
+        group_by_at("region_bld") %>%
+          mutate(ms_switch_fuel_exo =
+            ms_switch_fuel_exo / sum(ms_switch_fuel_exo)) %>%
+         ungroup()
+
+  }
   # Exlcude fuel if it is not used in any region
   d$ct_fuel_excl_reg <- d$ms_switch_fuel_exo %>%
     filter(ms_switch_fuel_exo == 0) %>%

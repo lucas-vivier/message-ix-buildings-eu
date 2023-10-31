@@ -10,13 +10,23 @@ suppressPackageStartupMessages(library(tidyverse))
 options(dplyr.width = Inf)
 options(dplyr.summarise.inform = FALSE)
 
-# rounding (number of decimals)
 start_script_time <- Sys.time()
-rnd <- 5
+
+# parameters
+rnd <- 5 # rounding (number of decimals)
 u_EJ_GWa <- 31.71
 min_shr_fuel <- 0.01
 inertia_wtp <- 4.3
-
+social_discount_rate <- 0.03
+sub_ren_shell_type <- "ad_valorem" #"ad_valorem"
+sub_ren_shell_target <- "all"
+objective_type <- NULL
+budget_constraint_insulation <- NULL # "carbon_revenue"
+premature_replacement <- 3
+anticipate_renovation <- 3
+sub_heater_type <- "ad_valorem" #"ad_valorem"
+budget_constraint_heater <- NULL # carbon_revenue
+sub_ren_shell_household_target <- "all"
 rate_dem_target <- NULL
 
 source("./STURM_model/F10_scenario_run.R")
@@ -49,20 +59,6 @@ if (run == "test") {
         "EU_no",
         "EU",
         "EU_double",
-        "EU_double_emission_1p5c",
-        "EU_constant",
-        "EU_price_2020_600",
-        "EU_no_constant",
-        "EU_double_constant",
-        "EU_triple",
-        "EU_triple_constant",
-        "EU_emission_1p5c",
-        "EU_1p5c"
-    )
-    runs <- c(
-        "EU_no",
-        "EU",
-        "EU_double",
         "EU_double_emission_1p5c")
 } else if (run == "full") {
     file_scenarios <- "scenarios_full_EU.csv"
@@ -78,22 +74,12 @@ if (run == "test") {
         "EU_carbon_tax",
         "EU_carbon_tax_policies"
         )
-} else {
+} else if (run == "policies") {
     file_scenarios <- "scenarios_EU.csv"
     energy_efficiency <- "endogenous"
-    runs <- c(
-        "EU",
-        "EU_carbon_tax",
-        "EU_incentives_policies",
-        "EU_mix_policies",
-        "EU_mix_policies_1p5c",
-        "EU_mix_policies_1p5c_2020_600",
-        "EU_carbon_tax_ambitious",
-        "EU_incentives_policies_advanced",
-        "EU_incentives_policies_income",
-        "EU_incentives_policies_advanced_income"
-        )
-    runs <- c("EU")
+    runs <- c("EU", "EU_mix", "EU_mix_deep", "EU_mix_ambitious",
+        "EU_mix_ambitious_low_income", "EU_mix_banstandalone", "EU_mix_ban")
+    runs <- c("EU_mix_ambitious")
 }
 
 report <- list(var = c("energy"),

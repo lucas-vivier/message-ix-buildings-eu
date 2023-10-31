@@ -51,7 +51,9 @@ fun_utility_ren_shell <- function(yrs,
                           lifetime_ren,
                           discount_ren,
                           sub_ren_shell = NULL,
-                          full = FALSE) {
+                          sub_ren_shell_type = "ad_valorem",
+                          full = FALSE,
+                          emission_factors = NULL) {
 
   en_hh_tot <- select(en_hh_tot, -c("budget_share",
     "heating_intensity", "en_hh_std"))
@@ -84,6 +86,9 @@ fun_utility_ren_shell <- function(yrs,
   discount_factor <- fun_discount_factor(bld_cases_fuel,
     discount_ren, lifetime_ren)
 
+  social_discount_factor <-
+    (1 - (1 + social_discount_rate)^-30) / social_discount_rate
+
   bld_age_exst <- ct_bld_age %>%
     filter(year_i < yrs[i]) %>%
     select(bld_age_id) %>%
@@ -103,16 +108,6 @@ fun_utility_ren_shell <- function(yrs,
       mutate(floor_size = floor_cap * hh_size) %>%
       left_join(discount_factor) %>%
       left_join(cost_invest_ren_shell) %>%
-      left_join(sub_ren_shell) %>%
-      mutate(sub_ren_shell = ifelse(is.na(sub_ren_shell), 0, sub_ren_shell)) %>%
-      # Use for reporting
-      mutate(sub_ren_hh =
-        sub_ren_shell * cost_invest_ren_shell * floor_size / 1e3) %>%
-      mutate(cost_invest_ren_shell =
-        cost_invest_ren_shell * (1 - sub_ren_shell)) %>%
-      # Calculate total investment costs
-      mutate(cost_invest_hh =
-        cost_invest_ren_shell * floor_size / 1e3) %>%
       # Operation costs after renovation
       left_join(en_hh_tot_ren_fin) %>%
       # Operation costs before renovation
@@ -121,16 +116,39 @@ fun_utility_ren_shell <- function(yrs,
       filter(cost_op_init > 0) %>%
       # Add operative costs (total)
       mutate(en_saving = en_hh_init - en_hh) %>%
+      mutate(en_saving_tot = social_discount_factor * en_saving) %>%
+      left_join(emission_factors) %>%
+      mutate(co2_saving =
+        social_discount_factor * en_saving * emission_factors * 3.6 / 1e6) %>%
       mutate(cost_op_saving = (cost_op_init - cost_op) / 1e3) %>%
+      # Cost
+      left_join(sub_ren_shell) %>%
+      mutate(sub_ren_shell = ifelse(is.na(sub_ren_shell), 0, sub_ren_shell)) %>%
+      mutate(sub_type = sub_ren_shell_type) %>%
+      # Use for reporting
+      mutate(sub_ren_hh = case_when(
+          sub_type == "ad_valorem" ~ sub_ren_shell *
+            cost_invest_ren_shell * floor_size / 1e3,
+          sub_type == "per_CO2" ~ co2_saving * sub_ren_shell / 1e3,
+          sub_type == "per_kWh" ~ en_saving_tot * sub_ren_shell / 1e3
+      )) %>%
+      # Calculate total investment costs
+      mutate(cost_invest_hh = cost_invest_ren_shell * floor_size / 1e3) %>%
+      mutate(sub_ren_hh = ifelse(sub_ren_hh > cost_invest_hh,
+        cost_invest_hh, sub_ren_hh)) %>%
+      # Calculate payback
+      mutate(payback = (cost_invest_hh - sub_ren_hh) / cost_op_saving) %>%
+      mutate(payback = ifelse(payback < 0, NA, payback)) %>%
       # Calculate utility
       mutate(utility_ren =
-      - cost_invest_hh + cost_op_saving * discount_factor) %>%
+      - cost_invest_hh + sub_ren_hh + cost_op_saving * discount_factor) %>%
       # Rename eneff column
       rename(eneff_i = eneff) %>%
       select(-c(
           "hh_size", "floor_cap", "en_hh",
           "cost_invest_ren_shell", "cost_op", "cost_op_init",
-          "discount_factor", "sub_ren_shell"))
+          "discount_factor", "sub_ren_shell", "sub_type", "emission_factors",
+          "co2_saving", "en_saving_tot"))
 
   if (!full) {
     utility_ren_hh <- select(utility_ren_hh, -c("floor_size",
@@ -176,8 +194,10 @@ fun_ms_ren_shell_endogenous <- function(yrs,
                           en_hh_tot,
                           lifetime_ren,
                           discount_ren,
-                          parameters = NULL) {
-  print(paste0("Running renovation decisions - year ", yrs[i]))
+                          sub_ren_shell_type = "ad_valorem",
+                          parameters = NULL,
+                          emission_factors = emission_factors,
+                          anticipate_renovation = NULL) {
 
   ## Define timestep
   stp <- yrs[i] - yrs[i - 1]
@@ -193,7 +213,15 @@ fun_ms_ren_shell_endogenous <- function(yrs,
                         en_hh_tot,
                         lifetime_ren,
                         discount_ren,
-                        sub_ren_shell = sub_ren_shell)
+                        sub_ren_shell_type = sub_ren_shell_type,
+                        sub_ren_shell = sub_ren_shell,
+                        emission_factors = emission_factors)
+  
+  payback <- utility_ren_hh %>%
+    select(-c("cost_invest_hh", "sub_ren_hh", "utility_ren")) %>%
+    filter(!is.na(payback))
+  
+  utility_ren_hh <- select(utility_ren_hh, -c("payback"))
 
   if ((!is.null(parameters))) {
     utility_ren_hh <- utility_ren_hh %>%
@@ -207,26 +235,42 @@ fun_ms_ren_shell_endogenous <- function(yrs,
         barrier_rent, 0)) %>%
       mutate(utility_ren = ifelse(tenr == "rent",
         utility_ren - barrier_rent, utility_ren)) %>%
-      select(-c("scaling_factor", "constant", "barrier_rent", "barrier_mfh"))
+      select(-c("scaling_factor", "constant",
+        "barrier_rent", "barrier_mfh")) %>%
+      filter(!is.na(utility_ren))
   }
 
   # All possible combinations covered (including no renovation)
   ms_i <- utility_ren_hh %>%
     group_by_at(setdiff(names(utility_ren_hh),
-                c("eneff_f", "utility_ren", "cost_invest_hh", "sub_ren_hh"))) %>%
+                c("eneff_f", "utility_ren",
+                "cost_invest_hh", "sub_ren_hh"))) %>%
     mutate(utility_exp_sum = sum(exp(utility_ren)) + 1) %>%
     mutate(ms = (1 / stp) * exp(utility_ren) / utility_exp_sum) %>%
     select(-c("utility_ren", "utility_exp_sum"))
 
+  # Test nested-logit model
+  if (FALSE) {
+    lambda <- 0.1
+    ms_i <- utility_ren_hh %>%
+      group_by_at(setdiff(names(utility_ren_hh),
+                  c("eneff_f", "utility_ren",
+                  "cost_invest_hh", "sub_ren_hh"))) %>%
+      mutate(utility_nest_sum = sum(exp(utility_ren / lambda))) %>%
+      mutate(utility_exp_sum = utility_nest_sum^lambda + 1) %>%
+      mutate(ms = (1 / stp) * exp(utility_ren / lambda) * utility_nest_sum^(lambda - 1) / utility_exp_sum) %>%
+      select(-c("utility_ren", "utility_exp_sum", "utility_nest_sum"))
+  }
+
   # Renovation rate
   rate_ren_i <- ms_i %>%
     filter(eneff_i != eneff_f) %>%
-    group_by_at(setdiff(names(ms_i), c("eneff_f", "ms"))) %>%
+    group_by_at(setdiff(names(ms_i),
+      c("eneff_f", "ms", "cost_invest_hh", "sub_ren_hh"))) %>%
     summarise(rate_ren = sum(ms)) %>%
     ungroup() %>%
     rename(eneff = eneff_i) %>%
-    filter(!is.na(rate_ren)) %>%
-    select(-c("cost_invest_hh", "sub_ren_hh"))
+    filter(!is.na(rate_ren))
 
   # Update market shares - keep renovations only
   ms_ren_i <- ms_i %>%
@@ -242,9 +286,24 @@ fun_ms_ren_shell_endogenous <- function(yrs,
     mutate(fuel_heat_f = fuel_heat_i) %>%
     filter(!is.na(ms_ren))
 
+
+  anticipate <- NULL
+  if (!is.null(anticipate_renovation)) {
+    anticipate <- payback %>%
+      # Select the cheaper renovation
+      group_by_at(setdiff(names(payback), c("payback", "eneff_f"))) %>%
+      filter(payback == min(payback)) %>%
+      ungroup() %>%
+      mutate(anticipate = ifelse(payback < anticipate_renovation, 1, 0)) %>%
+      filter(anticipate == 1) %>%
+      rename(eneff = eneff_i)
+
+  }
+
   output <- list(
     ms_ren_i = ms_ren_i,
-    rate_ren_i = rate_ren_i
+    rate_ren_i = rate_ren_i,
+    anticipate = anticipate
   )
 
   return(output)
@@ -267,7 +326,6 @@ fun_ms_ren_shell_exogenous <- function(yrs,
                                         rate_shell_ren_exo,
                                         ms_shell_ren_exo
                                         ) {
-  print(paste0("Running renovation target - year ", yrs[i]))
 
   # Filter based on the construction period
   p_past <- ct_bld_age %>%
@@ -318,23 +376,35 @@ fun_utility_heat <- function(yrs,
                         i,
                         bld_stock,
                         en_hh_tot,
-                        ct_switch_heat,
-                        ct_fuel_excl_reg,
-                        ct_heat,
-                        ct_heat_new,
+                        options_switch_heat,
+                        exclude_fuels_region,
+                        mapping_heat,
+                        options_heat_new,
                         cost_invest_heat,
                         lifetime_heat,
                         discount_heat,
                         sub_heat = NULL,
                         inertia = NULL,
-                        full = FALSE) {
+                        full = FALSE,
+                        sub_heater_type = "ad_valorem",
+                        emission_factors = NULL) {
 
-  en_hh_tot <- select(en_hh_tot,
-    -c("budget_share", "heating_intensity", "en_hh_std"))
+  social_discount_factor <-
+    (1 - (1 + social_discount_rate)^-20) / social_discount_rate
+
+  en_hh_tot <- en_hh_tot %>%
+    left_join(emission_factors) %>%
+    mutate(emission =
+      social_discount_factor * en_hh * emission_factors * 3.6 / 1e6) %>%
+    select(-c("budget_share", "heating_intensity",
+      "en_hh_std", "emission_factors", "fuel", "fuel_cool"))
+
 
   # Operational energy costs before/after renovation
-  en_hh_tot_switch_fin <- en_hh_tot %>%
-    rename(fuel_heat_f = fuel_heat)
+  en_hh_tot_switch_fin <- rename(en_hh_tot, fuel_heat_f = fuel_heat)
+  en_hh_tot_ini <- en_hh_tot %>%
+    rename(emission_ini = emission, cost_op_ini = cost_op) %>%
+    select(-c("en_hh"))
 
   # Prepare investment cost data
   if ("year" %in% names(cost_invest_heat)) {
@@ -360,37 +430,57 @@ fun_utility_heat <- function(yrs,
   discount_factor <- fun_discount_factor(bld_stock,
     discount_heat, lifetime_heat)
   
+  # Add fuel_heat to only target p5 buildings that have been constructed
+  options_heat_new <- mutate(options_heat_new, fuel_heat = NA)
+
   # Calculate utility
   utility_heat_hh <- bld_stock %>%
-    left_join(ct_switch_heat %>%
+    left_join(options_switch_heat %>%
         rename(fuel_heat = fuel_heat_i),
         relationship = "many-to-many") %>%
-    left_join(ct_heat_new, relationship =
+    left_join(options_heat_new, relationship =
       "many-to-many") %>%
-    mutate(fuel_heat_f = ifelse(
-        !is.na(fuel_heat_new), fuel_heat_new, fuel_heat_f)) %>%
+    # mutate(fuel_heat_f = ifelse(is.na(fuel_heat_f), fuel_heat_new, fuel_heat_f)) %>%
+    mutate(fuel_heat_f = ifelse(!is.na(fuel_heat_new),
+      fuel_heat_new, fuel_heat_f)) %>%
     select(-c("fuel_heat_new", "ct_heat_new")) %>%
     filter(!is.na(fuel_heat_f)) %>%
-    left_join(ct_fuel_excl_reg) %>%
+    left_join(exclude_fuels_region) %>%
     filter(is.na(ct_fuel_excl_reg)) %>%
-    left_join(ct_heat %>% rename(fuel_heat_f = fuel_heat)) %>%
+    left_join(mapping_heat %>% rename(fuel_heat_f = fuel_heat)) %>%
     mutate(ct_heat = ifelse(
         is.na(ct_heat) | ct_heat == 1, 1, 0)) %>%
     left_join(cost_invest_heat) %>%
     # Operation costs after renovation
-    left_join(en_hh_tot_switch_fin %>% select(-c("fuel", "fuel_cool"))) %>%
+    left_join(en_hh_tot_switch_fin) %>%
+    left_join(en_hh_tot_ini) %>%
+    mutate(emission_saving = ifelse(emission_ini - emission < 0, 0,
+      emission_ini - emission)) %>%
+    mutate(emission_saving = ifelse(is.na(emission_saving), 0,
+      emission_saving)) %>%
     left_join(discount_factor) %>%
     left_join(sub_heat) %>%
     mutate(sub_heat = ifelse(is.na(sub_heat), 0, sub_heat)) %>%
-    mutate(sub_heat_hh = cost_invest_heat * sub_heat) %>%
-    mutate(cost_invest_heat = cost_invest_heat * (1 - sub_heat)) %>%
+    mutate(sub_type = sub_heater_type) %>%
+    mutate(sub_heat_hh = case_when(
+          sub_type == "ad_valorem" ~ sub_heat * cost_invest_heat,
+          sub_type == "per_CO2" ~ sub_heat * emission_saving
+      )) %>%
+    mutate(sub_heat_hh = ifelse(sub_heat_hh > cost_invest_heat,
+      cost_invest_heat, sub_heat_hh)) %>%
+    mutate(cost_invest_heat = cost_invest_heat - sub_heat_hh) %>%
+    # Calculate payback of heat-pumps
+    mutate(payback = ifelse(fuel_heat_f == "heat_pump",
+      cost_invest_heat / (cost_op_ini - cost_op), NA)) %>%
+    mutate(payback = ifelse(payback < 0, NA, payback)) %>%
     # Calculate utility
     mutate(utility_heat =
       (- cost_invest_heat - cost_op * discount_factor) / 1e3) %>%
     filter((ct_switch_heat == 1) | (bld_age == "p5")) %>%
     filter(ct_heat == 1) %>%
-    select(-c("cost_op", "en_hh", "sub_heat",
-      "ct_switch_heat", "ct_fuel_excl_reg", "ct_heat", "discount_factor"))
+    select(-c("cost_op", "en_hh", "sub_heat", "cost_op_ini",
+      "ct_switch_heat", "ct_fuel_excl_reg", "ct_heat", "discount_factor",
+      "emission", "emission_ini", "emission_saving", "sub_type"))
 
   if (!is.null(inertia)) {
     utility_heat_hh <- utility_heat_hh %>%
@@ -421,11 +511,12 @@ fun_ms_switch_heat_endogenous <- function(yrs,
                           lifetime_heat = 20,
                           inertia = NULL,
                           parameters = NULL,
-                          ban_fuel = NULL) {
-  print(paste0("Running renovation decisions - year ", yrs[i]))
+                          ban_fuel = NULL,
+                          ban_fuel_renovation = NULL,
+                          sub_heater_type = "ad_valorem",
+                          emission_factors = NULL,
+                          premature_replacement = NULL) {
 
-  
-  
   utility_heat_hh <- fun_utility_heat(yrs,
                         i,
                         bld_stock,
@@ -438,7 +529,15 @@ fun_ms_switch_heat_endogenous <- function(yrs,
                         lifetime_heat,
                         discount_heat,
                         inertia = inertia,
-                        sub_heat = sub_heat)
+                        sub_heat = sub_heat,
+                        sub_heater_type = sub_heater_type,
+                        emission_factors = emission_factors)
+
+  payback <- utility_heat_hh %>%
+    select(-c("cost_invest_heat", "sub_heat_hh", "utility_heat")) %>%
+    filter(!is.na(payback))
+
+  utility_heat_hh <- select(utility_heat_hh, -c("payback"))
 
   if ((!is.null(ban_fuel))) {
     utility_heat_hh <- utility_heat_hh %>%
@@ -448,12 +547,22 @@ fun_ms_switch_heat_endogenous <- function(yrs,
       select(-c("ban_fuel"))
   }
 
+  if ((!is.null(ban_fuel_renovation))) {
+    utility_heat_hh <- utility_heat_hh %>%
+      left_join(ban_fuel_renovation) %>%
+      mutate(ban_fuel_renovation =
+        ifelse(is.na(ban_fuel_renovation), 0, ban_fuel_renovation)) %>%
+      filter(ban_fuel_renovation != 1) %>%
+      select(-c("ban_fuel_renovation"))
+  }
+
   if ((!is.null(parameters))) {
     utility_heat_hh <- utility_heat_hh %>%
       left_join(parameters) %>%
       mutate(utility_heat = utility_heat * scaling_factor + constant) %>%
       select(-c("scaling_factor", "constant"))
   }
+
 
   # All possible combinations covered (including no renovation)
   ms_i <- utility_heat_hh %>%
@@ -464,7 +573,14 @@ fun_ms_switch_heat_endogenous <- function(yrs,
     ungroup() %>%
     select(-c("utility_heat", "utility_exp_sum"))
 
-  return(ms_i)
+  premature <- NULL
+  if (!is.null(premature_replacement)) {
+    premature <- payback %>%
+      mutate(premature = ifelse(payback < premature_replacement, 1, 0)) %>%
+      filter(premature == 1)
+  }
+
+  return(list(ms_i = ms_i, premature = premature))
 }
 
 
@@ -496,3 +612,5 @@ fun_ms_fuel_sw_exogenous <- function(yrs,
 
   return(ms_sw_i)
 }
+
+
