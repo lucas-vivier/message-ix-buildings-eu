@@ -23,6 +23,25 @@ colors_efficiency <- c("Slum" = "grey30",
                 "New standard" = "palegreen3",
                 "New advanced" = "palegreen4")
 
+# Insulation levels
+
+rename_insulation <- c(
+  "0-0.5" = "Advanced insulation",
+  "0.5-1" = "Basic insulation",
+  "1.5-2" = "Poor insulation",
+  ">2" = "No insulation"
+)
+
+order_insulation <- c("No insulation", "Poor insulation", "Basic insulation", "Advanced insulation")
+
+colors_insulation <- c(
+  "No insulation" = "grey30",
+  "Poor insulation" = "coral4",
+  "Basic insulation" = "goldenrod1",
+  "Advanced insulation" = "palegreen3"
+)
+
+
 
 # Heating fuels
 rename_fuels <- c("biomass_solid" = "Biomass",
@@ -95,6 +114,39 @@ rename_countries <- c(
   "C-WEU-SWE" = "Sweden",
   "EU" = "EU"
 )
+
+rename_countries_code <- c(
+  "C-EEU-BGR" = "BGR",
+  "C-EEU-CZE" = "CZE",
+  "C-EEU-EST" = "EST",
+  "C-EEU-HUN" = "HUN",
+  "C-EEU-LTU" = "LTU",
+  "C-EEU-LVA" = "LVA",
+  "C-EEU-POL" = "POL",
+  "C-EEU-ROU" = "ROU",
+  "C-EEU-SVK" = "SVK",
+  "C-EEU-SVN" = "SVN",
+  "C-WEU-AUT" = "AUT",
+  "C-WEU-BEL" = "BEL",
+  "C-WEU-HRV" = "HRV",
+  "C-WEU-CYP" = "CYP",
+  "C-WEU-MLT" = "MLT",
+  "C-WEU-DEU" = "DEU",
+  "C-WEU-DNK" = "DNK",
+  "C-WEU-ESP" = "ESP",
+  "C-WEU-FIN" = "FIN",
+  "C-WEU-FRA" = "FRA",
+  "C-WEU-GBR" = "GBR",
+  "C-WEU-GRC" = "GRC",
+  "C-WEU-IRL" = "IRL",
+  "C-WEU-ITA" = "ITA",
+  "C-WEU-LUX" = "LUX",
+  "C-WEU-NLD" = "NLD",
+  "C-WEU-PRT" = "PRT",
+  "C-WEU-SWE" = "SWE",
+  "EU" = "EU"
+)
+
 
 colors_countries <- c(
   "Bulgaria" = "green",

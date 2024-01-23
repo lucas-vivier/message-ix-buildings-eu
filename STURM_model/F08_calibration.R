@@ -94,7 +94,8 @@ fun_calibration_ren_shell <- function(yrs,
                           coeff_barriers_rent,
                           stp,
                           path_out,
-                          discount_ren) {
+                          discount_ren,
+                          social_discount_rate) {
     
     start_calibration <- Sys.time()
 
@@ -109,6 +110,7 @@ fun_calibration_ren_shell <- function(yrs,
                           en_hh_tot,
                           lifetime_ren,
                           discount_ren,
+                          social_discount_rate,
                           full = TRUE)
     
     report <- utility_ren_hh %>%
@@ -693,4 +695,62 @@ fun_calibration_consumption <- function(bld_det_ini,
       "en_calculation_unit",  "en_calculation_std_unit",
       "en_calculation_dw", "en_poverty", "sh_en_poverty"))
     return(shr_en)
+}
+
+fun_calibration_poverty <- function(bld_det_ini,
+                                    en_hh_tot,
+                                    energy_poverty_observed,
+                                    path_out) {
+    # Calibration of energy poverty at base year
+    # Determine the threshold of budget share so energy poverty simulated align with the observed
+    temp <- bld_det_ini %>%
+      left_join(en_hh_tot)
+    
+    objective_function <- function(x, temp_region, objective) {
+      # x is the threshold of budget share
+      # objective is the observed energy poverty
+      # temp is the dataframe of building stock
+      calculation <- temp_region %>%
+        mutate(energy_poverty = ifelse(budget_share > x, 1, 0)) %>%
+        group_by_at("energy_poverty") %>%
+        summarize(n = sum(n_units_fuel)) %>%
+        ungroup() %>%
+        mutate(shr_energy_poverty = n / sum(n))
+
+      
+      # If there is only 0 for energy poverty, then the share of energy poverty is 0
+      if (!(1 %in% calculation$energy_poverty)){
+        calculation <- calculation %>%
+          add_row(energy_poverty = 1, shr_energy_poverty = 0)
+      }
+
+      calculation <- calculation %>%
+        filter(energy_poverty == 1)
+
+      return(calculation$shr_energy_poverty - objective)
+    }
+
+    threshold_poverty <- data.frame(
+      threshold_poverty = numeric(),
+      region_bld = character())
+
+    for (k in unique(bld_det_ini$region_bld)) {
+      objective <- filter(energy_poverty_observed, region_bld == k)$energy_poverty
+      temp_region <- filter(temp, region_bld == k)
+      
+      root <- uniroot(objective_function,
+        interval = c(0, 1), objective = objective, temp_region = temp_region)
+
+      rslt <- data.frame(
+        threshold_poverty = root$root,
+        region_bld = k)
+      
+      threshold_poverty <- bind_rows(threshold_poverty, rslt)
+      
+    }
+
+    write.csv(left_join(energy_poverty_observed, threshold_poverty),
+      paste0(path_out, "threshold_poverty.csv"))
+
+    return(threshold_poverty)
 }

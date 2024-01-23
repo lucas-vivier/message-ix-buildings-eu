@@ -62,11 +62,12 @@ fun_space_heating_calculation <- function(bld_cases_fuel,
                                       area_floor,
                                       area_windows,
                                       hdd,
+                                      en_sav_ren,
                                       d_hs = 200,
                                       i_sol = 200,
                                       simplified = TRUE) {
 
-  attributes <- c("clim", "region_bld", "arch", "bld_age")
+  attributes <- c("clim", "region_bld", "arch", "bld_age", "eneff")
   if (!simplified) {
     h_ve <- c_air * (n_air_infiltr + n_air_use) * h_room
   } else {
@@ -91,7 +92,15 @@ fun_space_heating_calculation <- function(bld_cases_fuel,
       (u_wall * area_wall + u_roof * area_roof +
         b_floor * u_floor * area_floor + u_windows * area_windows)) %>%
     mutate(h_tr = h_tr +
-      u_th_br * (area_wall + area_roof + area_floor + area_windows))
+      u_th_br * (area_wall + area_roof + area_floor + area_windows)) %>%
+    group_by(region_bld) %>%
+    mutate(min_h_tr = min(h_tr)) %>%
+    ungroup() %>%
+    left_join(en_sav_ren) %>%
+    mutate_cond(is.na(en_sav_ren), en_sav_ren = 0) %>%
+    mutate(h_tr = h_tr * (1 - en_sav_ren)) %>%
+    mutate(h_tr = ifelse(h_tr < min_h_tr, min_h_tr, h_tr)) %>%
+    mutate(u_building = h_tr / (area_wall + area_roof + area_floor + area_windows))
 
   q_gains <- area_windows %>%
     mutate(q_sol = f_sh * (1 - f_f) * f_w * g_gl * i_sol) %>%
@@ -103,7 +112,7 @@ fun_space_heating_calculation <- function(bld_cases_fuel,
     left_join(q_gains) %>%
     mutate(q_losses = 24 / 1000 * f_nu * hdd * (h_tr + h_ve)) %>%
     mutate(en_int_heat = q_losses - gain_utilitization_factor * q_gains) %>%
-    select(c(all_of(attributes), "en_int_heat"))
+    select(c(all_of(attributes), "en_int_heat", "u_building"))
 
   return(en_int_heat)
   }
@@ -122,7 +131,6 @@ fun_space_heating_calculation <- function(bld_cases_fuel,
 #' @param days_cool Days of cooling
 #' @param eff_cool Cooling efficiency
 #' @param eff_heat Heating efficiency
-#' @param en_sav_ren Energy savings due to renovation
 #' @param hours_heat Hours of heating
 #' @param shr_floor_heat Share of floor area for heating
 #' @param hours_cool Hours of cooling
@@ -144,7 +152,6 @@ fun_en_sim <- function(sector,
                        days_cool,
                        eff_cool,
                        eff_heat,
-                       en_sav_ren,
                        hours_heat,
                        shr_floor_heat,
                        hours_cool,
@@ -173,8 +180,6 @@ fun_en_sim <- function(sector,
     mutate(year = yrs[i]) %>%
     left_join(eff_cool) %>%
     left_join(eff_heat) %>%
-    left_join(en_sav_ren) %>%
-    mutate_cond(is.na(en_sav_ren), en_sav_ren = 0) %>%
     left_join(hours_heat) %>%
     mutate(f_h = hours_heat / 24) %>%
     left_join(shr_floor_cool) %>%
@@ -189,10 +194,10 @@ fun_en_sim <- function(sector,
     left_join(en_int_cool) %>%
     left_join(days_cool) %>%
     # Edit heating demand (final) [kWh/m2/y]
-    mutate(en_dem_heat = en_int_heat * (1 - en_sav_ren) * shr_acc_heat /
+    mutate(en_dem_heat = en_int_heat * shr_acc_heat /
       eff_heat * shr_floor_heat * f_h) %>%
     # Edit cooling demand - AC (final) [kWh/m2/y] (fans not included for now)
-    mutate(en_dem_c_ac = en_int_cool * (1 - en_sav_ren) * shr_acc_cool /
+    mutate(en_dem_c_ac = en_int_cool * shr_acc_cool /
       eff_cool * shr_floor_cool * f_c) %>%
     # Cooling demand - FANS (final) [kWh/m2/y]
     mutate(en_dem_c_fans =
@@ -210,7 +215,7 @@ fun_en_sim <- function(sector,
     select(-c(
       eff_cool, eff_heat, f_h, f_c,
       shr_floor_heat, shr_floor_cool, hours_heat, hours_cool,
-      en_sav_ren, hours_fans, power_fans, f_f))
+      hours_fans, power_fans, f_f))
 
   ## Energy demand SPACE HEATING ONLY - by fuel: for investment decisions
   en_m2_scen_heat <- bld_cases_fuel %>%
@@ -282,7 +287,8 @@ fun_hw_resid <- function(yrs, i,
                          bld_cases_fuel,
                          hh_size,
                          # ct_fuel_dhw,
-                         eff_hotwater, en_int_hotwater,
+                         eff_hotwater,
+                         en_int_hotwater,
                          en_int_heat) {
   print(paste0("Running energy demand year ", yrs[i]))
 

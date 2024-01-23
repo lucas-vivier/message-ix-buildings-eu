@@ -44,6 +44,7 @@ fun_format_output <- function(i,
                               shr_need_heat,
                               floor_cap,
                               hh_size,
+                              pop,
                               report_var,
                               report,
                               en_m2_scen_heat,
@@ -56,6 +57,7 @@ fun_format_output <- function(i,
                               emission_factors,
                               emission_factors_embodied,
                               income,
+                              threshold_poverty = threshold_poverty,
                               new_det_i = NULL,
                               ren_det_i = NULL,
                               bld_det_i_sw = NULL,
@@ -81,7 +83,8 @@ fun_format_output <- function(i,
             en_m2_scen_cool,
             en_hh_tot,
             en_hh_hw_scen,
-            emission_factors
+            emission_factors,
+            threshold_poverty
         )
         en_stock_i <- left_join(en_stock_i, income)
 
@@ -93,7 +96,8 @@ fun_format_output <- function(i,
             group_by_at(c("region_bld", "year", "fuel_heat")) %>%
             summarise(
                 stock_building = sum(stock_M) * 1e6,
-                energy_poverty_thres = sum(energy_poverty_thres),
+                energy_poverty_10 = sum(energy_poverty_10),
+                energy_poverty_thresh = sum(energy_poverty_thresh),
                 heat_kWh = sum(heat_TJ) / 3.6 * 1e6,
                 heat_std_kWh = sum(heat_std_TJ) / 3.6 * 1e6,
                 heat_EJ = sum(heat_TJ) / 1e6,
@@ -101,12 +105,13 @@ fun_format_output <- function(i,
                 heat_tCO2 = sum(heat_tCO2),
                 hotwater_tCO2 = sum(hotwater_tCO2),
                 cost_heat_EUR = sum(cost_energy_hh),
-                floor_m2 = sum(floor_Mm2) * 1e6
+                floor_m2 = sum(floor_Mm2) * 1e6,
+
             ) %>%
             ungroup() %>%
             rename(resolution = fuel_heat) %>%
             gather(variable, value, stock_building,
-                energy_poverty_thres,
+                energy_poverty_10, energy_poverty_thresh,
                 heat_kWh, heat_std_kWh, heat_EJ, 
                 hotwater_EJ,
                 heat_tCO2, hotwater_tCO2,
@@ -120,6 +125,17 @@ fun_format_output <- function(i,
             mutate(resolution = "all")
 
         temp <- bind_rows(det_rows, agg_rows)
+
+        # Adding population
+        t <- pop %>%
+            filter(year == yrs[i]) %>%
+            filter(region_bld %in% unique(en_stock_i$region_bld)) %>%
+            group_by_at(c("region_bld", "year")) %>%
+            summarise(value = sum(pop) * 1e6) %>%
+            ungroup() %>%
+            mutate(resolution = "all", variable = "population")
+
+        temp <- bind_rows(temp, t)
         
         # Aggregating at eneff level
         det_rows <- en_stock_i %>%
@@ -128,7 +144,8 @@ fun_format_output <- function(i,
             group_by_at(c("region_bld", "year", "efficiency")) %>%
             summarise(
                 stock_building = sum(stock_M) * 1e6,
-                energy_poverty_thres = sum(energy_poverty_thres),
+                energy_poverty_10 = sum(energy_poverty_10),
+                energy_poverty_thresh = sum(energy_poverty_thresh),
                 heat_kWh = sum(heat_TJ) / 3.6 * 1e6,
                 heat_std_kWh = sum(heat_std_TJ) / 3.6 * 1e6,
                 heat_EJ = sum(heat_TJ) / 1e6,
@@ -142,20 +159,32 @@ fun_format_output <- function(i,
             ) %>%
             ungroup() %>%
             rename(resolution = efficiency) %>%
-          gather(variable, value, stock_building,
-                 energy_poverty_thres,
-                 heat_kWh, heat_std_kWh, heat_EJ, 
-                 hotwater_EJ, cool_EJ,
-                 heat_tCO2, hotwater_tCO2, cool_tCO2,
-                 cost_heat_EUR, floor_m2)
+            gather(variable, value, stock_building,
+                    energy_poverty_10, energy_poverty_thresh,
+                    heat_kWh, heat_std_kWh, heat_EJ, 
+                    hotwater_EJ, cool_EJ,
+                    heat_tCO2, hotwater_tCO2, cool_tCO2,
+                    cost_heat_EUR, floor_m2)
         temp <- bind_rows(temp, det_rows)
         
+        det_rows <- en_stock_i %>%
+            group_by_at(c("region_bld", "year", "insulation_level")) %>%
+            summarise(
+                stock_building = sum(stock_M) * 1e6
+            ) %>%
+            ungroup() %>%
+            rename(resolution = insulation_level) %>%
+            gather(variable, value, stock_building)
+        temp <- bind_rows(temp, det_rows)
+
+
         # Adding results at building type level
         det_rows <- en_stock_i %>%
           group_by_at(c("region_bld", "year", "arch")) %>%
           summarise(
             stock_building = sum(stock_M) * 1e6,
-            energy_poverty_thres = sum(energy_poverty_thres),
+            energy_poverty_10 = sum(energy_poverty_10),
+            energy_poverty_thresh = sum(energy_poverty_thresh),
             heat_kWh = sum(heat_TJ) / 3.6 * 1e6,
             heat_std_kWh = sum(heat_std_TJ) / 3.6 * 1e6,
             heat_EJ = sum(heat_TJ) / 1e6,
@@ -170,7 +199,7 @@ fun_format_output <- function(i,
           ungroup() %>%
           rename(resolution = arch) %>%
           gather(variable, value, stock_building,
-                 energy_poverty_thres,
+                 energy_poverty_10, energy_poverty_thresh,
                  heat_kWh, heat_std_kWh, heat_EJ, 
                  hotwater_EJ, cool_EJ,
                  heat_tCO2, hotwater_tCO2, cool_tCO2,
@@ -183,13 +212,15 @@ fun_format_output <- function(i,
             group_by_at(c("region_bld", "year", "inc_cl")) %>%
             summarise(
                 stock_building = sum(stock_M) * 1e6,
-                energy_poverty_thres = sum(energy_poverty_thres),
+                energy_poverty_10 = sum(energy_poverty_10),
+                energy_poverty_thresh = sum(energy_poverty_thresh),
                 cost_energy = sum(cost_energy_hh),
                 income = sum(income * stock_M) * 1e6,
                 ) %>%
             ungroup() %>%
             rename(resolution = inc_cl) %>%
-            gather(variable, value, energy_poverty_thres,
+            gather(variable, value, energy_poverty_10,
+                energy_poverty_thresh,
                 cost_energy, income, stock_building)
 
         temp <- bind_rows(temp, det_rows)
@@ -609,7 +640,8 @@ fun_format_bld_stock_energy <- function(
                                         en_m2_scen_cool,
                                         en_hh_tot,
                                         en_hh_hw_scen,
-                                        emission_factors
+                                        emission_factors,
+                                        threshold_poverty
                                         ) {
 
 
@@ -676,14 +708,23 @@ fun_format_bld_stock_energy <- function(
                 weighted_median(budget_share, n_units_fuel))
 
         en_stock_i <- en_stock_i %>%
+            mutate(insulation_level =
+                ifelse(u_building < 0.5, "0-0.5",
+                ifelse(u_building < 1, "0.5-1",
+                ifelse(u_building < 1.5, "1-1.5",
+                ifelse(u_building < 2, "1.5-2", ">2"))))) %>%
             left_join(median_budget_share) %>%
             mutate(budget_share =
                 ifelse(fuel_heat == "v_no_heat", 0, budget_share)) %>%
             mutate(energy_poverty_median =
                 ifelse(budget_share >= 2 * median_budget_share,
                 n_units_fuel, 0)) %>%
-            mutate(energy_poverty_thres =
+            mutate(energy_poverty_10 =
                 ifelse(budget_share >= 0.1, n_units_fuel, 0)) %>%
+            left_join(threshold_poverty) %>%
+            mutate(energy_poverty_thresh =
+                ifelse(budget_share >= threshold_poverty,
+                n_units_fuel, 0)) %>%
             mutate(cost_energy_hh = cost_energy_hh * n_units_fuel) %>%
             left_join(en_hh_hw_scen) %>%
             # convert n. units to millions
@@ -738,8 +779,9 @@ fun_format_bld_stock_energy <- function(
                 "scenario", "year", "stock_M", "floor_Mm2",
                 "heat_TJ", "heat_std_TJ", "cool_TJ", "cool_ac_TJ", "cool_fans_TJ",
                 "hotwater_TJ", "other_uses_TJ", "cost_energy_hh",
-                "heat_tCO2","hotwater_tCO2", "cool_tCO2", "energy_poverty_median", "energy_poverty_thres",
-                "heating_intensity"
+                "heat_tCO2","hotwater_tCO2", "cool_tCO2", "energy_poverty_median",
+                "energy_poverty_10", "energy_poverty_thresh",
+                "heating_intensity", "insulation_level"
             )))
             
     }

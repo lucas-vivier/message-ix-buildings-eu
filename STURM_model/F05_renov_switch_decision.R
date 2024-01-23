@@ -50,13 +50,14 @@ fun_utility_ren_shell <- function(yrs,
                           en_hh_tot,
                           lifetime_ren,
                           discount_ren,
+                          social_discount_rate,
                           sub_ren_shell = NULL,
                           sub_ren_shell_type = "ad_valorem",
                           full = FALSE,
                           emission_factors = NULL) {
 
   en_hh_tot <- select(en_hh_tot, -c("budget_share",
-    "heating_intensity", "en_hh_std"))
+    "heating_intensity", "en_hh_std", "u_building"))
   # Operational energy costs before/after renovation
   en_hh_tot_ren_fin <- en_hh_tot %>%
     rename(eneff_f = eneff)
@@ -81,6 +82,10 @@ fun_utility_ren_shell <- function(yrs,
     sub_ren_shell <- cost_invest_ren_shell %>%
       mutate(sub_ren_shell = 0) %>%
       select(-c("cost_invest_ren_shell"))
+  }
+
+  if (is.null(emission_factors)) {
+    emission_factors <- data.frame(emission_factors = 0, year = yrs[i])
   }
 
   discount_factor <- fun_discount_factor(bld_cases_fuel,
@@ -194,6 +199,7 @@ fun_ms_ren_shell_endogenous <- function(yrs,
                           en_hh_tot,
                           lifetime_ren,
                           discount_ren,
+                          social_discount_rate,
                           sub_ren_shell_type = "ad_valorem",
                           parameters = NULL,
                           emission_factors = emission_factors,
@@ -213,6 +219,7 @@ fun_ms_ren_shell_endogenous <- function(yrs,
                         en_hh_tot,
                         lifetime_ren,
                         discount_ren,
+                        social_discount_rate,
                         sub_ren_shell_type = sub_ren_shell_type,
                         sub_ren_shell = sub_ren_shell,
                         emission_factors = emission_factors)
@@ -293,6 +300,8 @@ fun_ms_ren_shell_endogenous <- function(yrs,
       # Select the cheaper renovation
       group_by_at(setdiff(names(payback), c("payback", "eneff_f"))) %>%
       filter(payback == min(payback)) %>%
+      filter(if(n() > 1) eneff_f == "adv" else TRUE) %>%
+      slice(1) %>%
       ungroup() %>%
       mutate(anticipate = ifelse(payback < anticipate_renovation, 1, 0)) %>%
       filter(anticipate == 1) %>%
@@ -383,6 +392,7 @@ fun_utility_heat <- function(yrs,
                         cost_invest_heat,
                         lifetime_heat,
                         discount_heat,
+                        social_discount_rate,
                         sub_heat = NULL,
                         inertia = NULL,
                         full = FALSE,
@@ -397,7 +407,7 @@ fun_utility_heat <- function(yrs,
     mutate(emission =
       social_discount_factor * en_hh * emission_factors * 3.6 / 1e6) %>%
     select(-c("budget_share", "heating_intensity",
-      "en_hh_std", "emission_factors", "fuel", "fuel_cool"))
+      "en_hh_std", "emission_factors", "fuel", "fuel_cool", "u_building"))
 
 
   # Operational energy costs before/after renovation
@@ -508,6 +518,7 @@ fun_ms_switch_heat_endogenous <- function(yrs,
                           ct_heat,
                           ct_heat_new,
                           discount_heat,
+                          social_discount_rate,
                           lifetime_heat = 20,
                           inertia = NULL,
                           parameters = NULL,
@@ -528,6 +539,7 @@ fun_ms_switch_heat_endogenous <- function(yrs,
                         cost_invest_heat,
                         lifetime_heat,
                         discount_heat,
+                        social_discount_rate,
                         inertia = inertia,
                         sub_heat = sub_heat,
                         sub_heater_type = sub_heater_type,

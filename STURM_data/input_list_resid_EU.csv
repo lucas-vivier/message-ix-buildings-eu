@@ -12,7 +12,6 @@ barriers_mfh,barriers_mfh,activity
 learning_rate_heat,learning_inv_heat_EU,activity
 learning_rate_shell,learning_inv_ren_shell_EU,activity
 objectives_renovation,objectives_renovation,policies
-objectives_deep_renovation,objectives_deep_renovation,policies
 pop,pop_clim_ssp2,basic
 hh_size,hh_size_EU,basic
 parameters_renovation,parameters_renovation,calibration
@@ -72,3 +71,4 @@ area_windows,area_windows,thermal
 area_wall,area_wall,thermal
 area_roof,area_roof,thermal
 area_floor,area_floor,thermal
+energy_poverty,energy_poverty_2015_EU,macro

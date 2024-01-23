@@ -17,8 +17,8 @@ u_EJ_GWa <- 31.71
 #' @param sector Name of the sector
 #' @param run Name of the scenario to run
 #' @return List of input dataframes
-fun_inputs_csv <- function(path_in, file_inputs, file_scenarios, sector, run
-                           ) {
+fun_inputs_csv <- function(path_in, file_inputs, file_scenarios, sector, run,
+                           param) {
   # PATH DATA INPUT FILES
   path_in_csv <- paste0(path_in, "./input_csv/")
 
@@ -103,7 +103,95 @@ fun_inputs_csv <- function(path_in, file_inputs, file_scenarios, sector, run
   # Remove provisional inputs
   rm(input, scen_setup)
 
-  return(list(d = d, scen_param = scen_param))
+  param <- read_parameters(scen_param, param)
+
+  return(list(d = d, param = param))
+}
+
+read_parameters <- function(scen_param, param) {
+  
+  if ("_sub_ren_shell_type" %in% scen_param$name_parameter) {
+    sub_ren_shell_type <- scen_param %>%
+      filter(name_parameter == "_sub_ren_shell_type") %>%
+      pull(scenario)
+    param$sub_ren_shell_type <- sub_ren_shell_type
+  }
+
+  if ("_sub_ren_shell_target" %in% scen_param$name_parameter) {
+    sub_ren_shell_target <- scen_param %>%
+      filter(name_parameter == "_sub_ren_shell_target") %>%
+      pull(scenario)
+    param$sub_ren_shell_target <- sub_ren_shell_target
+  }
+
+  if ("_sub_ren_shell_household_target" %in% scen_param$name_parameter) {
+    sub_ren_shell_household_target <- scen_param %>%
+      filter(name_parameter == "_sub_ren_shell_household_target") %>%
+      pull(scenario)
+    param$sub_ren_shell_household_target <- sub_ren_shell_household_target
+  }
+
+  if ("_objective_type" %in% scen_param$name_parameter) {
+    objective_type <- scen_param %>%
+      filter(name_parameter == "_objective_type") %>%
+      pull(scenario)
+    param$objective_type <- objective_type
+  }
+
+  if ("_sub_heat_type" %in% scen_param$name_parameter) {
+    sub_heater_type <- scen_param %>%
+      filter(name_parameter == "_sub_heat_type") %>%
+      pull(scenario)
+    param$sub_heater_type <- sub_heater_type
+  }
+
+  if ("_carbon_tax_recycling" %in% scen_param$name_parameter) {
+    temp <- scen_param %>%
+      filter(name_parameter == "_carbon_tax_recycling") %>%
+      pull(scenario)
+    
+    if (temp == "subsidies") {
+        budget_constraint_insulation <- "carbon_revenue"
+        param$budget_constraint_insulation <- budget_constraint_insulation
+        budget_constraint_heater <- "carbon_revenue"
+        param$budget_constraint_heater <- budget_constraint_heater
+      } else if (temp == "insulation") {
+        budget_constraint_insulation <- "carbon_revenue"
+        param$budget_constraint_insulation <- budget_constraint_insulation
+      } else if (temp == "heater") {
+        budget_constraint_heater <- "carbon_revenue"
+        param$budget_constraint_heater <- budget_constraint_heater
+      }
+  }
+
+  if ("_share_recycling" %in% scen_param$name_parameter) {
+    share_recycling <- scen_param %>%
+      filter(name_parameter == "_share_recycling") %>%
+      mutate(scenario = as.numeric(scenario)) %>%
+      pull(scenario)
+    
+    param$share_recycling <- share_recycling
+  }
+
+  if ("_mandatory_switch" %in% scen_param$name_parameter) {
+    mandatory_switch <- scen_param %>%
+      filter(name_parameter == "_mandatory_switch") %>%
+      mutate(scenario = as.logical(scenario)) %>%
+      pull(scenario)
+    
+    param$mandatory_switch <- mandatory_switch
+  }
+  if ("_premature_replacement" %in% scen_param$name_parameter) {
+    premature_replacement <- scen_param %>%
+      filter(name_parameter == "_premature_replacement") %>%
+      mutate(scenario = as.numeric(scenario)) %>%
+      pull(scenario)
+
+    param$premature_replacement <- premature_replacement
+  }
+
+  return(param)
+
 }
 
 

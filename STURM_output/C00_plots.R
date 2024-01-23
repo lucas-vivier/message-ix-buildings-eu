@@ -4,6 +4,8 @@ library(dplyr)
 library(ggplot2)
 library(stringr)
 library(scales)
+library(sf)
+library(rnaturalearth)
 
 source("STURM_output/C00_plots_settings.R")
 
@@ -19,9 +21,9 @@ plot_settings <- list(
   "height" = 1 * 16, #height cm
   "dpi" = 300, #DPI
   "font_family" = "Arial",
-  "colors" = c(colors_efficiency, colors_fuels, colors_countries, colors_cost),
-  "rename" = c(rename_eneff, rename_fuels, rename_countries, rename_hh, rename_cost),
-  "order" = c(order_fuels, order_eneff, order_countries, order_hh, order_cost)
+  "colors" = c(colors_efficiency, colors_fuels, colors_countries, colors_cost, colors_insulation),
+  "rename" = c(rename_eneff, rename_fuels, rename_countries, rename_hh, rename_cost, rename_insulation),
+  "order" = c(order_fuels, order_eneff, order_countries, order_hh, order_cost, order_insulation)
 )
 
 
@@ -277,7 +279,7 @@ plot_clustered_barplot <- function(df,
   if (!is.null(angle_x_label)) {
     # put text.x in bold
     p <- p +
-      theme(axis.text.x = element_text(angle = 90, hjust = 1, size = plot_settings[["size_text"]], face = "bold"))
+      theme(axis.text.x = element_text(angle = angle_x_label, hjust = 1, size = plot_settings[["size_text"]], face = "bold"))
   }
 
   if (!is.null(save_path)) {
@@ -313,6 +315,9 @@ plot_multiple_lines <- function(df,
   }
 
   linewidth <- 2
+  if (presentation) {
+    linewidth <- 3
+  }
   if (!is.null(group_column)) {
     df <- df %>%
       mutate(!!group_column := plot_settings[["rename"]][.data[[group_column]]]) %>%
@@ -1014,7 +1019,6 @@ budget_share_energy_plots <- function(data, years, sub_scenarios, ref, save_dir,
 
   ## STEP 2
 
-
   parse_data <- long_data %>%
     filter(region_bld == "EU") %>%
     filter(year %in% years) %>%
@@ -1062,3 +1066,46 @@ budget_share_energy_plots <- function(data, years, sub_scenarios, ref, save_dir,
     x_order = sub_scenarios,
     angle_x_label = angle_x_label)
   }
+
+
+
+plot_map <- function(data,
+                    limits,
+                    figure_title = "",
+                    save_path = NULL,
+                    legend_title = "") {
+  
+  data <- data %>%
+    mutate(iso_a3_eh = substr(region_bld, nchar(region_bld)-2, nchar(region_bld)))
+
+  eu_countries <- ne_countries(continent = "Europe", returnclass = "sf")
+
+  merged_data <- merge(eu_countries, data, by = "iso_a3_eh") %>%
+    filter(!is.na(value))
+
+  merged_data <- st_crop(merged_data, xmin = -20, xmax = 45,
+                                      ymin = 30, ymax = 73)
+
+  p <- ggplot(merged_data) +
+    geom_sf(aes(fill = value), color = "white") +
+    scale_fill_gradient(
+      low = "green", high = "red",
+      na.value = "grey50", limits = limits,
+      oob = squish) +
+    theme_void() +
+    theme(
+      plot.title = element_text(size = plot_settings[["big_size_text"]]),
+      legend.title = element_text(size = plot_settings[["size_text"]]),
+      legend.text = element_text(size = plot_settings[["size_text"]])) +
+    labs(title = figure_title) +
+    guides(fill = guide_legend(title = legend_title))
+
+  if (!is.null(save_path)) {
+    ggsave(save_path, plot = p, width = plot_settings[["width"]],
+           height = plot_settings[["height"]],
+           dpi = plot_settings[["dpi"]])
+  } else {
+    print(p)
+  }
+
+}

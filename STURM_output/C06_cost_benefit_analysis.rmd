@@ -21,29 +21,26 @@ path <- "STURM_data/input_csv/input_resid/macro/social_cost_carbon_20.csv"
 social_cost_carbon <- read.csv(path) %>%
   rename(social_cost_carbon = value)
 
+run <- "scenarios_detail"
 
-run <- "scenarios_mix_paper"
 scenarios <- c(
     "EU" = "Current policies",
-    "EU_mix" = " Base",
-    "EU_mix_ambitious" = "Enhanced",
-    "EU_mix_ban" = "Fossil-Ban"
-    #,"EU_mix_advanced_ban" = "Mix Advanced & Ban"
+    "EU_reno_wave" = "Renovation wave",
+    "EU_deep_reno_wave" = "Deep Renovation wave",
+    "EU_carbon_tax" = "Carbon tax",
+    "EU_carbon_tax_ambitious" = "Carbon tax ambitious",
+    "EU_heat_pump" = "Climate Fund",
+    "EU_heat_pump_ambitious" = "Climate Fund ambitious"
 )
+
+run <- "scenarios_cba"
+scenarios <- c(
+    "EU" = "Current policies",
+    "EU_mix" = "Proposed",
+    "EU_mix_ambitious" = "Enhanced",
+    "EU_mix_ban" = "Fossil-Ban")
 # Reconstuction flows
-flows <- c("cost_renovation_EUR", "cost_heater_EUR")
 
-data <- data %>%
-  mutate(scenario = scenarios[.data[["scenario"]]])
-
-stp <- 5
-
-data <- data %>%
- mutate(year = ifelse(variable %in% flows, year - stp, year),
-        value = ifelse(variable %in% flows, value / stp, value))
-data <- distinct(data)
-
-ref <- "EU"
 ```
 
 ## Read data
@@ -69,6 +66,20 @@ for (scenario in names(scenarios)) {
 
   data <- bind_rows(data, temp)
 }
+
+flows <- c("cost_renovation_EUR", "cost_heater_EUR")
+
+data <- data %>%
+  mutate(scenario = scenarios[.data[["scenario"]]])
+
+stp <- 5
+
+data <- data %>%
+ mutate(year = ifelse(variable %in% flows, year - stp, year),
+        value = ifelse(variable %in% flows, value / stp, value))
+data <- distinct(data)
+
+ref <- "Current policies"
 ```
 
 Calculate the differences between scenarios and baseline:
@@ -76,9 +87,6 @@ Calculate the differences between scenarios and baseline:
 - Cost heating system,
 - Cost fuel of heating,
 - Emission.
-
-
-
 
 ```{r}
 lifetime_renovation <- 35 # years
@@ -109,14 +117,10 @@ wide_data <- wide_data %>%
       social_discount / (1 - (1 + social_discount)^(-lifetime_renovation)),
     annuities_heater =
       social_discount / (1 - (1 + social_discount)^(-lifetime_heater)),
-    cost_renovation_EUR_year =
-      cost_renovation_EUR * annuities_renovation,
-    cost_heater_EUR_year =
-      cost_heater_EUR * annuities_heater,
-    cost_emission_EUR =
-      heat_tCO2 * social_cost_carbon * stp,
-    cost_heat_EUR =
-      cost_heat_EUR * stp
+    cost_renovation_EUR_year = cost_renovation_EUR * annuities_renovation * stp,
+    cost_heater_EUR_year = cost_heater_EUR * annuities_heater * stp,
+    cost_emission_EUR = heat_tCO2 * social_cost_carbon * stp,
+    cost_heat_EUR = cost_heat_EUR * stp
     )
 
 
@@ -143,9 +147,6 @@ wide_data <- wide_data %>%
     cost_heat_EUR + cost_emission_EUR)
 
 write.csv(filter(wide_data, region_bld == "EU"), paste0(save_dir, "/cba_calculation_eu.csv"))
-
-
-
 ```
 
 ```{r}
@@ -191,7 +192,6 @@ summary <- wide_data_diff %>%
   ungroup() 
 
 
-
 write.csv(summary, paste0(save_dir, "/cba_summary.csv"))
 ```
 
@@ -217,7 +217,7 @@ df <- summary %>%
   gather(variable, value, cost_renovation_sum, cost_heater_sum, cost_heat_sum, cost_emission_sum, running_cost) %>%
   mutate(variable = rename_list[.data[["variable"]]]) %>%
   filter(scenario != ref) %>%
-  mutate(scenario = scenarios[.data[["scenario"]]]) %>%
+  # mutate(scenario = scenarios[.data[["scenario"]]]) %>%
   mutate(value = - value)
 
 total <- df %>%

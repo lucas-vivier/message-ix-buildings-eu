@@ -3,7 +3,6 @@ library(rstudioapi)
 library(tidyverse, quietly = TRUE)
 library(readxl)
 library(dplyr)
-library(parallel)
 
 suppressPackageStartupMessages(library(tidyverse))
 
@@ -16,18 +15,20 @@ start_script_time <- Sys.time()
 rnd <- 5 # rounding (number of decimals)
 u_EJ_GWa <- 31.71
 min_shr_fuel <- 0.01
-inertia_wtp <- 4.3
-social_discount_rate <- 0.03
-sub_ren_shell_type <- "ad_valorem" #"ad_valorem"
-sub_ren_shell_target <- "all"
-objective_type <- NULL
-budget_constraint_insulation <- NULL # "carbon_revenue"
-premature_replacement <- 3
-anticipate_renovation <- 3
-sub_heater_type <- "ad_valorem" #"ad_valorem"
-budget_constraint_heater <- NULL # carbon_revenue
-sub_ren_shell_household_target <- "all"
-rate_dem_target <- NULL
+
+param <- list(sub_ren_shell_type = "ad_valorem",
+            sub_ren_shell_target = "all",
+            objective_type = NULL,
+            budget_constraint_insulation = NULL,
+            premature_replacement = 3,
+            anticipate_renovation = 3,
+            sub_heater_type = "ad_valorem",
+            budget_constraint_heater = NULL,
+            sub_ren_shell_household_target = "all",
+            rate_dem_target = NULL,
+            mandatory_switch = FALSE,
+            inertia_wtp = 4.3,
+            social_discount_rate = 0.03)
 
 source("./STURM_model/F10_scenario_run.R")
 
@@ -77,9 +78,11 @@ if (run == "test") {
 } else if (run == "policies") {
     file_scenarios <- "scenarios_EU.csv"
     energy_efficiency <- "endogenous"
-    runs <- c("EU", "EU_mix", "EU_mix_deep", "EU_mix_ambitious",
-        "EU_mix_ambitious_low_income", "EU_mix_banstandalone", "EU_mix_ban")
-    runs <- c("EU_mix_ambitious")
+    runs <- c("EU_deep_reno_wave", "EU_carbon_tax", "EU_carbon_tax_ambitious",
+        "EU_heat_pump", "EU_heat_pump_ambitious")
+    runs <- c("EU", "EU_mix", "EU_mix_ambitious", "EU_mix_ban")
+    runs <- c("EU")
+
 }
 
 report <- list(var = c("energy"),
