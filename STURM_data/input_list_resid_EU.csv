@@ -2,23 +2,23 @@ name_parameter,name_file,category
 floor_cap,floor_capita,activity
 prob_dem,bld_demolition_distr_long_EU,activity
 lifetime_heater,lifetime_heater_EU,activity
-rate_shell_ren_exo,rate_shell_ren_EU,activity
-ms_shell_ren_exo,ms_shell_ren_EU,activity
+rate_shell_ren_exo,rate_renovation_EU,activity
+ms_shell_ren_exo,ms_renovation_EU,activity
+ms_shell_new_exo,ms_renovation_new_EU,activity
 ms_switch_fuel_exo,ms_switch_fuel_EU_jrcidees_correctionhp,activity
-ms_shell_new_exo,ms_shell_new_EU,activity
 discount_rate,discount_rate,activity
 barriers_rent,barriers_rent,activity
 barriers_mfh,barriers_mfh,activity
 learning_rate_heat,learning_inv_heat_EU,activity
 learning_rate_shell,learning_inv_ren_shell_EU,activity
 objectives_renovation,objectives_renovation,policies
-pop,pop_clim_ssp2,basic
+pop,pop_clim_ssp2_hrv,basic
 hh_size,hh_size_EU,basic
 parameters_renovation,parameters_renovation,calibration
 parameters_heater,parameters_heater,calibration
 hdd,hdd_tabula,climate
-cost_invest_heat,cost_inv_heat_EU,decision
-cost_invest_ren_shell,cost_inv_ren_shell_EU,decision
+cost_invest_heat,cost_invest_heater_EU,decision
+cost_invest_ren_shell,cost_invest_renovation_EU,decision
 lifetime_new,bld_lifetime_new,decision
 lifetime_ren,bld_lifetime_ren,decision
 ct_fuel_excl_reg,ct_fuel_excluded_reg,decision
@@ -30,6 +30,7 @@ carbon_market,carbon_market,emission
 emission_ini,emission_ini,emission
 emission_factors,emission_factors_NPi,emission
 emission_factors_embodied,emission_factors_embodied,emission
+pe_conversion_factor,pe_conversion_factor_EU,macro
 eff_heat ,eff_heat_EU,energy
 eff_cool,eff_cool_ssp2,energy
 eff_hotwater,eff_hotwater_resid_EU,energy
@@ -50,7 +51,8 @@ energy_prices_projections,input_prices_NPi,macro
 income,income,macro
 mat_int,material_int_resid,material
 sub_heat,sub_heat_EU,policies
-sub_ren_shell,sub_ren_shell_EU,policies
+subsidies_renovation,subsidies_renovation_EU,policies
+subsidies_renovation_target,subsidies_renovation_target,policies
 carbon_tax,carbon_tax_EU,policies
 ban_fuel,ban_fuel_EU,policies
 ban_fuel_renovation,ban_fuel_renovation_EU,policies

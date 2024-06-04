@@ -34,9 +34,7 @@ a_h0 <- 0.8 # constant parameter
 tau_h0 <- 30
 c_m <- 45 # Wh/(m2.K), internal heat capacity
 
-# service factor
-alpha <- 0.3564
-p_elasticity <- -0.244
+
 
 #' @title Function to calculate energy demand for space heating
 #' @description Calculate energy demand for space heating
@@ -98,9 +96,14 @@ fun_space_heating_calculation <- function(bld_cases_fuel,
     ungroup() %>%
     left_join(en_sav_ren) %>%
     mutate_cond(is.na(en_sav_ren), en_sav_ren = 0) %>%
+    mutate(en_sav_ren = ifelse(bld_age == "p5", 0, en_sav_ren)) %>%
     mutate(h_tr = h_tr * (1 - en_sav_ren)) %>%
     mutate(h_tr = ifelse(h_tr < min_h_tr, min_h_tr, h_tr)) %>%
-    mutate(u_building = h_tr / (area_wall + area_roof + area_floor + area_windows))
+    mutate(h_tr = ifelse((bld_age == "p5") & (eneff == "adv"),
+      min(h_tr), h_tr)) %>%
+    mutate(u_building = h_tr /
+      (area_wall + area_roof + area_floor + area_windows)) %>%
+    mutate(u_building = ifelse(u_building < 0.1, 0.1, u_building))
 
   q_gains <- area_windows %>%
     mutate(q_sol = f_sh * (1 - f_f) * f_w * g_gl * i_sol) %>%
@@ -162,18 +165,24 @@ fun_en_sim <- function(sector,
                        hh_size,
                        floor_cap,
                        price_en,
+                       price_en_wt,
                        income,
+                       pe_conversion_factor,
+                       bill_rebates = NULL,
                        shr_acc_heat = 1,
+                       nzeb = FALSE,
                        en_method = "TABULA",
-                       path_out = NULL) {
-  print(paste0("Running energy demand year ", yrs[i]))
-
+                       path_out = NULL,
+                       alpha = NULL,
+                       short_term_price_elasticity = -0.2) {
   if (en_method == "TABULA") {
+    # If using TABULA data, do not calibrated parameters used with CHILLED
     hours_heat <- mutate(hours_heat,
       hours_heat = ifelse(hours_heat > 0, 24, 0))
     shr_floor_heat <- mutate(shr_floor_heat,
       shr_floor_heat = ifelse(shr_floor_heat > 0, 1, 0))
   }
+
 
 
   energy_det <- bld_cases_fuel %>%
@@ -203,68 +212,96 @@ fun_en_sim <- function(sector,
     mutate(en_dem_c_fans =
       days_cool * shr_floor_cool * f_f * 24 * power_fans / (25 * 1e3)) %>%
     mutate_cond(is.na(en_dem_heat), en_dem_heat = 0) %>%
-    # Remove NA values
     mutate_cond(is.na(en_dem_c_ac), en_dem_c_ac = 0) %>%
-    # Remove NA values
     mutate_cond(is.na(en_dem_c_fans), en_dem_c_fans = 0) %>%
-    # Total energy demand for cooling
     mutate(en_dem_cool = en_dem_c_ac + en_dem_c_fans) %>%
     select(-c(en_int_heat, en_int_cool, days_cool))
 
+  # Formatting energy demand
   energy_det_subset <- energy_det %>%
     select(-c(
       eff_cool, eff_heat, f_h, f_c,
       shr_floor_heat, shr_floor_cool, hours_heat, hours_cool,
       hours_fans, power_fans, f_f))
 
-  ## Energy demand SPACE HEATING ONLY - by fuel: for investment decisions
+  # Formatting energy demand for space heating
   en_m2_scen_heat <- bld_cases_fuel %>%
-    # mutate(fuel = fuel_heat) %>%
     left_join(energy_det_subset) %>%
     select(-c("en_dem_cool", "en_dem_c_ac", "en_dem_c_fans",
       "shr_acc_cool", "fuel_cool"))
 
+  # Formatting energy demand for space cooling
   en_m2_scen_cool <- bld_cases_fuel %>%
     left_join(energy_det_subset) %>%
     select(-c("fuel_heat", "en_dem_heat")) %>%
     distinct()
 
   en_hh <- NULL
-  # Calculate household energy demand - for cost calculations - residential only
   if (sector == "resid") {
 
-    # Add hh size, only for heating
-    en_hh <- en_m2_scen_heat %>%
-      rename(en_m2_std = en_dem_heat) %>%
-      left_join(hh_size) %>%
-      # filter(year == yrs[i]) %>%
-     # Add floor surface area
-      left_join(floor_cap) %>%
-      # Calculate total energy demand per household
-      mutate(en_hh_std = en_m2_std * floor_cap * hh_size) %>%
-      # Associate energy prices to en_perm
-      left_join(price_en) %>%
-      # Calculate the total costs for operational energy
-      mutate(cost_op_std = en_hh_std * price_en) %>%
-      left_join(income) %>%
-      mutate(budget_share = cost_op_std / income) %>%
-      mutate(heating_intensity = alpha * (budget_share)**p_elasticity) %>%
-      mutate(en_hh = en_hh_std * heating_intensity) %>%
-      mutate(cost_op = en_hh * price_en) %>%
-      select(-c(en_m2_std, hh_size, floor_cap, price_en, fuel,
-        cost_op_std, income)) %>%
-      left_join(bld_cases_fuel)
+    if (is.null(bill_rebates)) {
+      bill_rebates <- data.frame(
+        region_bld = unique(bld_cases_fuel$region_bld),
+        bill_rebates = 0
+      )
+    }
 
+    if (is.null(alpha)) {
+    # put one value for alpha for all countries
+    alpha <- bld_cases_fuel %>%
+      select("region_bld") %>%
+      distinct() %>%
+      mutate(coeff_alpha = 1)
   }
 
+    # Calculating household energy cost (residential only)
+    en_hh <- en_m2_scen_heat %>%
+      rename(en_m2_std = en_dem_heat) %>%
+      left_join(pe_conversion_factor) %>%
+      mutate(pe_conversion_factor = ifelse(is.na(pe_conversion_factor),
+        1, pe_conversion_factor)) %>%
+      mutate(en_pe_hh_std = en_m2_std * pe_conversion_factor) %>%
+      left_join(hh_size) %>%
+      left_join(floor_cap) %>%
+      mutate(m2 = hh_size * floor_cap) %>%
+      mutate(en_hh_std = en_m2_std * m2) %>%
+      left_join(price_en) %>%
+      mutate(cost_op_std = en_hh_std * price_en) %>%
+      left_join(bill_rebates) %>%
+      mutate(bill_rebates = ifelse(is.na(bill_rebates), 0, bill_rebates)) %>%
+      mutate(bill_rebates = ifelse(bill_rebates > 0.9 * cost_op_std,
+        0.9 * cost_op_std, bill_rebates)) %>%
+      mutate(cost_op_std = cost_op_std - bill_rebates) %>%
+      left_join(income) %>%
+      mutate(budget_share = cost_op_std / income) %>%
+      # mutate(heating_intensity = alpha * (budget_share)**p_elasticity) %>%
+      left_join(alpha) %>%
+      mutate(heating_intensity = coeff_alpha * cost_op_std**short_term_price_elasticity) %>%
+      # Calculating heating intensity (household heating behavior)
+      mutate(en_hh = en_hh_std * heating_intensity) %>%
+      mutate(en_m2 = en_hh / m2) %>%
+      mutate(cost_op = en_hh * price_en) %>%
+      left_join(price_en_wt) %>%
+      mutate(cost_op_wt = en_hh * price_en_wt) %>%
+      select(-c(hh_size, floor_cap, price_en, fuel, income,
+        cost_op_std, bill_rebates, pe_conversion_factor, m2, coeff_alpha,
+        price_en_wt)) %>%
+      left_join(bld_cases_fuel)
+  }
+
+  # Calculating household energy cost (residential only)
   if (!is.null(path_out)) {
+    print('Extracting energy demand and cost at household level')
     temp <- en_hh %>%
       select("region_bld", "clim", "urt",
         "arch", "bld_age", "eneff", "fuel_heat",
-        "tenr", "inc_cl", "en_hh_std", "en_hh",
+        "tenr", "inc_cl", "en_m2_std", "en_m2", "en_hh_std", "en_hh",
         "budget_share", "heating_intensity", "cost_op")
     write.csv(temp, paste0(path_out, "/detail_energy.csv"))
   }
+
+  en_hh <- en_hh %>%
+    select(-c(en_m2_std, en_m2))
 
   output <- list(
     en_m2_scen_heat = en_m2_scen_heat,
@@ -290,8 +327,6 @@ fun_hw_resid <- function(yrs, i,
                          eff_hotwater,
                          en_int_hotwater,
                          en_int_heat) {
-  print(paste0("Running energy demand year ", yrs[i]))
-
   acc_hw <- 1 # Access to DHW
 
   en_hh_hw_scen <- bld_cases_fuel %>%

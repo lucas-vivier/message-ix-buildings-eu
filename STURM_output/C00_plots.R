@@ -6,6 +6,7 @@ library(stringr)
 library(scales)
 library(sf)
 library(rnaturalearth)
+library(viridis)  # Load the viridis package
 
 source("STURM_output/C00_plots_settings.R")
 
@@ -21,9 +22,12 @@ plot_settings <- list(
   "height" = 1 * 16, #height cm
   "dpi" = 300, #DPI
   "font_family" = "Arial",
-  "colors" = c(colors_efficiency, colors_fuels, colors_countries, colors_cost, colors_insulation),
-  "rename" = c(rename_eneff, rename_fuels, rename_countries, rename_hh, rename_cost, rename_insulation),
-  "order" = c(order_fuels, order_eneff, order_countries, order_hh, order_cost, order_insulation)
+  "colors" = c(colors_efficiency, colors_fuels,
+    colors_countries, colors_cost, colors_insulation, colors_primary),
+  "rename" = c(rename_eneff, rename_fuels, rename_countries,
+    rename_hh, rename_cost, rename_insulation, rename_primary),
+  "order" = c(order_fuels, order_eneff, order_countries,
+    order_hh, order_cost, order_insulation, order_primary)
 )
 
 
@@ -109,6 +113,31 @@ message_building_subplot_theme <- theme_minimal() +
 
 # Function to create Message-ix-Buidling Figures
 
+plot_stacked_bars <- function(data,
+                              fill_column,
+                              x_column,
+                              y_column,
+                              save_path
+                              ) {
+
+  p <- data %>%
+    mutate(!!fill_column := plot_settings[["rename"]][.data[[fill_column]]]) %>%
+    mutate(!!sym(fill_column) := factor(!!sym(fill_column), levels = rev(plot_settings[["order"]]))) %>%
+    ggplot(aes(x = .data[[x_column]], y = .data[[y_column]])) +
+    geom_bar(stat = "identity", aes(fill = .data[[fill_column]])) +
+    scale_fill_manual(values = plot_settings[["colors"]]) +
+    scale_y_continuous(labels = percent_format()) +  # Formatting y-axis as percentage
+    message_building_theme +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5))
+
+  ggsave(save_path, plot = p, width = plot_settings[["width"]],
+          height = plot_settings[["height"]],
+          dpi = plot_settings[["dpi"]])
+}
+
+
+
+
 plot_stacked_areas <- function(data,
                               x_column,
                               y_column,
@@ -173,7 +202,6 @@ plot_stacked_areas <- function(data,
     } else {
       p <- p
       if (presentation) {
-        print("ok")
         p <- p +
           message_building_theme_presentation +
            theme(strip.text = element_blank())
@@ -216,13 +244,15 @@ plot_stacked_areas <- function(data,
 plot_clustered_barplot <- function(df,
                                     x_column,
                                     fill_column,
+                                    subplot_column = "year",
                                     save_path = NULL,
                                     y_label_suffix = "",
                                     y_label = "",
                                     year_start = 2015,
                                     x_order = NULL,
                                     display_total = TRUE,
-                                    angle_x_label = NULL) {
+                                    angle_x_label = NULL,
+                                    legend = TRUE) {
 
   custom_label <- function(x) {
     label_comma()(x) %>% paste0(" ", y_label_suffix)
@@ -233,6 +263,8 @@ plot_clustered_barplot <- function(df,
     df <- df %>%
       filter(!(year == year_start & scenario != "Current policies"))
   }
+
+  df[[subplot_column]] <- factor(df[[subplot_column]], levels = unique(df[[subplot_column]]))
 
   df <- df %>%
     mutate(!!fill_column := plot_settings[["rename"]][.data[[fill_column]]]) %>%
@@ -258,9 +290,8 @@ plot_clustered_barplot <- function(df,
         stat = 'summary', fun = sum, vjust = -1, fontface = "bold", size = 7
       )
   }
-
   p <- p +
-    facet_grid(~year, scales = "free_x", space = "free") +
+    facet_grid(reformulate(subplot_column), scales = "free_x", space = "free") +
     labs(title = y_label) +
     scale_fill_manual(values =
       plot_settings[["colors"]], na.translate = FALSE) +
@@ -280,6 +311,9 @@ plot_clustered_barplot <- function(df,
     # put text.x in bold
     p <- p +
       theme(axis.text.x = element_text(angle = angle_x_label, hjust = 1, size = plot_settings[["size_text"]], face = "bold"))
+  }
+  if (!legend) {
+    p <- p + theme(legend.position = "none", legend.title = element_text(size=10))
   }
 
   if (!is.null(save_path)) {
@@ -608,8 +642,8 @@ output_table <- function(data,
     paste0(run, "_", end_year, "_summary_eu.csv"), sep = "/")
 
   variables <- c("heat_kWh", "heat_std_kWh", "heat_tCO2",
-      "energy_poverty_thres", "stock_building",
-        "heating_intensity")
+      "energy_poverty_thresh", "stock_building",
+        "heating_intensity", "population")
 
   low_carbon <- c("biomass_solid", "heat_pump", "electricity", "district_heat")
 
@@ -636,6 +670,17 @@ output_table <- function(data,
       values_from = value)
 
   table <- bind_rows(ini, table)
+
+  # cumulated ghg
+  temp <- data %>%
+    filter(year <= end_year) %>%
+    filter(resolution == "all") %>%
+    filter(variable == "heat_tCO2") %>%
+    group_by_at(c("region_bld", "scenario")) %>%
+    summarize(heat_tCO2_cum = sum(value) * 5) %>%
+    ungroup()
+
+  table <- left_join(table, temp, by = c("region_bld", "scenario"))
 
   # replacement heating system
   temp <- data %>%
@@ -724,6 +769,38 @@ output_table <- function(data,
   table <- left_join(table, temp, by = c("region_bld", "scenario")) %>%
     mutate(advanced_renovated_building =
       ifelse(is.na(advanced_renovated_building), 0, advanced_renovated_building))
+
+  # stock energy consumption
+  temp <- data %>%
+    filter(variable == "stock_building") %>%
+    filter(year == end_year) %>%
+    filter(resolution %in% names(rename_primary)) %>%
+    mutate(resolution = rename_primary[resolution]) %>%
+    group_by_at(c("region_bld", "scenario", "resolution")) %>%
+    summarize(building = sum(value)) %>%
+    ungroup() %>%
+    mutate(building = ifelse(is.na(building), 0, building)) %>%
+    pivot_wider(id_cols = c("region_bld", "scenario"),
+      names_from = resolution,
+      values_from = building)
+  
+  ini <- data %>%
+    filter(variable == "stock_building") %>%
+    filter(year == base_year) %>%
+    filter(scenario == ref) %>%
+    filter(resolution %in% names(rename_primary)) %>%
+    mutate(resolution = rename_primary[resolution]) %>%
+    group_by_at(c("region_bld", "scenario", "resolution")) %>%
+    summarize(building = sum(value)) %>%
+    ungroup() %>%
+    mutate(building = ifelse(is.na(building), 0, building)) %>%
+    pivot_wider(id_cols = c("region_bld", "scenario"),
+      names_from = resolution,
+      values_from = building) %>%
+    mutate(scenario = "Initial")
+
+  temp <- bind_rows(ini, temp)
+  table <- left_join(table, temp, by = c("region_bld", "scenario"))
 
   # low-carbon buildings
   temp <- data %>%
@@ -828,6 +905,7 @@ output_table <- function(data,
       heat_kWh = round(heat_kWh / 1e9, 2),
       heat_std_kWh = round(heat_std_kWh / 1e9, 2),
       heat_tCO2 = round(heat_tCO2 / 1e6, 2),
+      heat_tCO2_cum = round(heat_tCO2_cum / 1e9, 2),
       stock_building = round(stock_building / 1e6, 2),
       heating_intensity = round(heating_intensity, 2),
       renovated_building = round(renovated_building / 1e6, 2),
@@ -836,30 +914,44 @@ output_table <- function(data,
       replacement_heater = round(replacement_heater / 1e6, 2),
       low_carbon_building = round(low_carbon_building / 1e6, 2),
       heat_pump = round(heat_pump / 1e6, 2),
-      energy_poverty_thres =
-        round(energy_poverty_thres / 1e6, 2),
+      energy_poverty_thresh =
+        round(energy_poverty_thresh / 1e6, 2),
       cost_renovation_EUR = round(cost_renovation_EUR / 1e9, 2),
       sub_renovation_EUR = round(sub_renovation_EUR / 1e9, 2),
       cost_heater_EUR = round(cost_heater_EUR / 1e9, 2),
-      sub_heater_EUR = round(sub_heater_EUR / 1e9, 2)
+      sub_heater_EUR = round(sub_heater_EUR / 1e9, 2),
+      population = round(population / 1e6, 2),
+      `Advanced performance` = round(`Advanced performance` / 1e6, 2),
+      `Basic performance` = round(`Basic performance` / 1e6, 2),
+      `Bad performance` = round(`Bad performance` / 1e6, 2),
+      `No performance` = round(`No performance` / 1e6, 2),
+      `No consumption` = round(`No consumption` / 1e6, 2)
         ) %>%
     mutate(region_bld = plot_settings[["rename"]][region_bld]) %>%
     select(c("region_bld", "scenario",
-      "heat_kWh", "heat_std_kWh", "heat_tCO2",
+      "population",
+      "heat_kWh", "heat_std_kWh", "heat_tCO2", "heat_tCO2_cum",
       "heat_kWh_fossil", "heat_kWh_electricity",
       "heating_intensity", "stock_building",
       "low_carbon_building", "heat_pump",
       "renovated_building", "advanced_renovated_building",
-      "replacement_heater", "energy_poverty_thres",
+      "replacement_heater", "energy_poverty_thresh",
       "cost_renovation_EUR", "sub_renovation_EUR",
-      "cost_heater_EUR", "sub_heater_EUR")) %>%
+      "cost_heater_EUR", "sub_heater_EUR",
+      "Advanced performance", "Basic performance", 
+      "Bad performance", "No performance", "No consumption")) %>%
     mutate(low_carbon_building_rate = low_carbon_building / stock_building,
       renovated_building_rate = renovated_building / stock_building,
-      energy_poverty_rate = energy_poverty_thres / stock_building,
+      energy_poverty_rate = energy_poverty_thresh / stock_building,
       heat_kWh_fossil_rate = heat_kWh_fossil / heat_kWh,
+      sh_sub_renovation = sub_renovation_EUR / cost_renovation_EUR,
+      sh_sub_heater = sub_heater_EUR / cost_heater_EUR,
+      consumption_capita = heat_kWh / population,
+      emission_capita = heat_tCO2 / population
       ) %>%
     rename(
-      "Energy poverty (Million)" = energy_poverty_thres,
+      "Population (Million)" = population,
+      "Energy poverty (Million)" = energy_poverty_thresh,
       "Energy poverty (Percent)" = energy_poverty_rate,
       "Renovated buildings (Million)" = renovated_building,
       "Renovated buildings advanced (Million)" = advanced_renovated_building,
@@ -871,77 +963,116 @@ output_table <- function(data,
       "Replacement heating system (Million)" = replacement_heater,
       "Heating intensity (Percent)" = heating_intensity,
       "Space heating consumption (TWh)" = heat_kWh,
+      "Space heating consumption (MWh/capita)" = consumption_capita,
       "Space heating consumption fossil (TWh)" = heat_kWh_fossil,
       "Share fossil-fuels (Percent)" = heat_kWh_fossil_rate,
       "Space heating consumption electricity (TWh)" = heat_kWh_electricity,
       "Space heating consumption standard (TWh)" = heat_std_kWh,
       "Emission (MtCO2)" = heat_tCO2,
+      "Emission cumulated (GtCO2)" = heat_tCO2_cum,
+      "Emission (tCO2/capita)" = emission_capita,
       "Member states" = region_bld,
       "Scenario" = scenario,
       "Cost renovation (Billion EUR)" = cost_renovation_EUR,
       "Subsidies renovation (Billion EUR)" = sub_renovation_EUR,
+      "Share subsidies renovation (Percent)" = sh_sub_renovation,
       "Cost heater (Billion EUR)" = cost_heater_EUR,
-      "Subsidies heater (Billion EUR)" = sub_heater_EUR
+      "Subsidies heater (Billion EUR)" = sub_heater_EUR,
+      "Share subsidies heater (Percent)" = sh_sub_heater
       )
 
-  write.csv(format_temp, save_file, row.names = FALSE)
-
-  format_temp_eu <- format_temp %>%
-  filter(`Member states` == "EU") %>%
-  select(-c("Member states"))
-
-  consumption_ini <- format_temp_eu %>%
+  consumption_ini <- format_temp %>%
     filter(Scenario == "Initial") %>%
-    pull(("Space heating consumption (TWh)"))
+    select(c("Member states", "Space heating consumption (TWh)")) %>%
+    rename(consumption_ini = "Space heating consumption (TWh)")
 
-  format_temp_eu <- format_temp_eu %>%
+  format_temp <- format_temp %>%
+    left_join(consumption_ini) %>%
     mutate(`Consumption saving (%)` =
-      (consumption_ini - `Space heating consumption (TWh)`) / consumption_ini)
+      (consumption_ini - `Space heating consumption (TWh)`) / consumption_ini) %>%
+    select(-c("consumption_ini"))
 
-  emission_ini <- format_temp_eu %>%
+  emission_ini <- format_temp %>%
     filter(Scenario == "Initial") %>%
-    pull(("Emission (MtCO2)"))
+    select(c("Member states", "Emission (MtCO2)")) %>%
+    rename(emission_ini = "Emission (MtCO2)")
 
-  format_temp_eu <- format_temp_eu %>%
+  format_temp <- format_temp %>%
+    left_join(emission_ini) %>%
     mutate(`Emission saving (%)` =
-      (emission_ini - `Emission (MtCO2)`) / emission_ini)
+      (emission_ini - `Emission (MtCO2)`) / emission_ini) %>%
+    select(-c("emission_ini"))
 
-  format_temp_eu <- as.data.frame(t(format_temp_eu))
-  colnames(format_temp_eu) <- format_temp_eu[1,]
-  format_temp_eu <- format_temp_eu[-1,]
-
-  format_temp_eu <- format_temp_eu %>%
-    select(c("Initial", unname(scenarios)))
-
+  # formatting
+  
   select_order <- c(
+    "Population (Million)",
     "Stock building (Million)",
     "Space heating consumption (TWh)",
+    "Space heating consumption standard (TWh)",
+    "Space heating consumption (MWh/capita)",
     "Consumption saving (%)",
     "Space heating consumption fossil (TWh)",
     "Share fossil-fuels (Percent)",
     "Space heating consumption electricity (TWh)",
+    "Replacement heating system (Million)",
     "Heat-pumps (Million)",
+    "Low carbon buildings (Million)",
     "Low carbon buildings (Percent)",
     "Renovated buildings (Million)",
     "Renovated buildings advanced (Million)",
     "Renovated buildings (Percent)",
     "Cost heater (Billion EUR)",
     "Subsidies heater (Billion EUR)",
+    "Share subsidies heater (Percent)",
     "Cost renovation (Billion EUR)",
     "Subsidies renovation (Billion EUR)",
+    "Share subsidies renovation (Percent)",
     "Emission (MtCO2)",
     "Emission saving (%)",
+    "Emission cumulated (GtCO2)",
+    "Emission (tCO2/capita)",
     "Heating intensity (Percent)",
     "Energy poverty (Million)",
-    "Energy poverty (Percent)"
+    "Energy poverty (Percent)",
+    "Advanced performance",
+    "Basic performance",
+    "Bad performance",
+    "No performance",
+    "No consumption"
   )
 
-  format_temp_eu <- format_temp_eu[select_order, ]
+  long_df <- format_temp %>% 
+    pivot_longer(
+      cols = -c("Member states", "Scenario"),
+      names_to = "variable",
+      values_to = "value"
+    )
+
+  wide_df <- long_df %>%
+    pivot_wider(
+      names_from = Scenario,
+      values_from = value
+    )
+  wide_df$variable <- factor(wide_df$variable, levels = select_order)
+  # Arrange the rows by 'variable' and then 'Member states'
+  final_df <- wide_df %>%
+    arrange(variable, `Member states`)
+
+  # Select the columns in the order you want
+  final_df <- final_df %>%
+    select(variable, `Member states`, "Initial", everything())
 
 
-  write.csv(format_temp_eu, save_file_eu)
+  write.csv(final_df, save_file, row.names = FALSE)
+
+  final_df_eu <- final_df %>%
+    filter(`Member states` == "EU") %>%
+    select(-c("Member states"))
+
+  write.csv(final_df_eu, save_file_eu, row.names = FALSE)
   
-  return(list(format_temp = format_temp, format_temp_eu = format_temp_eu))
+  return(format_temp)
 }
 
 
@@ -1068,12 +1199,13 @@ budget_share_energy_plots <- function(data, years, sub_scenarios, ref, save_dir,
   }
 
 
-
 plot_map <- function(data,
                     limits,
                     figure_title = "",
                     save_path = NULL,
-                    legend_title = "") {
+                    legend_title = "",
+                    subplot_column = NULL,
+                    ncol = 2) {
   
   data <- data %>%
     mutate(iso_a3_eh = substr(region_bld, nchar(region_bld)-2, nchar(region_bld)))
@@ -1087,16 +1219,27 @@ plot_map <- function(data,
                                       ymin = 30, ymax = 73)
 
   p <- ggplot(merged_data) +
-    geom_sf(aes(fill = value), color = "white") +
-    scale_fill_gradient(
-      low = "green", high = "red",
-      na.value = "grey50", limits = limits,
-      oob = squish) +
+    geom_sf(aes(fill = value), color = "gray20", size = 5) +
+    geom_sf_text(aes(label = iso_a3_eh), size = 5, color = "grey50",
+      fontface = "bold") +  # Add country codes with geom_sf_text
+    scale_fill_viridis_c(
+      limits = limits,
+      oob = scales::squish,
+      na.value = "grey50")
+
+  if (!is.null(subplot_column)) {
+    p <- p +
+      facet_wrap(subplot_column, ncol = ncol)
+  }
+
+  p <- p +
     theme_void() +
     theme(
       plot.title = element_text(size = plot_settings[["big_size_text"]]),
       legend.title = element_text(size = plot_settings[["size_text"]]),
-      legend.text = element_text(size = plot_settings[["size_text"]])) +
+      legend.text = element_text(size = plot_settings[["size_text"]]),
+      strip.background = element_blank(),
+      strip.text = element_text(size = 20, face = "bold")) +
     labs(title = figure_title) +
     guides(fill = guide_legend(title = legend_title))
 

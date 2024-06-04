@@ -59,3 +59,5 @@ C-WEU-PRT,perm,std,0.928571429
 C-WEU-PRT,perm,adv,0.071428571
 C-WEU-SWE,perm,std,0.875
 C-WEU-SWE,perm,adv,0.125
+C-WEU-HRV,perm,std,0.9375
+C-WEU-HRV,perm,adv,0.0625

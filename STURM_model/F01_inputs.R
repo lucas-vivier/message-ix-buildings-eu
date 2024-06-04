@@ -66,9 +66,6 @@ fun_inputs_csv <- function(path_in, file_inputs, file_scenarios, sector, run,
       path_file)) %>%
     mutate(path_file = paste0(path_file, ".csv"))
 
-  print(filter(input, name_parameter == "sub_ren_shell")$path_file)
-
-
   ### TEMPORARY ### EXCLUDE SPECIAL DATA FILES
   input <- input %>%
     filter(!name_parameter %in%
@@ -110,32 +107,18 @@ fun_inputs_csv <- function(path_in, file_inputs, file_scenarios, sector, run,
 
 read_parameters <- function(scen_param, param) {
   
-  if ("_sub_ren_shell_type" %in% scen_param$name_parameter) {
-    sub_ren_shell_type <- scen_param %>%
-      filter(name_parameter == "_sub_ren_shell_type") %>%
+  if ("_subsidies_renovation_type" %in% scen_param$name_parameter) {
+    subsidies_renovation_type <- scen_param %>%
+      filter(name_parameter == "_subsidies_renovation_type") %>%
       pull(scenario)
-    param$sub_ren_shell_type <- sub_ren_shell_type
+    param$subsidies_renovation_type <- subsidies_renovation_type
   }
 
-  if ("_sub_ren_shell_target" %in% scen_param$name_parameter) {
-    sub_ren_shell_target <- scen_param %>%
-      filter(name_parameter == "_sub_ren_shell_target") %>%
+  if ("_objective_renovation" %in% scen_param$name_parameter) {
+    objective_renovation <- scen_param %>%
+      filter(name_parameter == "_objective_renovation") %>%
       pull(scenario)
-    param$sub_ren_shell_target <- sub_ren_shell_target
-  }
-
-  if ("_sub_ren_shell_household_target" %in% scen_param$name_parameter) {
-    sub_ren_shell_household_target <- scen_param %>%
-      filter(name_parameter == "_sub_ren_shell_household_target") %>%
-      pull(scenario)
-    param$sub_ren_shell_household_target <- sub_ren_shell_household_target
-  }
-
-  if ("_objective_type" %in% scen_param$name_parameter) {
-    objective_type <- scen_param %>%
-      filter(name_parameter == "_objective_type") %>%
-      pull(scenario)
-    param$objective_type <- objective_type
+    param$objective_renovation <- objective_renovation
   }
 
   if ("_sub_heat_type" %in% scen_param$name_parameter) {
@@ -164,13 +147,27 @@ read_parameters <- function(scen_param, param) {
       }
   }
 
-  if ("_share_recycling" %in% scen_param$name_parameter) {
-    share_recycling <- scen_param %>%
-      filter(name_parameter == "_share_recycling") %>%
+  if ("_sh_recycling_subsidies" %in% scen_param$name_parameter) {
+    sh_recycling_subsidies <- scen_param %>%
+      filter(name_parameter == "_sh_recycling_subsidies") %>%
       mutate(scenario = as.numeric(scenario)) %>%
       pull(scenario)
-    
-    param$share_recycling <- share_recycling
+    param$sh_recycling_subsidies <- sh_recycling_subsidies
+  }
+
+  if ("_sh_recycling_rebates" %in% scen_param$name_parameter) {
+    sh_recycling_rebates <- scen_param %>%
+      filter(name_parameter == "_sh_recycling_rebates") %>%
+      mutate(scenario = as.numeric(scenario)) %>%
+      pull(scenario)
+    param$sh_recycling_rebates <- sh_recycling_rebates
+  }
+
+    if ("_recycling_rebates" %in% scen_param$name_parameter) {
+    recycling_rebates <- scen_param %>%
+      filter(name_parameter == "_recycling_rebates") %>%
+      pull(scenario)
+    param$recycling_rebates <- recycling_rebates
   }
 
   if ("_mandatory_switch" %in% scen_param$name_parameter) {
@@ -178,7 +175,6 @@ read_parameters <- function(scen_param, param) {
       filter(name_parameter == "_mandatory_switch") %>%
       mutate(scenario = as.logical(scenario)) %>%
       pull(scenario)
-    
     param$mandatory_switch <- mandatory_switch
   }
   if ("_premature_replacement" %in% scen_param$name_parameter) {
@@ -186,7 +182,6 @@ read_parameters <- function(scen_param, param) {
       filter(name_parameter == "_premature_replacement") %>%
       mutate(scenario = as.numeric(scenario)) %>%
       pull(scenario)
-
     param$premature_replacement <- premature_replacement
   }
 

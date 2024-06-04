@@ -1,14 +1,14 @@
 library(dplyr)
 
 
-fun_subsidies_insulation <- function(i,
+fun_subsidies_renovation <- function(i,
   yrs,
   stp,
-  objective_type,
+  objective_renovation,
   budget_constraint_insulation,
   carbon_revenue,
-  sub_ren_shell_type,
-  sub_ren_shell_household_target,
+  subsidies_renovation_type,
+  subsidies_renovation_target,
   d,
   cat,
   param,
@@ -17,19 +17,20 @@ fun_subsidies_insulation <- function(i,
   parameters_renovation,
   emission_factors,
   anticipate_renovation,
-  region = NULL
+  region = NULL,
+  objectives_endogenous = NULL
   ) {
 
-  print("Endogenous subsidies insulation")
-  budget_renovation_function <- function(x, objective, objective_type,
-                                  household_target,
+  budget_renovation_function <- function(x, objective, objective_renovation,
+                                  subsidies_renovation_target,
                                   target = c("std", "adv")) {
-      
-      sub <- data.frame(sub_ren_shell = x, eneff_f = target,
+      sub <- data.frame(subsidies_renovation = x, eneff_f = target,
         year = yrs[i]) %>%
-        left_join(household_target, relationship = "many-to-many") %>%
-        mutate(sub_ren_shell = sub_ren_shell * factor) %>%
-        select(-c("factor"))
+        left_join(subsidies_renovation_target,
+          relationship = "many-to-many") %>%
+        mutate(subsidies_renovation =
+          subsidies_renovation * subsidies_renovation_target) %>%
+        select(-c("subsidies_renovation_target"))
 
       temp <- fun_ms_ren_shell_endogenous(yrs,
             i,
@@ -44,7 +45,9 @@ fun_subsidies_insulation <- function(i,
             d$lifetime_ren,
             d$discount_rate,
             param$social_discount_rate,
-            sub_ren_shell_type = sub_ren_shell_type,
+            d$income,
+            param$credit_constraint,
+            subsidies_renovation_type = subsidies_renovation_type,
             parameters = parameters_renovation,
             emission_factors = emission_factors,
             anticipate_renovation = anticipate_renovation)
@@ -62,19 +65,28 @@ fun_subsidies_insulation <- function(i,
       ren_det_i <- temp$ren_det_i %>%
         mutate(subsidies = n_units_fuel * sub_ren_hh)
 
-      sum <- sum(filter(bld_det_i, bld_age != "p5",
-        eneff %in% c("avg"))$n_units_fuel_exst)
+      if (FALSE) {
+        sum <- sum(filter(bld_det_i, bld_age != "p5",
+          eneff %in% c("avg"))$n_units_fuel_exst)
+      } else {
+        sum <- sum(bld_det_i$n_units_fuel_exst)
+      }
 
-      if (objective_type == "budget") {
+
+      if (objective_renovation == "budget") {
         rslt <- sum(ren_det_i$subsidies) * 1e3 / 1e9
-      } else if (objective_type %in% c("renovation", "deep_renovation")) {
+      } else if (grepl("rate", objective_renovation)) {
         rslt <- sum(ren_det_i$n_units_fuel) / sum / step_year
+      } else if (grepl("renovation", objective_renovation)) {
+        rslt <- sum(ren_det_i$n_units_fuel) / step_year
+      } else {
+        print("NOT IMPLEMENTED: objective_renovation")
       }
 
       return(rslt - objective)
   }
 
-  if (objective_type == "budget") {
+  if (objective_renovation == "budget") {
     objective <- NULL
     if (!is.null(budget_constraint_insulation)) {
       if (budget_constraint_insulation == "carbon_revenue") {
@@ -85,89 +97,88 @@ fun_subsidies_insulation <- function(i,
         print("Cannot read budget_constraint_insulation")
       }
     }
-  } else if (objective_type %in% "renovation") {
-    if (!is.null(region)) {
-      objective <- filter(d$objectives_renovation, region_bld == region)
+  } else if (grepl("renovation", objective_renovation)) {
+    if (grepl("endogenous", objective_renovation)) {
+      objective <- filter(objectives_endogenous, region_bld == region)
     } else {
-      objective <- d$objectives_renovation
+      if (!is.null(region)) {
+        objective <- filter(d$objectives_renovation, region_bld == region)
+      } else {
+        objective <- d$objectives_renovation
+      }
     }
-
     objective <- filter(objective,
       year == yrs[i]) %>% pull(objectives_renovation)
     
     target <- c("std", "adv")
-  } else if (objective_type == "deep_renovation") {
-    if (!is.null(region)) {
-      objective <- filter(d$objectives_renovation, region_bld == region)
-        } else {
-      objective <- d$objectives_renovation
-    }
+  } else {
+    print("NOT IMPLEMENTED: objective_renovation")
+  }
 
-    objective <- filter(objective,
-      year == yrs[i]) %>% pull(objectives_renovation)
+  if (grepl("deep", objective_renovation)) {
     target <- c("adv")
-  } else {
-    print("Cannot read objective_type")
   }
 
 
-  if (sub_ren_shell_type == "ad_valorem") {
+  if (subsidies_renovation_type == "ad_valorem") {
     interval <- c(0, 0.9)
-  } else if (sub_ren_shell_type == "per_CO2") {
+  } else if (subsidies_renovation_type == "per_CO2") {
     interval <- c(0, 2000)
-  } else if (sub_ren_shell_type == "per_kWh") {
-    interval <- c(0.01, 0.2)
+  } else if (subsidies_renovation_type == "per_kWh") {
+    interval <- c(0.01, 1)
   } else {
-    print("No subsidies type for renovation")
+    print("NOT IMPLEMENTED: subsidies_renovation_type")
   }
 
-  household_target <- data.frame(inc_cl = c("q1", "q2", "q3"),
-    factor = 1, year = yrs[i])
-  if (sub_ren_shell_household_target == "low_income") {
-    print("low_income")
-    household_target <- data.frame(inc_cl = c("q1", "q2", "q3"),
-      factor = c(1, 0.7, 0.5), year = rep(yrs[i], 3))
+  if ("year" %in% colnames(subsidies_renovation_target)) {
+    subsidies_renovation_target <-
+      subsidies_renovation_target %>% filter(year == yrs[i])
+  } else {
+    subsidies_renovation_target <-
+      subsidies_renovation_target %>% mutate(year = yrs[i])
   }
 
-
-  if (budget_renovation_function(interval[2], objective, objective_type, household_target, target) <= 0) {
+  if (budget_renovation_function(interval[2], objective,
+    objective_renovation, subsidies_renovation_target, target) <= 0) {
     val <- interval[2]
-  } else if (budget_renovation_function(interval[1], objective, objective_type, household_target, target) >= 0) {
+  } else if (budget_renovation_function(interval[1], objective,
+    objective_renovation, subsidies_renovation_target, target) >= 0) {
     val <- interval[1]
   } else {
     root <- uniroot(budget_renovation_function,
       interval = interval, objective = objective,
-      objective_type = objective_type, target = target,
-      household_target = household_target,
-      tol = 0.01)
+      objective_renovation = objective_renovation,
+      target = target,
+      subsidies_renovation_target = subsidies_renovation_target)
     val <- root$root
   }
 
-
-
-  if (sub_ren_shell_type == "ad_valorem") {
+  if (subsidies_renovation_type == "ad_valorem") {
     print(paste0("Subsidies renovation shell: ", round(val * 100, 3), "%"))
-  } else if (sub_ren_shell_type == "per_kWh") {
+  } else if (subsidies_renovation_type == "per_kWh") {
     print(paste0("Subsidies renovation shell: ", round(val, 3), "EUR/kWh"))
-  } else if (sub_ren_shell_type == "per_CO2") {
+  } else if (subsidies_renovation_type == "per_CO2") {
     print(paste0("Subsidies renovation shell: ", round(val, 0), "EUR/tCO2"))
   } else {
     print("No subsidies type for renovation")
   }
 
-  sub <- data.frame(sub_ren_shell = val,
+  sub <- data.frame(subsidies_renovation = val,
     eneff_f = target,
     year = yrs[i]) %>%
-    left_join(household_target, relationship = "many-to-many") %>%
-    mutate(sub_ren_shell = sub_ren_shell * factor) %>%
-    select(-c("factor"))
+    left_join(subsidies_renovation_target, relationship = "many-to-many") %>%
+    mutate(subsidies_renovation =
+      subsidies_renovation * subsidies_renovation_target) %>%
+    select(-c("subsidies_renovation_target"))
       
+  temp <- colnames(sub)[!colnames(sub) %in% c("subsidies_renovation", "year")]
+  sub$resolution <- apply(sub[, all_of(temp)], 1, function(row) paste(row, collapse = "-"))
   sub_report <- sub %>%
-    mutate(resolution = paste0(eneff_f, "-", inc_cl)) %>%
-    select(-c(eneff_f, inc_cl)) %>%
-    rename(value = sub_ren_shell) %>%
+    select(-all_of(temp)) %>%
+    rename(value = subsidies_renovation) %>%
     mutate(variable = "insulation",
-      type = sub_ren_shell_type)
+      type = subsidies_renovation_type)
+  sub <- sub %>% select(-resolution)
     
   return(list(sub = sub, sub_report = sub_report))
 
@@ -186,16 +197,16 @@ fun_subsidies_heater <- function(i,
   en_hh_tot,
   cost_invest_heat,
   parameters_heater,
-  lifetime_heater,
+  heater_vintage,
   emission_factors,
   premature_replacement,
   sub_report
   ) {
 
-  print("Endogenous heater subsidies to reach budget constraint")
+  print("Determining level of subsidies for heat-pumps")
 
   budget_switch_function <- function(x, budget) {
-    # print(x)
+
     sub <- data.frame(sub_heat = x,
                       fuel_heat_f = "heat_pump",
                       fuel_heat = c("oil", "gas", "coal"),
@@ -226,7 +237,7 @@ fun_subsidies_heater <- function(i,
     premature <- temp$premature
 
     temp <- fun_stock_switch_fuel_dyn(bld_det_i,
-                              lifetime_heater,
+                              heater_vintage,
                               ms_sw_i,
                               cat$ct_fuel,
                               stp,
@@ -247,15 +258,15 @@ fun_subsidies_heater <- function(i,
   }
 
   root <- uniroot(budget_switch_function,
-    interval = c(0, 0.9), budget = budget, tol = 0.01)
+    interval = c(0, 1), budget = budget, tol = 0.01)
 
   if (sub_heater_type == "ad_valorem") {
     print(paste0("Subsidies heater: ",
-    round(root$root * 100, 0), "%"))
+      round(root$root * 100, 0), "%"))
 
   } else if (sub_heater_type == "per_CO2") {
     print(paste0("Subsidies heater: ",
-    round(root$root, 0), "EUR/tCO2"))
+      round(root$root, 0), "EUR/tCO2"))
   } else {
     print("No subsidies type for renovation")
   }

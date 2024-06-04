@@ -17,64 +17,55 @@ print(paste("Working directory is:", getwd()))
 source("STURM_output/C00_plots.R")
 
 
-run_test <- FALSE
-if (run_test) {
-      run <- "scenarios_test"
-      scenarios <- c(
-        "EU_exogenous" = "Baseline",
-        "EU_constant_exogenous" = "Price constant",
-        "EU_price_2020_600_exogenous" = "Carbon tax",
-        "EU_no_exogenous" = "No renovation",
-        "EU_no_constant_exogenous" = "No renovation, Price constant",
-        "EU_double_exogenous" = "Doubling renovation",
-        "EU_double_constant_exogenous" =
-          "Doubling renovation, Price constant",
-        "EU_triple_exogenous" = "Tripling renovation",
-        "EU_triple_constant_exogenous" =
-          "Tripling renovation, Price constant",
-        "EU_emission_1p5c_exogenous" = "Low emission factor",
-        "EU_double_emission_1p5c_exogenous" =
-          "Doubling renovation, Low emission factor",
-        "EU_1p5c_exogenous" = "1p5C"
-    )
-      scenarios <- c(
-        "EU_no_exogenous" = "No renovation",
-        "EU_exogenous" = "Baseline",
-        "EU_double_exogenous" = "Doubling renovation",
-        "EU_double_emission_1p5c_exogenous" = "Doubling renovation, 1p5c")
 
-      colors_scenarios <- c(
-        "Price constant" = "#247f6e",
-        "Doubling renovation" = "#ee6a6b",
-        "Doubling renovation, Price constant" = "#531717",
-        "Doubling renovation, 1p5c" = "#1f540b",
-        "Tripling renovation" = "#380707",
-        "Tripling renovation, Price constant" = "#531717",
-        "No renovation" = "#6a4c93",
-        "No renovation, Price constant" = "#531717"
-      )
-    } else {
-    run <- "scenarios_detail"
 
-    scenarios <- c(
-        "EU" = "Current policies",
-        "EU_reno_wave" = "Renovation wave",
-        "EU_deep_reno_wave" = "Deep Renovation wave",
-        "EU_carbon_tax" = "Carbon tax",
-        "EU_carbon_tax_ambitious" = "Carbon tax ambitious",
-        "EU_heat_pump" = "Climate Fund",
-        "EU_heat_pump_ambitious" = "Climate Fund ambitious"
-    )
+run <- "scenarios_report"
 
-    run <- "scenarios_report"
+scenarios <- c(
+    "EU" = "Current policies",
+    "EU_mix" = "Base Mix",
+    "EU_mix_ambitious" = "Enhanced Mix",
+    "EU_mix_ban" = "Fossil-Ban Mix"
+)
 
-    scenarios <- c(
-        "EU" = "Current policies",
-        "EU_mix" = "Base Mix",
-        "EU_mix_ambitious" = "Enhanced Mix",
-        "EU_mix_ban" = "Fossil-Ban Mix"
-    )
-  }
+run <- "policy_detail"
+
+scenarios <- c(
+    "EU" = "Current policies",
+    "EU_carbon_tax" = "Carbon tax",
+    "EU_carbon_tax_rebates" = "Carbon tax lump-sum",
+    "EU_carbon_tax_rebates_q1" = "Carbon tax low-income",
+    "EU_carbon_tax_heat_pump" = "Carbon tax subsidies",
+    "EU_carbon_tax_dual" = "Carbon tax dual"
+)
+scenarios <- c(
+    "EU" = "Current policies",
+    "EU_reno" =  "Reno",
+    "EU_reno_lowincome" =  "Reno lowincome",
+    "EU_reno_performance" =  "Reno performance",
+    "EU_reno_all" =  "Reno all",
+    "EU_reno_all_lowincome" =  "Reno all lowincome",
+    "EU_reno_all_performance" = "Reno all performance"
+)
+  scenarios <- c(
+    "EU" = "Current policies",
+    "EU_reno" = "Reno non-coordinated",
+    "EU_reno_endogenous" = "Reno coordinated",
+    "EU_reno_lowincome" = "Reno low-income",
+    "EU_reno_performance" = "Reno performance",
+    "EU_deep_reno" = "Deep renovation",
+    "EU_carbon_tax" = "Carbon tax",
+    "EU_carbon_tax_dual" = "Carbon tax dual",
+    "EU_carbon_tax_rebates" = "Carbon tax rebates",
+    "EU_mix" = "Base Mix",
+    "EU_mix_enhance" = "Enhanced Mix"
+)
+
+run <- "test"
+scenarios <- c(
+    "EU" = "Current policies",
+    "EU_carbon_tax" = "Carbon tax"
+)
 
 colors_scenarios <- c(
   "Current policies" = "#00111c",
@@ -83,9 +74,22 @@ colors_scenarios <- c(
   "Fossil-Ban Mix" = "#d45113"
   )
 
+colors_scenarios <- c(
+  "Current policies" = "#00111c",
+  "Reno non-coordinated" = "#057a55",
+  "Reno coordinated" = "#057a55",
+  "Reno low-income" = "#057a55",
+  "Reno performance" = "#057a55",
+  "Deep renovation" = "#057a55",
+  "Carbon tax" = "#d45113",
+  "Carbon tax dual" = "#d45113",
+  "Carbon tax rebates" = "#d45113"
+)
+
+
 line_styles_scenarios <- c(
   "Current policies" = "solid",
-  "Proposed Mix" = "solid",
+  "Base Mix" = "solid",
   "Enhanced Mix" = "dotted",
   "Fossil-Ban Mix" = "dotdash"
 )
@@ -127,9 +131,11 @@ stp <- 5
 
 data <- data %>%
  mutate(year = ifelse(variable %in% flows, year - stp, year),
-        value = ifelse(variable %in% flows, value / stp, value))
+        value = ifelse(variable %in% flows, value
+         / stp, value))
 data <- distinct(data)
 ```
+
 
 ## Processing output
 ### Table summary
@@ -139,9 +145,9 @@ source("STURM_output/C00_plots.R")
 ref <- "Current policies"
 base_year <- 2015
 
-temp <- output_table(data, save_dir = save_dir, end_year = 2050, base_year = 2015)
-format_temp <- temp$format_temp
 output_table(data, save_dir = save_dir, end_year = 2030, base_year = 2015)
+format_temp <- output_table(data, save_dir = save_dir,
+  end_year = 2050, base_year = 2015)
 
 format_temp_eu <- format_temp %>%
   filter(Scenario != "Initial") %>%
@@ -152,11 +158,10 @@ format_temp_eu <- format_temp %>%
   mutate(`Cost total (Billion EUR per year)` =
     `Cost total (Billion EUR)` / 35) %>%
   mutate(Scenario = factor(Scenario), levels = unname(Scenario))
+```
 
-````
+### By scenarios at the EU-level
 ```{r}
-source("STURM_output/C00_plots.R")
-
 legend <- TRUE
 presentation <- FALSE
 scatter_plots(format_temp_eu,
@@ -177,19 +182,255 @@ scatter_plots(format_temp_eu,
               )
 ```
 
+```{r}
+legend <- TRUE
+presentation <- FALSE
+scatter_plots(format_temp_eu,
+              "Space heating consumption (TWh)",
+              "Energy poverty (Percent)",
+              color_column = "Scenario",
+              colors_scenarios = colors_scenarios,
+              size_column = "Cost total (Billion EUR per year)",
+              legend_suffix = "B€/year",
+              save_path = paste(save_dir,
+                paste0(run, "_kWh_poverty_eu.png"), sep = "/"),
+              y_label_suffix = "%",
+              x_label_suffix = "TWh",
+              legend = legend,
+              presentation = presentation,
+              y_label = "Share of population in energy poverty",
+              x_label = "Space heating consumption"
+              )
+```
+
+
+### By countries
+```{r}
+temp <- format_temp %>%
+  filter(Scenario == "Current policies") %>%
+  filter(`Member states` != "EU") %>%
+  select(c("Scenario", "Member states", "Population (Million)",
+    "Emission saving (%)", "Energy poverty (Percent)")) %>%
+  mutate(`Emission saving (%)` = `Emission saving (%)` * 100,
+         `Energy poverty (Percent)` = `Energy poverty (Percent)` * 100)
+
+
+
+legend <- TRUE
+presentation <- FALSE
+scatter_plots(temp,
+              "Emission saving (%)",
+              "Energy poverty (Percent)",
+              color_column = "Member states",
+              colors_scenarios = plot_settings[["colors"]],
+              size_column = "Population (Million)",
+              legend_suffix = "M",
+              save_path = paste(save_dir,
+                paste0(run, "_tCO2_poverty_ms.png"), sep = "/"),
+              y_label_suffix = "%",
+              x_label_suffix = "%",
+              legend = legend,
+              presentation = presentation,
+              y_label = "Share of population in energy poverty",
+              x_label = "Space heating emission saving (%)"
+              )
+```
+
+### Maps by scenarios
+```{r}
+var <- "heat_kWh"
+ref <- "floor_m2"
+years <- c(2050)
+limits <- c(0, 200)
+figure_title <- "Energy consumption for space heating"
+legend_title <- "kWh/m2.year"
+title <- "kwh_m2"
+scenarios_map <- c("Current policies", "Deep renovation", "Carbon tax")
+
+df <- data %>%
+    filter(variable %in% c(var, ref)) %>%
+    filter(resolution == "all") %>%
+    pivot_wider(id_cols = c(region_bld, year, resolution, scenario),
+      names_from = variable,
+      values_from = value) %>%
+    filter(!is.na(.data[[var]])) %>%
+    filter(!is.na(.data[[ref]])) %>%
+    mutate(value = .data[[var]] / .data[[ref]]) %>%
+    filter(year %in% years) %>%
+    select(-c(all_of(var), all_of(ref), "resolution"))
+
+if (!is.null(scenarios_map)) {
+  df <- filter(df, scenario %in% scenarios_map)
+}
+
+plot_map(df,
+  limits,
+  figure_title = figure_title,
+  legend_title = legend_title,
+  subplot_column = "scenario",
+  ncol = 3,
+  save_path = paste(save_dir,
+    paste0(scenario, "_map_", title, "_2050.png"), sep = "/"))
+```
+
 ## Figure
 ## Figures comparison scenario
+```{r}
+sub_scenarios <- c(
+  "Current policies" = "Current policies",
+  "Base Mix" = "Base",
+  "Enhanced Mix" = "Enhanced",
+  "Fossil-Ban Mix" = "Fossil-Ban")
+
+sub_scenarios <- c(
+    "Current policies" = "Current policies",
+    "Carbon tax" = "Carbon tax",
+    "Carbon tax lump-sum" = "Carbon tax lump-sum",
+    "Carbon tax low-income" = "Carbon tax low-income"
+)
+
+sub_scenarios <- c(
+    "Current policies" = "Current policies",
+    "Reno" = "Reno",
+    "Reno all" = "Reno all",
+    "Reno lowincome" = "Reno lowincome",
+    "Reno performance" = "Reno performance",
+    "Reno all lowincome" = "Reno all lowincome",
+    "Reno all performance" = "Reno all performance"
+)
+sub_scenarios <- c(
+    "Current policies" = "Current policies",
+    "Reno" = "Reno",
+    "Reno all" = "Reno all")
+```
+
+### Clustered stack bar plot by countries
+#### Fuel types
+```{r}
+var <- "stock_building"
+years <- c(2050)
+region <- c("C-WEU-DEU", "C-WEU-FRA", "C-WEU-SWE", "C-EEU-POL")
+
+df <- data %>%
+  filter(scenario %in% names(sub_scenarios)) %>%
+  mutate(scenario = sub_scenarios[.data[["scenario"]]]) %>%
+  filter(resolution %in% names(rename_fuels)) %>%
+  filter(variable == var) %>%
+  filter(region_bld %in% region) %>%
+  filter(year %in% years) %>%
+  mutate(value = value / 1e6) %>%
+  mutate(region_bld = rename_countries[.data[["region_bld"]]])
+
+
+plot_clustered_barplot(df,
+  "scenario",
+  "resolution",
+  subplot_column = "region_bld",
+  y_label = "Dwelling units by fuel type",
+  y_label_suffix = "Million",
+  display_total = FALSE,
+  x_order = sub_scenarios,
+  angle_x_label = 90,
+  save_path = paste(save_dir, paste0(run, "_dwelling_fuel_year_scenario_stack.png"), sep = "/"))
+```
+
+#### PE Consumption
+```{r}
+source("STURM_output/C00_plots.R")
+
+sub_scenarios <- c("Current policies" = "Current policies",
+      "Deep renovation" = "Deep renovation",
+      "Carbon tax" = "Carbon tax")
+
+var <- "stock_building"
+yr <- 2050
+initial <- TRUE
+region <- c("C-WEU-DEU", "C-WEU-FRA", "C-WEU-SWE", "C-EEU-POL")
+# region <- unique(data$region_bld)
+region <- NULL
+breakdown <- rename_primary
+y_label <- "Dwelling units by primary energy"
+percent <- TRUE
+if (percent) {
+  y_label_suffix <- "%"
+} else {
+  y_label_suffix <- "Million"
+}
+file <- "_dwelling_pe_year_scenario_stack.png"
+
+df <- data %>%
+  filter(scenario %in% names(sub_scenarios)) %>%
+  mutate(scenario = sub_scenarios[.data[["scenario"]]]) %>%
+  filter(resolution %in% names(breakdown)) %>%
+  filter(variable == var)
+
+if (initial) {
+  temp <- df %>%
+    filter(year == 2015) %>%
+    filter(scenario == "Current policies") %>%
+    mutate(scenario = "Initial") %>%
+    mutate(year = yr)
+  
+  df <- bind_rows(df, temp)
+  temp_scenarios <- c("Initial", sub_scenarios)
+}
+
+df <- df %>%
+  filter(year == yr) %>%
+  mutate(value = value / 1e6)
+
+region_grouping <- df %>%
+  filter(resolution %in% c(">200", "150-200")) %>%
+  group_by_at("region_bld") %>%
+  summarise(order_by = sum(value)) %>%
+  ungroup()
+
+df <- df %>%
+  left_join(region_grouping, by = "region_bld") %>%
+  mutate(order_by = ifelse(is.na(order_by), 0, order_by)) %>%
+  arrange(desc(order_by)) %>%
+  select(-order_by)
+
+
+if (!is.null(region)) {
+  df <- df %>%
+    filter(region_bld %in% region)
+} else {
+  # Select only the top 5 regions
+  df <- df %>%
+    filter(region_bld != "EU") %>%
+    filter(region_bld %in% head(unique(df$region_bld), 5 + 1))
+}
+
+if (percent) {
+  df <- df %>%
+    group_by(scenario, region_bld) %>%
+    mutate(value = value / sum(value) * 100) %>%
+    ungroup()
+}
+
+df <- mutate(df, region_bld = rename_countries_code[.data[["region_bld"]]])
+
+plot_clustered_barplot(df,
+  "scenario",
+  "resolution",
+  subplot_column = "region_bld",
+  y_label = y_label,
+  y_label_suffix = y_label_suffix,
+  display_total = FALSE,
+  x_order = temp_scenarios,
+  angle_x_label = 90,
+  legend = FALSE,
+  save_path = paste(save_dir, paste0(run, file), sep = "/"))
+```
+
+
 ### Dwelling units by fuel type
 ```{r}
 source("STURM_output/C00_plots.R")
 
 var <- "stock_building"
 years <- c(2015, 2030, 2050)
-sub_scenarios <- c(
-  "Current policies" = "Current policies",
-  "Base Mix" = "Base",
-  "Enhanced Mix" = "Enhanced",
-  "Fossil-Ban Mix" = "Fossil-Ban")
 
 df <- data %>%
   filter(scenario %in% names(sub_scenarios)) %>%
@@ -203,7 +444,9 @@ df <- data %>%
 plot_clustered_barplot(df,
   "scenario",
   "resolution",
+  subplot_column = "year",
   y_label = "Dwelling units in the EU by fuel type",
+  year_start = 2015,
   y_label_suffix = "Million",
   display_total = FALSE,
   x_order = sub_scenarios,
@@ -236,7 +479,7 @@ plot_clustered_barplot(df,
   display_total = FALSE,
   x_order = sub_scenarios,
   angle_x_label = 90,
-  save_path = paste(save_dir, paste0(run, "_dwelling_eff_year_scenario_stack.png"), sep = "/"))
+  save_path = paste(save_dir, paste0(run, "_dwelling_eneff_year_scenario_stack.png"), sep = "/"))
 
 ```
 
@@ -264,9 +507,36 @@ plot_clustered_barplot(df,
   display_total = FALSE,
   x_order = sub_scenarios,
   angle_x_label = 90,
-  save_path = paste(save_dir, paste0(run, "_dwelling_eff_year_scenario_stack.png"), sep = "/"))
-
+  save_path = paste(save_dir, paste0(run, "_dwelling_insulation_year_scenario_stack.png"), sep = "/"))
 ```
+
+### Dwelling units by primary energy
+```{r}
+source("STURM_output/C00_plots.R")
+
+var <- "stock_building"
+years <- c(2015, 2030, 2050)
+
+df <- data %>%
+  filter(scenario %in% names(sub_scenarios)) %>%
+  mutate(scenario = sub_scenarios[.data[["scenario"]]]) %>%
+  filter(resolution %in% names(rename_primary)) %>%
+  filter(variable == var) %>%
+  filter(region_bld == "EU") %>%
+  filter(year %in% years) %>%
+  mutate(value = value / 1e6)
+
+plot_clustered_barplot(df,
+  "scenario",
+  "resolution",
+  y_label = "Dwelling units in the EU by fuel type",
+  y_label_suffix = "Million",
+  display_total = FALSE,
+  x_order = sub_scenarios,
+  angle_x_label = 90,
+  save_path = paste(save_dir, paste0(run, "_dwelling_pe_year_scenario_stack.png"), sep = "/"))
+```
+
 ### Space heating consumption by fuel type and scenario
 ```{r}
 source("STURM_output/C00_plots.R")
@@ -294,6 +564,7 @@ plot_clustered_barplot(df,
   save_path = paste(save_dir, paste0(run, "_kWh_year_scenario_stack.png"), sep = "/"))
 
 ```
+
 ### Space heating emission by fuel type and scenario
 ```{r}
 source("STURM_output/C00_plots.R")
@@ -343,8 +614,8 @@ plot_multiple_lines(temp,
       paste0(run, "_heat_kWh_countries.png"), sep = "/")
     )
 
-legend <- FALSE
-presentation <- TRUE
+legend <- TRUE
+presentation <- FALSE
 plot_multiple_lines(filter(temp, region_bld == "EU"),
     x_column = "year",
     y_column = "value",
@@ -354,7 +625,7 @@ plot_multiple_lines(filter(temp, region_bld == "EU"),
     y_label = "Residential space heating consumption",
     free_y = TRUE,
     colors_lines = colors_scenarios,
-    line_types = line_styles_scenarios,
+    #line_types = line_styles_scenarios,
     save_path = paste(save_dir,
       paste0(run, "_heat_kWh_eu.png"), sep = "/"),
     legend = legend,
@@ -385,8 +656,8 @@ plot_multiple_lines(temp,
     save_path = paste(save_dir,
       paste0(run, "_heat_kWh_electricity_countries.png"), sep = "/"))
 
-legend <- FALSE
-presentation <- TRUE
+legend <- TRUE
+presentation <- FALSE
 plot_multiple_lines(filter(temp, region_bld == "EU"),
     x_column = "year",
     y_column = "value",
@@ -462,8 +733,8 @@ plot_multiple_lines(temp,
     save_path = paste(save_dir,
       paste0(run, "_heat_tCO2_countries.png"), sep = "/"))
 
-legend <- FALSE
-presentation <- TRUE
+legend <- TRUE
+presentation <- FALSE
 plot_multiple_lines(filter(temp, region_bld == "EU"),
     x_column = "year",
     y_column = "value",
@@ -485,7 +756,6 @@ plot_multiple_lines(filter(temp, region_bld == "EU"),
 
 #### Number of renovations cumulated
 ```{r}
-
 temp <- data %>%
   filter(variable == "n_renovation") %>%
   filter(resolution %in% "all") %>%
@@ -624,9 +894,7 @@ plot_multiple_lines(filter(temp, region_bld == "EU"),
     line_order = unname(scenarios))
 ```
 
-
 #### Cost of renovation
-
 ```{r}
 temp <- data %>%
   filter(variable == "cost_renovation_EUR") %>%
@@ -831,6 +1099,101 @@ plot_multiple_lines(temp,
     y_label_suffix = "kWh/dw")
 ```
 
+
+#### kWh std per m2
+```{r}
+source("STURM_output/C00_plots.R")
+
+var <- "heat_std_kWh"
+ref <- "floor_m2"
+
+temp <- data %>%
+  filter(variable %in% c(var, ref)) %>%
+  filter(resolution == "all") %>%
+  pivot_wider(id_cols = c(region_bld, year, scenario, resolution),
+    names_from = variable,
+    values_from = value) %>%
+  filter(!is.na(.data[[var]])) %>%
+  filter(!is.na(.data[[ref]])) %>%
+  mutate(value = .data[[var]] / .data[[ref]]) %>%
+  select(-c(var, ref, "resolution"))
+
+
+plot_multiple_lines(temp,
+    x_column = "year",
+    y_column = "value",
+    line_column = "scenario",
+    group_column = "region_bld",
+    ncol = 4,
+    y_label = "Space heating consumption\nkWh per m2",
+    free_y = FALSE,
+    colors_lines = colors_scenarios,
+    save_path = paste(save_dir,
+      paste0(run, "_kwh_std_m2_countries.png"), sep = "/"))
+
+path <- "_kwh_m2_eu.png"
+temp <- filter(temp, region_bld == "EU")
+plot_multiple_lines(temp,
+    x_column = "year",
+    y_column = "value",
+    line_column = "scenario",
+    group_column = NULL,
+    ncol = 4,
+    y_label = "Space heating consumption\nkWh per dwelling",
+    free_y = FALSE,
+    colors_lines = colors_scenarios,
+    save_path = paste(save_dir,
+      paste0(run, "_kwh_std_m2_eu.png"), sep = "/"),
+    y_label_suffix = "kWh/m2")
+```
+
+#### kWh per m2
+```{r}
+source("STURM_output/C00_plots.R")
+
+var <- "heat_kWh"
+ref <- "floor_m2"
+
+temp <- data %>%
+  filter(variable %in% c(var, ref)) %>%
+  filter(resolution == "all") %>%
+  pivot_wider(id_cols = c(region_bld, year, scenario, resolution),
+    names_from = variable,
+    values_from = value) %>%
+  filter(!is.na(.data[[var]])) %>%
+  filter(!is.na(.data[[ref]])) %>%
+  mutate(value = .data[[var]] / .data[[ref]]) %>%
+  select(-c(var, ref, "resolution"))
+
+
+plot_multiple_lines(temp,
+    x_column = "year",
+    y_column = "value",
+    line_column = "scenario",
+    group_column = "region_bld",
+    ncol = 4,
+    y_label = "Space heating consumption\nkWh per m2",
+    free_y = FALSE,
+    colors_lines = colors_scenarios,
+    save_path = paste(save_dir,
+      paste0(run, "_kwh_m2_countries.png"), sep = "/"))
+
+path <- "_kwh_m2_eu.png"
+temp <- filter(temp, region_bld == "EU")
+plot_multiple_lines(temp,
+    x_column = "year",
+    y_column = "value",
+    line_column = "scenario",
+    group_column = NULL,
+    ncol = 4,
+    y_label = "Space heating consumption\nkWh per dwelling",
+    free_y = FALSE,
+    colors_lines = colors_scenarios,
+    save_path = paste(save_dir,
+      paste0(run, "_kwh_m2_eu.png"), sep = "/"),
+    y_label_suffix = "kWh/m2")
+```
+
 #### Renovation rate
 ```{r}
 var <- "n_renovation"
@@ -958,7 +1321,7 @@ plot_multiple_lines(temp,
 
 ```
 
-### Distributive impact
+### Distributional consequences
 ```{r}
 source("STURM_output/C00_plots.R")
 

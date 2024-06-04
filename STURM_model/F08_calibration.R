@@ -95,7 +95,9 @@ fun_calibration_ren_shell <- function(yrs,
                           stp,
                           path_out,
                           discount_ren,
-                          social_discount_rate) {
+                          social_discount_rate,
+                          income,
+                          credit_constraint = NULL) {
     
     start_calibration <- Sys.time()
 
@@ -111,6 +113,8 @@ fun_calibration_ren_shell <- function(yrs,
                           lifetime_ren,
                           discount_ren,
                           social_discount_rate,
+                          income,
+                          credit_constraint = credit_constraint,
                           full = TRUE)
     
     report <- utility_ren_hh %>%
@@ -124,7 +128,9 @@ fun_calibration_ren_shell <- function(yrs,
     print("Dumped static analysis results in
         STURM_output/report_static_ren_shell.csv")
     
-    # Initial guess for the optimization
+    # Initial guess required to solve the optimization pb
+    region <- "C-WEU-FRA"
+
     scaling_factor <- utility_ren_hh %>%
         group_by(region_bld) %>%
         summarize(min_value = min(utility_ren),
@@ -133,7 +139,13 @@ fun_calibration_ren_shell <- function(yrs,
             (4 - (-4)) / (max_value - min_value),
             4 / abs(min_value))) %>%
         select(-c("min_value", "max_value"))
-
+    
+    # Put value for "C-WEU-FRA" for all regions
+    temp <- filter(scaling_factor, region_bld == region) %>%
+        pull(scaling_factor)
+    scaling_factor <- scaling_factor %>%
+        mutate(scaling_factor = temp)
+    
     utility_ren_hh <- utility_ren_hh %>%
         select(-c("sub_ren_hh")) %>%
         left_join(scaling_factor) %>%
@@ -146,21 +158,30 @@ fun_calibration_ren_shell <- function(yrs,
         rename(eneff_f = eneff, target = value) %>%
         mutate(target = if_else(target == 0, 0.001, target))
 
-    objective_function <- function(x, utility, tgt, stp, elasticity, b_mfh, b_rent) {
+    objective_function <- function(x, utility, tgt, stp, elasticity,
+        b_mfh, b_rent, scale = NULL) {
         constant <- x[1:nrow(tgt)]
-        scale <- x[nrow(tgt) + 1]
 
+        # If elasticity is null no need to calibrate the scale
+        calib_scale <- FALSE
+        k <- 0
+        if (is.null(scale)) {
+            calib_scale <- TRUE
+            scale <- x[nrow(tgt) + 1]
+            k <- 1
+        }
+        
         if (b_rent != 1) {
-            barrier_rent <- x[nrow(tgt) + 2]
+            barrier_rent <- x[nrow(tgt) + 1 + k]
             if (b_mfh != 1) {
-                barrier_mfh <- x[nrow(tgt) + 3]
+                barrier_mfh <- x[nrow(tgt) + 2 + k]
             } else {
                 barrier_mfh <- 0
             }
         } else {
             barrier_rent <- 0
             if (b_mfh != 1) {
-                barrier_mfh <- x[nrow(tgt) + 2]
+                barrier_mfh <- x[nrow(tgt) + 1 + k]
             } else {
                 barrier_mfh <- 0
             }
@@ -180,18 +201,17 @@ fun_calibration_ren_shell <- function(yrs,
             region_bld = unique(tgt$region_bld),
             barrier_mfh = barrier_mfh)
 
-         
         output <- ms_agg_ren_shell(utility, cst, scale, stp,
             barrier_rent, barrier_mfh)
 
         ms_agg <- output$ms_agg %>%
             left_join(tgt, by = c("region_bld", "mat", "eneff_f"))
-        
 
         objective <- c(
-            ms_agg$target - ms_agg$ms,
-            output$elasticity - elasticity
-            )
+            ms_agg$target - ms_agg$ms)
+        if (calib_scale) {
+            objective <- c(objective, output$elasticity - elasticity)
+        }
 
         if (b_rent != 1) {
             objective <- c(objective, output$ratio_rent - b_rent)
@@ -209,6 +229,50 @@ fun_calibration_ren_shell <- function(yrs,
 
     target <- filter(target, region_bld %in% unique(utility_ren_hh$region_bld))
     
+    
+    # First, we esimate the scale of the utility for the country we have most data
+    print(paste("Calibration region:", region))
+
+    u <- filter(utility_ren_hh, region_bld == region)
+    t <- filter(target, region_bld == region)
+    x <- rep(0, times = nrow(t))
+    x <- c(x, 1)
+
+    # We add constraint if barriers if ratio are less than 1
+    b_rent <- filter(coeff_barriers_rent,
+        region_bld == region)$barriers_rent
+    if (b_rent != 1) {
+        x <- c(x, 0)
+    }
+    b_mfh <- filter(coeff_barriers_mfh,
+        region_bld == region)$barriers_mfh
+    if (b_mfh != 1) {
+        x <- c(x, 0)
+    }
+
+    root <- multiroot(objective_function, start = x,
+        maxiter = 1e3, utility = u, tgt = t, stp = stp,
+        b_mfh = b_mfh, b_rent = b_rent,
+        elasticity = -1, scale = NULL)
+
+    constant <- root$root[1:nrow(t)]
+    scale <- root$root[nrow(t) + 1]
+    if (b_rent != 1) {
+        barrier_rent <- root$root[nrow(t) + 2]
+        if (b_mfh != 1) {
+            barrier_mfh <- root$root[nrow(t) + 3]
+        } else {
+            barrier_mfh <- 0
+        }
+    } else {
+        barrier_rent <- 0
+        if (b_mfh != 1) {
+            barrier_mfh <- root$root[nrow(t) + 2]
+        } else {
+            barrier_mfh <- 0
+        }
+    }
+
     result <- tibble(region_bld = character(),
                             mat = character(),
                             eneff_f = character(),
@@ -217,14 +281,21 @@ fun_calibration_ren_shell <- function(yrs,
                             scale = double(),
                             barrier_rent = double(),
                             barrier_mfh = double())
+
     for (region in unique(utility_ren_hh$region_bld)) {
 
-        print(paste("Region:", region))
+        print(paste("Calibration region:", region))
+
+        calibration_scale <- FALSE
 
         u <- filter(utility_ren_hh, region_bld == region)
         t <- filter(target, region_bld == region)
         x <- rep(0, times = nrow(t))
-        x <- c(x, 1)
+        k <- 0
+        if (calibration_scale) {
+            x <- c(x, 1)
+            k <- 1
+        }
 
         # We add constraint if barriers if ratio are less than 1
         b_rent <- filter(coeff_barriers_rent,
@@ -241,21 +312,23 @@ fun_calibration_ren_shell <- function(yrs,
         root <- multiroot(objective_function, start = x,
             maxiter = 1e3, utility = u, tgt = t, stp = stp,
             b_mfh = b_mfh, b_rent = b_rent,
-            elasticity = -1)
+            elasticity = NULL, scale = scale)
 
         constant <- root$root[1:nrow(t)]
-        scale <- root$root[nrow(t) + 1]
+        if (calibration_scale) {
+            scale <- root$root[nrow(t) + 1]
+        }
         if (b_rent != 1) {
-            barrier_rent <- root$root[nrow(t) + 2]
+            barrier_rent <- root$root[nrow(t) + 1 + k]
             if (b_mfh != 1) {
-                barrier_mfh <- root$root[nrow(t) + 3]
+                barrier_mfh <- root$root[nrow(t) + 2 + k]
             } else {
                 barrier_mfh <- 0
             }
         } else {
             barrier_rent <- 0
             if (b_mfh != 1) {
-                barrier_mfh <- root$root[nrow(t) + 2]
+                barrier_mfh <- root$root[nrow(t) + 1 + k]
             } else {
                 barrier_mfh <- 0
             }
@@ -338,14 +411,21 @@ fun_calibration_switch_heat <- function(yrs,
                           ct_heat_new,
                           path_out,
                           discount_heat,
-                          lifetime_heat = 20,
+                          heater_vintage,
                           inertia = NULL,
                           emission_factors = NULL,
                           min_switch_fuel = 0.05) {
     
     start_calibration <- Sys.time()
 
-    # print(filter(ms_switch_fuel, region_bld == "C-WEU-IRL"))
+    heater_vintage <- heater_vintage %>%
+        filter(vintage <= yrs[i]) %>%
+        group_by(region_bld, fuel_heat, lifetime_heater) %>%
+        summarise(n_vintage = sum(n_vintage)) %>%
+        ungroup()
+
+    # We only use 1/20 which is the average lifetime of a heater (only work for calibration)
+
     # Calculate market-share objectives
     ms_switch_fuel <- bld_stock %>%
         filter(!is.na(fuel_heat)) %>%
@@ -355,7 +435,12 @@ fun_calibration_switch_heat <- function(yrs,
         group_by_at(c("region_bld")) %>%
         mutate(ms_stock = n_before / sum(n_before)) %>%
         ungroup() %>%
-        mutate(n_break_down = 1 / lifetime_heat * n_before) %>%
+        # left_join(heater_vintage) %>%
+        # group_by_at(c("region_bld", "fuel_heat")) %>%
+        # mutate(rate_switch = n_vintage / sum(n_before)) %>%
+        # ungroup() %>%
+        mutate(rate_switch = 1 / 20) %>%
+        mutate(n_break_down = rate_switch * n_before) %>%
         left_join(ms_switch_fuel_exo %>% rename(fuel_heat = fuel_heat_f)) %>%
         # Minimum share of 5% for all segments
         mutate(ms_switch_fuel_exo = ifelse(
@@ -416,7 +501,6 @@ fun_calibration_switch_heat <- function(yrs,
         }
     
 
-
     ms_switch_fuel_exo <- ms_switch_fuel
 
     # simplification
@@ -453,11 +537,12 @@ fun_calibration_switch_heat <- function(yrs,
                         ct_heat,
                         ct_heat_new,
                         cost_invest_heat,
-                        lifetime_heat,
+                        20,
                         discount_heat,
                         inertia = inertia,
                         full = TRUE,
                         emission_factors = emission_factors)
+
 
     scaling_factor <- utility_heat_hh %>%
         group_by(region_bld) %>%
@@ -642,6 +727,51 @@ fun_calibration_switch_heat <- function(yrs,
 
 
 fun_calibration_consumption <- function(bld_det_ini,
+                                        en_hh_tot,
+                                        hh_size,
+                                        floor_cap,
+                                        en_consumption,
+                                        path_out
+                                        ) {
+    # Calibration of energy demand
+    bld_energy <- bld_det_ini %>%
+      left_join(en_hh_tot) %>%
+      left_join(hh_size) %>%
+      left_join(floor_cap) %>%
+      mutate(floor_size = floor_cap * hh_size * n_units_fuel) %>%
+      mutate(en_segment = en_hh * n_units_fuel,
+        en_std_segment = en_hh_std * n_units_fuel)
+
+
+    bld_energy <- bld_energy %>%
+      group_by_at(setdiff(names(en_consumption), "en_consumption")) %>%
+      summarize(en_calculation = sum(en_segment),
+        en_calculation_std = sum(en_std_segment),
+        n_units_fuel = sum(n_units_fuel),
+        floor_size = sum(floor_size)) %>%
+      ungroup() %>%
+      # Conversion from kWh to ktoe
+      mutate(
+        en_calculation_dw = en_calculation / n_units_fuel,
+        en_calculation_unit = en_calculation / floor_size,
+        en_calculation_std_unit = en_calculation_std / floor_size,
+        en_calculation = en_calculation / 11630 / 1e3,
+        en_calculation_std = en_calculation_std / 11630 / 1e3,
+        n_units_fuel = n_units_fuel / 1e6,
+        floor_size = floor_size / 1e6) %>%
+      left_join(en_consumption) %>%
+      mutate(coeff_alpha = en_consumption / en_calculation)
+    write.csv(bld_energy, paste0(path_out, "calibration_consumption.csv"))
+
+    alpha <- select(bld_energy, -c("en_consumption", "en_calculation",
+      "n_units_fuel", "floor_size", "en_calculation_std",
+      "en_calculation_unit",  "en_calculation_std_unit",
+      "en_calculation_dw"))
+    return(alpha)
+
+    }
+# Old version of calibration of energy demand
+fun_calibration_consumption_agg <- function(bld_det_ini,
                                         en_hh_tot,
                                         hh_size,
                                         floor_cap,

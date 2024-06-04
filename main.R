@@ -8,27 +8,33 @@ suppressPackageStartupMessages(library(tidyverse))
 
 options(dplyr.width = Inf)
 options(dplyr.summarise.inform = FALSE)
+options(dplyr.show_progress = FALSE)
 
 start_script_time <- Sys.time()
 
-# parameters
+# Parameters
 rnd <- 5 # rounding (number of decimals)
 u_EJ_GWa <- 31.71
 min_shr_fuel <- 0.01
 
-param <- list(sub_ren_shell_type = "ad_valorem",
-            sub_ren_shell_target = "all",
-            objective_type = NULL,
+param <- list(subsidies_renovation_type = "ad_valorem",
+            objective_renovation = NULL,
             budget_constraint_insulation = NULL,
             premature_replacement = 3,
             anticipate_renovation = 3,
             sub_heater_type = "ad_valorem",
             budget_constraint_heater = NULL,
-            sub_ren_shell_household_target = "all",
+            recycling_rebates = "lump_sum",
             rate_dem_target = NULL,
             mandatory_switch = FALSE,
             inertia_wtp = 4.3,
-            social_discount_rate = 0.03)
+            social_discount_rate = 0.03,
+            heat_pump_floor_cost = FALSE,
+            short_term_price_elasticity = -0.2,
+            credit_constraint = 0.05,
+            duration_remboursment = 10,
+            nzeb = FALSE,
+            tol = 1e-2)
 
 source("./STURM_model/F10_scenario_run.R")
 
@@ -78,11 +84,19 @@ if (run == "test") {
 } else if (run == "policies") {
     file_scenarios <- "scenarios_EU.csv"
     energy_efficiency <- "endogenous"
-    runs <- c("EU_deep_reno_wave", "EU_carbon_tax", "EU_carbon_tax_ambitious",
-        "EU_heat_pump", "EU_heat_pump_ambitious")
     runs <- c("EU", "EU_mix", "EU_mix_ambitious", "EU_mix_ban")
-    runs <- c("EU")
-
+    runs <- c(
+        "EU_carbon_tax_heat_pump", "EU_carbon_tax_dual",
+        "EU_carbon_tax", "EU_carbon_tax_rebates", "EU_carbon_tax_rebates_q1",
+        "EU")
+    runs <- c(
+        "EU_reno", "EU_reno_lowincome", "EU_reno_performance",
+        "EU_reno_all", "EU_reno_all_lowincome", "EU_reno_all_performance")
+    runs <- c("EU_reno_endogenous")
+    runs <- c("EU_reno_endogenous")
+    runs <- c(
+        "EU", "EU_carbon_tax"
+    )
 }
 
 report <- list(var = c("energy"),

@@ -28,19 +28,46 @@ colors_efficiency <- c("Slum" = "grey30",
 rename_insulation <- c(
   "0-0.5" = "Advanced insulation",
   "0.5-1" = "Basic insulation",
+  "1-1.5" = "Bad insulation",
   "1.5-2" = "Poor insulation",
-  ">2" = "No insulation"
+  ">2" = "No insulation",
+  "no_heating" = "No heating"
 )
 
-order_insulation <- c("No insulation", "Poor insulation", "Basic insulation", "Advanced insulation")
+order_insulation <- c("No heating", "No insulation", "Poor insulation", "Bad insulation",
+  "Basic insulation", "Advanced insulation")
 
 colors_insulation <- c(
+  "No heating" = "black",
   "No insulation" = "grey30",
   "Poor insulation" = "coral4",
+  "Bad insulation" = "coral3",
   "Basic insulation" = "goldenrod1",
   "Advanced insulation" = "palegreen3"
 )
 
+# Primary consumption level
+
+rename_primary <- c(
+  "0-50" = "Advanced performance",
+  "50-100" = "Basic performance",
+  "100-150" = "Bad performance",
+  "150-200" = "Poor performance",
+  ">200" = "No performance",
+  "no_consumption" = "No consumption"
+)
+
+order_primary <- c("No consumption", "No performance", "Poor performance", "Bad performance",
+  "Basic performance", "Advanced performance")
+
+colors_primary <- c(
+  "No consumption" = "black",
+  "No performance" = "grey30",
+  "Poor performance" = "coral4",
+  "Bad performance" = "coral3",
+  "Basic performance" = "goldenrod1",
+  "Advanced performance" = "palegreen3"
+)
 
 
 # Heating fuels
@@ -52,7 +79,8 @@ rename_fuels <- c("biomass_solid" = "Biomass",
             "gas" = "Gas",
             "oil" = "Oil")
 
-order_fuels <- c("Coal", "Oil", "Gas", "District heating", "Direct electric", "Heat pump", "Biomass")
+order_fuels <- c("Coal", "Oil", "Gas", "District heating",
+  "Direct electric", "Heat pump", "Biomass")
 
 colors_fuels <- c("No Heating" = "grey92",
   "Direct electric" = "slateblue",
@@ -98,6 +126,7 @@ rename_countries <- c(
   "C-WEU-AUT" = "Austria",
   "C-WEU-BEL" = "Belgium",
   "C-WEU-CYP" = "Cyprus",
+  "C-WEU-HRV" = "Croatia",
   "C-WEU-MLT" = "Malta",
   "C-WEU-DEU" = "Germany",
   "C-WEU-DNK" = "Denmark",
@@ -151,6 +180,7 @@ rename_countries_code <- c(
 colors_countries <- c(
   "Bulgaria" = "green",
   "Czech Republic" = "blue",
+  "Croatia" = "red",
   "Estonia" = "#4891D9",   # Light blue
   "Hungary" = "red",
   "Lithuania" = "#FFC300",   # Yellow
@@ -182,6 +212,7 @@ order_countries <- c(
   "Belgium",
   "Bulgaria",
   "Cyprus",
+  "Croatia",
   "Czech Republic",
   "Denmark",
   "Estonia",

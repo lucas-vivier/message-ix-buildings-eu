@@ -68,11 +68,6 @@ fun_stock_turnover_dyn <- function(i, yrs, bld_cases_fuel, ct_bld_age,
     }
   }
 
-  demolition_heater <- bld_det_i %>%
-    group_by_at(c("region_bld", "fuel_heat")) %>%
-    summarize(n_dem = sum(n_dem)) %>%
-    ungroup()
-
   print(paste("Number of demolitions is",
     round(sum(bld_det_i$n_dem) / 1e6, 0), "million units.",
     "i.e. ", round(sum(bld_det_i$n_dem) /
@@ -107,13 +102,8 @@ fun_stock_turnover_dyn <- function(i, yrs, bld_cases_fuel, ct_bld_age,
     summarise(n_new = sum(n_new),
               n_empty = sum(n_empty)) %>%
     mutate(diff = ifelse(n_empty > 0 & n_new > 0, min(n_new, n_empty), 0)) %>%
-    ungroup %>%
+    ungroup() %>%
     select(-n_new, -n_empty)
-
-  test <- bld_aggr_i %>%
-    group_by(region_bld, year) %>%
-    summarise(n_new = sum(n_new),
-              n_empty = sum(n_empty)) %>%
     
   # Recalculate new construction and empty buildings based on assumed transition between rural and urban
   bld_aggr_i <- bld_aggr_i %>%
@@ -125,6 +115,7 @@ fun_stock_turnover_dyn <- function(i, yrs, bld_cases_fuel, ct_bld_age,
     mutate(n_units_aggr = ifelse(n_new > 0 & diff > 0 & n_new >= diff,
       n_units_aggr + diff, n_units_aggr)) %>%
     select(-diff)
+  # LV: I think n_units_aggr should not be changed here
   
   # rm(bld_aggr_i_check)
   
@@ -172,6 +163,10 @@ fun_stock_turnover_dyn <- function(i, yrs, bld_cases_fuel, ct_bld_age,
   } else {
     print("Test passed. Empty buildings.")
   }
+  demolition_heater <- bld_det_i %>%
+    group_by_at(c("region_bld", "fuel_heat")) %>%
+    summarize(n_dem = sum(n_dem) + sum(n_empty)) %>%
+    ungroup()
 
   report <- bld_det_i %>%
     group_by_at("region_bld") %>%
@@ -337,7 +332,7 @@ fun_stock_renovation_dyn <- function(bld_det_i,
 
   if (verbose) {
     print(
-      paste("Renovated buildings:",
+      paste("Number of renovated buildings is",
         round(sum(ren_det_i$n_units_fuel) / 1e6, 0),
         "million units in", stp, "years.",
         "i.e.",
@@ -368,9 +363,9 @@ fun_stock_renovation_dyn <- function(bld_det_i,
     if (round((sum(woren_det_i$n_units_fuel) +
         sum(ren_det_i$n_units_fuel)) / 1e6, 0) !=
         round(temp / 1e6, 0)) {
-      print("Test failed. Existing buildings.")
+      print("Test failed. Renovated buildings.")
     } else {
-      print("Test passed. Existing buildings.")
+      print("Test passed. Renovated buildings.")
     }
   }
 
@@ -393,7 +388,13 @@ fun_stock_renovation_dyn <- function(bld_det_i,
 
 }
 
-
+#' @title Fuel switch dynamics
+#' @description Fuel switch dynamics
+#' @param bld_det_i Data frame with building stock  
+#' @param heater_vintage Data frame with heater vintage
+#' @param ms_sw_i Data frame with market shares of fuel switch
+#' @param ct_fuel Data frame with fuel costs
+#' @param stp Number of years per time step
 fun_stock_switch_fuel_dyn <- function(bld_det_i,
                                       heater_vintage,
                                       ms_sw_i,
@@ -421,22 +422,6 @@ fun_stock_switch_fuel_dyn <- function(bld_det_i,
     )
   }
 
-  if (year_run == 2035) {
-    print("break")
-  }
-
-  t <- heater_vintage %>%
-    group_by(region_bld, fuel_heat) %>%
-    summarise(n_vintage = sum(n_vintage)) %>%
-    ungroup()
-
-  test <- bld_det_i %>%
-    filter(yr_con < year_run) %>%
-    group_by_at(c("region_bld", "fuel_heat")) %>%
-    summarise(n_units_fuel = sum(n_units_fuel)) %>%
-    ungroup() %>%
-    left_join(t)
-
   heater_vintage <- heater_vintage %>%
     filter(vintage <= year_run) %>%
     group_by(region_bld, fuel_heat, lifetime_heater) %>%
@@ -448,12 +433,9 @@ fun_stock_switch_fuel_dyn <- function(bld_det_i,
     filter(n_units_fuel > 0) %>%
     left_join(heater_vintage) %>%
     group_by(region_bld, fuel_heat) %>%
-    mutate(total = sum(n_units_fuel)) %>%
     mutate(rate_switch_fuel_heat = n_vintage /
       sum(ifelse((yr_con < year_run), n_units_fuel, 0))) %>%
-      # sum(ifelse((yr_con <= year_run - lifetime_heater), n_units_fuel, 0))) %>%
     ungroup() %>%
-    # mutate(rate_switch_fuel_heat = ifelse((yr_con <= year_run - lifetime_heater), rate_switch_fuel_heat, 0)) %>%
     left_join(renovation) %>%
     mutate(mandatory = mandatory_switch) %>%
     mutate(rate_switch_fuel_heat =
@@ -481,20 +463,24 @@ fun_stock_switch_fuel_dyn <- function(bld_det_i,
     mutate(premature = ifelse(is.na(premature), 0, premature)) %>%
     mutate(n_units_replacement = ifelse(premature == 1,
       n_units_replacement + n_units_fuel, n_units_replacement)) %>%
+    mutate(n_premature = ifelse(premature == 1,
+      n_units_fuel, 0)) %>%
     # Format data
     select(-c("n_vintage", "lifetime_heater", "rate_switch_fuel_heat",
       "ms", "n_units_fuel", "payback", "premature")) %>%
     rename(n_units_fuel = n_units_replacement) %>%
     filter(n_units_fuel > 0)
 
-  test <- bld_det_i_sw %>%
-    filter(yr_con < year_run) %>%
+  premature <- bld_det_i_sw %>%
     group_by_at(c("region_bld", "fuel_heat")) %>%
-    summarise(n_units_fuel = sum(n_units_fuel)) %>%
+    summarise(n_premature = sum(n_premature)) %>%
     ungroup() %>%
-    left_join(heater_vintage)
+    filter(n_premature > 0)
 
-  # Update buildings without new heating system
+  bld_det_i_sw <- bld_det_i_sw %>%
+    select(-c("n_premature"))
+
+  # Remove buildings that have replaced their heating system
   bld_det_i <- bld_det_i %>%
     left_join(bld_det_i_sw %>%
       group_by_at(setdiff(names(bld_det_i), c("n_units_fuel"))) %>%
@@ -505,7 +491,7 @@ fun_stock_switch_fuel_dyn <- function(bld_det_i,
     select(-c(n_sw, n_units_fuel)) %>%
     rename(n_units_fuel = n_after) %>%
     # Only keeping buildings with fuel
-    filter(n_units_fuel > 0)
+    filter(n_units_fuel > 1e-3)
 
   # Format buildings with fuel switch by renaming columns
   bld_det_i_sw <- bld_det_i_sw %>%
@@ -518,9 +504,10 @@ fun_stock_switch_fuel_dyn <- function(bld_det_i,
       sum(bld_det_i_sw$n_units_fuel)) / 1e6, 0)) {
       stop("Test failed. Error during switching fuel.")
     } else {
-      print(paste("Test passed.", "Switch",
+      print("Test passed. Replacement boilers is consistent.")
+      print(paste("Number of heater installation is",
         round(sum(bld_det_i_sw$n_units_fuel) / 1e6, 0),
-        "million units. i.e.", round(sum(bld_det_i_sw$n_units_fuel) /
+        "million units in 5 years. i.e.", round(sum(bld_det_i_sw$n_units_fuel) /
           (temp * 1e6) * 100, 1), "% of the existing stock."))
     }
    }
@@ -536,7 +523,8 @@ fun_stock_switch_fuel_dyn <- function(bld_det_i,
 
   output <- list(
     bld_det_i = bld_det_i,
-    bld_det_i_sw = bld_det_i_sw
+    bld_det_i_sw = bld_det_i_sw,
+    premature = premature
   )
 
   return(output)

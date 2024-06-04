@@ -21,7 +21,7 @@ path <- "STURM_data/input_csv/input_resid/macro/social_cost_carbon_20.csv"
 social_cost_carbon <- read.csv(path) %>%
   rename(social_cost_carbon = value)
 
-run <- "scenarios_detail"
+run <- "test"
 
 scenarios <- c(
     "EU" = "Current policies",
@@ -33,12 +33,13 @@ scenarios <- c(
     "EU_heat_pump_ambitious" = "Climate Fund ambitious"
 )
 
-run <- "scenarios_cba"
+run <- "test"
 scenarios <- c(
     "EU" = "Current policies",
-    "EU_mix" = "Proposed",
-    "EU_mix_ambitious" = "Enhanced",
-    "EU_mix_ban" = "Fossil-Ban")
+    "EU_carbon_tax" = "Proposed")
+
+# "EU_mix_ambitious" = "Enhanced",
+# "EU_mix_ban" = "Fossil-Ban"
 # Reconstuction flows
 
 ```
@@ -89,7 +90,7 @@ Calculate the differences between scenarios and baseline:
 - Emission.
 
 ```{r}
-lifetime_renovation <- 35 # years
+lifetime_renovation <- 20 #30 # years
 lifetime_heater <- 20 # years
 social_discount <- 0.02 # % per year
 stp <- 5
@@ -97,7 +98,7 @@ stp <- 5
 data <- filter(data,
     resolution == "all",
     variable %in% c("cost_renovation_EUR", "cost_heater_EUR",
-      "cost_heat_EUR", "heat_tCO2")) %>%
+      "cost_heat_EUR", "heat_tCO2", "thermal_comfort_EUR")) %>%
     filter(year > 2015) %>%
     select(-resolution)
 
@@ -120,7 +121,8 @@ wide_data <- wide_data %>%
     cost_renovation_EUR_year = cost_renovation_EUR * annuities_renovation * stp,
     cost_heater_EUR_year = cost_heater_EUR * annuities_heater * stp,
     cost_emission_EUR = heat_tCO2 * social_cost_carbon * stp,
-    cost_heat_EUR = cost_heat_EUR * stp
+    cost_heat_EUR = cost_heat_EUR * stp,
+    thermal_comfort_EUR = - thermal_comfort_EUR * stp
     )
 
 
@@ -144,7 +146,7 @@ wide_data <- wide_data %>%
 
 wide_data <- wide_data %>%
   mutate(running_cost = cost_renovation_EUR_cumsum + cost_heater_EUR_cumsum +
-    cost_heat_EUR + cost_emission_EUR)
+    cost_heat_EUR + cost_emission_EUR + thermal_comfort_EUR)
 
 write.csv(filter(wide_data, region_bld == "EU"), paste0(save_dir, "/cba_calculation_eu.csv"))
 ```
@@ -153,10 +155,10 @@ write.csv(filter(wide_data, region_bld == "EU"), paste0(save_dir, "/cba_calculat
 long_data <- wide_data %>%
   select("region_bld", "year", "scenario", "cost_renovation_EUR_cumsum",
     "cost_heater_EUR_cumsum", "cost_heater_EUR_cumsum",
-    "cost_heat_EUR", "cost_emission_EUR", "running_cost") %>%
+    "cost_heat_EUR", "cost_emission_EUR", "thermal_comfort_EUR", "running_cost") %>%
   pivot_longer(cols = c("cost_renovation_EUR_cumsum",
     "cost_heater_EUR_cumsum", "cost_heater_EUR_cumsum",
-    "cost_heat_EUR", "cost_emission_EUR", "running_cost"),
+    "cost_heat_EUR", "cost_emission_EUR", "thermal_comfort_EUR", "running_cost"),
                names_to = "variable",
                values_to = "value")
 
@@ -187,6 +189,7 @@ summary <- wide_data_diff %>%
     cost_heater_sum = sum(cost_heater_EUR_cumsum * discount_factor) / 1e9,
     cost_heat_sum = sum(cost_heat_EUR * discount_factor) / 1e9,
     cost_emission_sum = sum(cost_emission_EUR * discount_factor) / 1e9,
+    thermal_comfort_sum = sum(thermal_comfort_EUR * discount_factor) / 1e9,
     running_cost = sum(running_cost * discount_factor) / 1e9
   ) %>%
   ungroup() 
@@ -196,6 +199,65 @@ write.csv(summary, paste0(save_dir, "/cba_summary.csv"))
 ```
 
 ```{r}
+# table recap
+# if _2050_summary_eu.csv exists, read it
+
+list_variables <- c(
+  "Space heating consumption (TWh)",
+  "Space heating consumption electricity (TWh)",
+  "Emission (MtCO2)",
+  "Emission cumulated (GtCO2)"
+  )
+
+file <- paste0(save_dir, "/", run, "_2050_summary_eu.csv")
+if (file.exists(file)) {
+  # read file column as character
+
+
+
+  summary_2050 <- read.csv(file, check.names = FALSE) %>%
+    # select only rows who variables are in list_variables
+    filter(variable %in% list_variables) %>%
+    # remove column "Initial"
+    select(-Initial) %>%
+
+
+
+  summary_2050 - summary_2050[[ref]]
+    mutate_at(vars(columns_to_diff), list(Difference = ~ . - .data[[ref]]))
+
+  data$Difference <- data$`Carbon tax` - data[[ref]]
+
+
+    # Calculate difference of each column with the column "Current policies"
+    
+
+
+}
+
+rename_list <- c(
+  cost_renovation_sum = "Delta cost renovation (Billion EUR)",
+  cost_heater_sum = "Delta cost heating system (Billion EUR)",
+  cost_heat_sum = "Delta cost fuel (Billion EUR)",
+  cost_emission_sum = "Delta cost emission (Billion EUR)",
+  thermal_comfort_sum = "Delta thermal comfort (Billion EUR)",
+  running_cost = "Delta total cost (Billion EUR)"
+)
+
+
+temp <- summary %>%
+  filter(region_bld == "EU") %>%
+  select(-region_bld) %>%
+  gather(variable, value, cost_renovation_sum, cost_heater_sum, cost_heat_sum,
+    cost_emission_sum, thermal_comfort_sum, running_cost) %>%
+  mutate(variable = rename_list[.data[["variable"]]]) %>%
+  # put scneario in column
+  pivot_wider(names_from = scenario, values_from = value) 
+
+```
+
+
+```{r}
 source("STURM_output/C00_plots.R")
 
 rename_list <- c(
@@ -203,6 +265,7 @@ rename_list <- c(
   cost_heater_sum = "Cost heating system",
   cost_heat_sum = "Cost fuel",
   cost_emission_sum = "Cost emission",
+  thermal_comfort_sum = "Thermal comfort",
   running_cost = "Total cost"
 )
 
@@ -210,11 +273,13 @@ color_list <- c(
   "Cost renovation" = "#ee6a6b",
   "Cost heating system" = "#62c5c0",
   "Cost fuel" = "#00589d",
-  "Cost emission" = "#fdbb40"
+  "Cost emission" = "#fdbb40",
+  "Thermal comfort" = "lightblue"
 )
 
 df <- summary %>%
-  gather(variable, value, cost_renovation_sum, cost_heater_sum, cost_heat_sum, cost_emission_sum, running_cost) %>%
+  gather(variable, value, cost_renovation_sum, cost_heater_sum, cost_heat_sum,
+    cost_emission_sum, thermal_comfort_sum, running_cost) %>%
   mutate(variable = rename_list[.data[["variable"]]]) %>%
   filter(scenario != ref) %>%
   # mutate(scenario = scenarios[.data[["scenario"]]]) %>%

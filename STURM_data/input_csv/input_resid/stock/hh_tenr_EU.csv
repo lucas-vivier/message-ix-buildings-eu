@@ -161,9 +161,9 @@ C-EEU-CZE,q3,own,0.809
 C-EEU-CZE,q1,rent,0.484
 C-EEU-CZE,q2,rent,0.191
 C-EEU-CZE,q3,rent,0.191
-C-WEU-HRV,q1,own,88
-C-WEU-HRV,q2,own,90.9
-C-WEU-HRV,q3,own,90.9
-C-WEU-HRV,q1,rent,12
-C-WEU-HRV,q2,rent,9.1
-C-WEU-HRV,q3,rent,9.1
+C-WEU-HRV,q1,own,0.88
+C-WEU-HRV,q2,own,0.909
+C-WEU-HRV,q3,own,0.909
+C-WEU-HRV,q1,rent,0.12
+C-WEU-HRV,q2,rent,0.091
+C-WEU-HRV,q3,rent,0.091

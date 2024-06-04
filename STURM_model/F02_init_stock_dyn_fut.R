@@ -63,6 +63,7 @@ fun_stock_aggr <- function(sector,
     c("mat", "arch", "region_gea")
   )
 
+
   # Stock aggregated: Number of units (Million) - "arch" level
   stock_aggr <- bld_cases_fuel %>%
     select_at(intersect(resolution_aggr, names(bld_cases_fuel))) %>%
@@ -74,16 +75,6 @@ fun_stock_aggr <- function(sector,
     left_join(shr_arch) %>%
     mutate(n_units_aggr = bld_units * shr_mat * shr_arch) %>%
     select(-c(bld_units, shr_mat, shr_arch))
-
-  temp <- stock_aggr %>%
-    group_by_at(c("region_bld", "year")) %>%
-    summarize(n = sum(n_units_aggr)) %>%
-    ungroup()
-  
-  p <- pop %>%
-    group_by_at(c("region_bld", "year")) %>%
-    summarize(pop = sum(pop)) %>%
-    ungroup()
 
   try(if(nrow(stock_aggr) !=
     nrow(distinct(stock_aggr %>% select(-c(n_units_aggr)))))
@@ -259,7 +250,7 @@ fun_stock_det_ini <- function(sector,
     if (round(temp / 1e6, 0) !=
       round(sum(bld_det_i$n_units_fuel) / 1e6, 0)) {
       print("Error:
-        Inconsistent income shares.")
+        Inconsistent occupancy-status shares.")
     }
   }
 

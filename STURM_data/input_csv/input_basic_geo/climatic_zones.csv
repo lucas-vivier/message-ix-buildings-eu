@@ -443,3 +443,9 @@ R32USA,urb,Zone_5A Cool Humid
 R32USA,urb,Zone_5C Cool Marine
 R32USA,urb,Zone_6A Cold Humid
 R32USA,urb,Zone_7A Very cold Humid
+C-WEU-HRV,rur,Zone_3A Warm Humid
+C-WEU-HRV,rur,Zone_4A Mixed Humid
+C-WEU-HRV,rur,Zone_5A Cool Humid
+C-WEU-HRV,urb,Zone_3A Warm Humid
+C-WEU-HRV,urb,Zone_4A Mixed Humid
+C-WEU-HRV,urb,Zone_5A Cool Humid

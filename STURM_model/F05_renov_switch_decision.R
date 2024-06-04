@@ -3,8 +3,8 @@
 
 library(dplyr)
 
-  # rounding (number of decimals)
-  rnd <- 5
+# rounding (number of decimals)
+rnd <- 5
 
 
 fun_lcc <- function(capex, opex, rate, duration) {
@@ -51,13 +51,15 @@ fun_utility_ren_shell <- function(yrs,
                           lifetime_ren,
                           discount_ren,
                           social_discount_rate,
-                          sub_ren_shell = NULL,
-                          sub_ren_shell_type = "ad_valorem",
+                          income,
+                          credit_constraint = NULL,
+                          subsidies_renovation = NULL,
+                          subsidies_renovation_type = "ad_valorem",
                           full = FALSE,
                           emission_factors = NULL) {
 
   en_hh_tot <- select(en_hh_tot, -c("budget_share",
-    "heating_intensity", "en_hh_std", "u_building"))
+    "heating_intensity", "en_hh_std", "cost_op_wt", "u_building", "en_pe_hh_std"))
   # Operational energy costs before/after renovation
   en_hh_tot_ren_fin <- en_hh_tot %>%
     rename(eneff_f = eneff)
@@ -73,14 +75,14 @@ fun_utility_ren_shell <- function(yrs,
     mutate(cost_invest_ren_shell = as.numeric(cost_invest_ren_shell))
     
   # Apply subsidy
-  if (!is.null(sub_ren_shell)) {
-    if ("year" %in% names(sub_ren_shell)) {
-      sub_ren_shell <- sub_ren_shell %>%
+  if (!is.null(subsidies_renovation)) {
+    if ("year" %in% names(subsidies_renovation)) {
+      subsidies_renovation <- subsidies_renovation %>%
         filter(year == yrs[i])
     }
   } else {
-    sub_ren_shell <- cost_invest_ren_shell %>%
-      mutate(sub_ren_shell = 0) %>%
+    subsidies_renovation <- cost_invest_ren_shell %>%
+      mutate(subsidies_renovation = 0) %>%
       select(-c("cost_invest_ren_shell"))
   }
 
@@ -94,18 +96,13 @@ fun_utility_ren_shell <- function(yrs,
   social_discount_factor <-
     (1 - (1 + social_discount_rate)^-30) / social_discount_rate
 
-  bld_age_exst <- ct_bld_age %>%
-    filter(year_i < yrs[i]) %>%
-    select(bld_age_id) %>%
-    pull(bld_age_id)
-
   utility_ren_hh <- bld_cases_fuel %>%
-      filter(bld_age %in% bld_age_exst) %>%
       left_join(ct_ren_eneff %>%
           rename(eneff = eneff_i),
           relationship = "many-to-many") %>%
       filter(!is.na(eneff_f)) %>%
       filter(eneff_f %in% c("adv", "std")) %>%
+      filter(bld_age %in% c("p1", "p2", "p3")) %>%
       # Attach year (in the loop)
       mutate(year = yrs[i]) %>%
       left_join(hh_size) %>%
@@ -127,15 +124,16 @@ fun_utility_ren_shell <- function(yrs,
         social_discount_factor * en_saving * emission_factors * 3.6 / 1e6) %>%
       mutate(cost_op_saving = (cost_op_init - cost_op) / 1e3) %>%
       # Cost
-      left_join(sub_ren_shell) %>%
-      mutate(sub_ren_shell = ifelse(is.na(sub_ren_shell), 0, sub_ren_shell)) %>%
-      mutate(sub_type = sub_ren_shell_type) %>%
+      left_join(subsidies_renovation) %>%
+      mutate(subsidies_renovation =
+        ifelse(is.na(subsidies_renovation), 0, subsidies_renovation)) %>%
+      mutate(sub_type = subsidies_renovation_type) %>%
       # Use for reporting
       mutate(sub_ren_hh = case_when(
-          sub_type == "ad_valorem" ~ sub_ren_shell *
+          sub_type == "ad_valorem" ~ subsidies_renovation *
             cost_invest_ren_shell * floor_size / 1e3,
-          sub_type == "per_CO2" ~ co2_saving * sub_ren_shell / 1e3,
-          sub_type == "per_kWh" ~ en_saving_tot * sub_ren_shell / 1e3
+          sub_type == "per_CO2" ~ co2_saving * subsidies_renovation / 1e3,
+          sub_type == "per_kWh" ~ en_saving_tot * subsidies_renovation / 1e3
       )) %>%
       # Calculate total investment costs
       mutate(cost_invest_hh = cost_invest_ren_shell * floor_size / 1e3) %>%
@@ -147,13 +145,26 @@ fun_utility_ren_shell <- function(yrs,
       # Calculate utility
       mutate(utility_ren =
       - cost_invest_hh + sub_ren_hh + cost_op_saving * discount_factor) %>%
+      # Credit constraint
+      left_join(income) %>%
+      mutate(to_pay = (cost_invest_hh - sub_ren_hh) * 1e3 /
+        param$duration_remboursment) %>%
+      mutate(ratio_to_pay = to_pay / income) %>%
+      mutate(threshold_credit = credit_constraint) %>%
+      mutate(constraint = ifelse(threshold_credit,
+        ratio_to_pay > threshold_credit, FALSE)) %>%
+      mutate(utility_ren = ifelse(constraint, NA, utility_ren)) %>%
+      filter(!is.na(utility_ren)) %>%
+      mutate(payback = ifelse(constraint, NA, payback)) %>%
       # Rename eneff column
       rename(eneff_i = eneff) %>%
       select(-c(
           "hh_size", "floor_cap", "en_hh",
           "cost_invest_ren_shell", "cost_op", "cost_op_init",
-          "discount_factor", "sub_ren_shell", "sub_type", "emission_factors",
-          "co2_saving", "en_saving_tot"))
+          "discount_factor", "subsidies_renovation",
+          "sub_type", "emission_factors",
+          "co2_saving", "en_saving_tot", "to_pay",
+          "ratio_to_pay", "income", "threshold_credit", "constraint"))
 
   if (!full) {
     utility_ren_hh <- select(utility_ren_hh, -c("floor_size",
@@ -195,12 +206,14 @@ fun_ms_ren_shell_endogenous <- function(yrs,
                           hh_size,
                           floor_cap,
                           cost_invest_ren_shell,
-                          sub_ren_shell,
+                          subsidies_renovation,
                           en_hh_tot,
                           lifetime_ren,
                           discount_ren,
                           social_discount_rate,
-                          sub_ren_shell_type = "ad_valorem",
+                          income,
+                          credit_constraint = NULL,
+                          subsidies_renovation_type = "ad_valorem",
                           parameters = NULL,
                           emission_factors = emission_factors,
                           anticipate_renovation = NULL) {
@@ -220,8 +233,10 @@ fun_ms_ren_shell_endogenous <- function(yrs,
                         lifetime_ren,
                         discount_ren,
                         social_discount_rate,
-                        sub_ren_shell_type = sub_ren_shell_type,
-                        sub_ren_shell = sub_ren_shell,
+                        income,
+                        credit_constraint = credit_constraint,
+                        subsidies_renovation_type = subsidies_renovation_type,
+                        subsidies_renovation = subsidies_renovation,
                         emission_factors = emission_factors)
   
   payback <- utility_ren_hh %>%
@@ -392,7 +407,7 @@ fun_utility_heat <- function(yrs,
                         cost_invest_heat,
                         lifetime_heat,
                         discount_heat,
-                        social_discount_rate,
+                        social_discount_rate = param$social_discount_rate,
                         sub_heat = NULL,
                         inertia = NULL,
                         full = FALSE,
@@ -406,8 +421,8 @@ fun_utility_heat <- function(yrs,
     left_join(emission_factors) %>%
     mutate(emission =
       social_discount_factor * en_hh * emission_factors * 3.6 / 1e6) %>%
-    select(-c("budget_share", "heating_intensity",
-      "en_hh_std", "emission_factors", "fuel", "fuel_cool", "u_building"))
+    select(-c("budget_share", "heating_intensity", "cost_op_wt",
+      "en_hh_std", "emission_factors", "fuel", "fuel_cool", "u_building", "en_pe_hh_std"))
 
 
   # Operational energy costs before/after renovation
@@ -574,7 +589,6 @@ fun_ms_switch_heat_endogenous <- function(yrs,
       mutate(utility_heat = utility_heat * scaling_factor + constant) %>%
       select(-c("scaling_factor", "constant"))
   }
-
 
   # All possible combinations covered (including no renovation)
   ms_i <- utility_heat_hh %>%

@@ -42,7 +42,7 @@ run_scenario <- function(run,
   start_time <- Sys.time()
 
 
-  # SOURCE MODEL FUNCTIONS
+  # Loading functions
   print("Load functions")
   source(file.path(path_rcode, "B00_functions.R"))
   source(file.path(path_rcode, "F01_inputs.R"))
@@ -68,20 +68,19 @@ run_scenario <- function(run,
     source(file.path(path_rcode, "R03_report_NGFS.R"))
   }
   source(file.path(path_rcode, "R05_report_NAVIGATE.R"))
-  print("Functions loaded!")
-
-  # Read categories
-  print("Load categories")
+  print("Functions loaded.")
+  # --------------------------------------------------------------
+  print("Load data")
+  # Loading categories
   path_in_csv <- paste0(path_in, "./input_csv/")
   cat <- read_categories(path_in_csv, sector, region)
 
-  # Source input data
-  print("Load data")
-  temp <- fun_inputs_csv(path_in, file_inputs, file_scenarios, sector, run, param)
+  # Loading input data
+  temp <- fun_inputs_csv(path_in, file_inputs,
+    file_scenarios, sector, run, param)
   d <- temp$d
   param <- temp$param
 
-  
   # Multiple cost by cost_factor if cost_invest_heat do not have cost_factor
   if (!"region_bld" %in% names(d$cost_invest_heat)) {
     d$cost_invest_heat <- d$cost_invest_heat %>%
@@ -90,7 +89,7 @@ run_scenario <- function(run,
       select(-cost_factor)
   }
 
-  # Ensure that adv cost are higher than std
+  # Ensure that renovation cost for "adv" renovation are higher than "std"
   temp <- d$cost_invest_ren_shell
   std_data <- temp %>% filter(eneff_f == "std")
   adv_data <- temp %>% filter(eneff_f == "adv")
@@ -101,10 +100,13 @@ run_scenario <- function(run,
     mutate(cost_invest_ren_shell_adv =
       max(cost_invest_ren_shell_std, cost_invest_ren_shell_adv))
   final_data <- adjusted_data %>%
-    select(region_bld, eneff_f_std = cost_invest_ren_shell_std, eneff_f_adv = cost_invest_ren_shell_adv) %>%
-    pivot_longer(cols = -region_bld, names_to = "eneff_f", values_to = "cost_invest_ren_shell")
+    select(region_bld, eneff_f_std = cost_invest_ren_shell_std,
+      eneff_f_adv = cost_invest_ren_shell_adv) %>%
+    pivot_longer(cols = -region_bld, names_to = "eneff_f",
+      values_to = "cost_invest_ren_shell")
   final_data <- final_data %>%
-    mutate(eneff_f = recode(eneff_f, "eneff_f_std" = "std", "eneff_f_adv" = "adv"))
+    mutate(eneff_f = recode(eneff_f, "eneff_f_std" = "std",
+      "eneff_f_adv" = "adv"))
   d$cost_invest_ren_shell <- final_data
 
   # Creating inertia data
@@ -135,20 +137,21 @@ run_scenario <- function(run,
           region_bld == region_bld)$discount_rate,  discount_rate))
     }
   }
-  
-  # Read energy prices
+
+  # Loading energy prices
   print("Load energy prices")
   price_en <- read_energy_prices(d$energy_prices_ini,
     d$energy_prices_projections,
     cat$geo_data, yrs[[1]], yrs[[length(yrs)]], path_out = NULL)
 
-  # Read emission factors
+  # Loading emission factors
   print("Load emission factors")
   emission_factors <-
     read_emission_factors(d$emission_factors, d$emission_ini,
       cat$geo_data, yrs[[1]])
 
-  # Calculate carbon price for electricity and district heating
+
+  # Calculating carbon price for electricity and district heating
   if (!is.null(d$carbon_market)) {
     d$carbon_market  <- d$carbon_market  %>%
       rowwise() %>%
@@ -168,8 +171,11 @@ run_scenario <- function(run,
       select(-carbon_market)
   }
 
-  # Read carbon tax for oil, gas and coal
-  if (!is.null(d$carbon_tax)){
+  price_en_wt <- price_en %>%
+    rename(price_en_wt = price_en)
+
+  # Loading carbon tax for oil, gas and coal
+  if (!is.null(d$carbon_tax)) {
     d$carbon_tax  <- d$carbon_tax  %>%
       rowwise() %>%
       mutate(fuel = list(c("oil", "gas", "coal"))) %>%
@@ -188,18 +194,18 @@ run_scenario <- function(run,
   }
 
   # Adding year column to start subsidies after calibration
-  if (!"year" %in% names(d$sub_ren_shell)) {
-    d$sub_ren_shell <- crossing(d$sub_ren_shell, yrs) %>%
+  if (!"year" %in% names(d$subsidies_renovation)) {
+    d$subsidies_renovation <- crossing(d$subsidies_renovation, yrs) %>%
       rename(year = "yrs") %>%
-      mutate(sub_ren_shell = ifelse(year <= yrs[[2]], 0, sub_ren_shell))
+      mutate(subsidies_renovation = ifelse(year <= yrs[[2]], 0, subsidies_renovation))
   }
   if (!"year" %in% names(d$sub_heat)) {
     d$sub_heat <- crossing(d$sub_heat, yrs) %>%
       rename(year = "yrs") %>%
       mutate(sub_heat = ifelse(year <= yrs[[2]], 0, sub_heat))
   }
-
-  print("Data loaded!")
+  print("Data loaded.")
+  # --------------------------------------------------------------
 
   # Create matrix of all dimensions
   bld_cases_fuel <- expand.grid(
@@ -222,12 +228,43 @@ run_scenario <- function(run,
     merge(as.data.frame(cat$ct_hh_tenr)) %>%
     rename("tenr" = "cat$ct_hh_tenr")
 
-  ### RESIDENTIAL SECTOR
+  # Residential sector
   if (sector == "resid") {
+    print("Initializing housing stock")
+    # Initialize housing stock aggregated
+    stock_aggr <- fun_stock_aggr(
+      sector,
+      yrs,
+      cat$geo_data,
+      bld_cases_fuel,
+      d$pop,
+      d$hh_size,
+      d$floor_cap,
+      cat$ct_eneff,
+      cat$ct_fuel,
+      d$shr_mat,
+      d$shr_arch
+    )
 
-    # Calculate energy consumption at dwelling level
-    print("Calculate energy consumption at dwelling level")
+    # Initialize housing stock detailed
+    temp <- fun_stock_det_ini(sector,
+                           stock_aggr,
+                           d$stock_arch_base,
+                           cat$geo_data,
+                           cat$ct_eneff,
+                           cat$ct_fuel,
+                           d$ct_heat,
+                           d$shr_fuel_heat_base,
+                           d$hh_tenure,
+                           report_var)
+    bld_det_ini <- temp$bld_det_i
+    report <- temp$report
+    print(paste("Initial building stock based on detailed data:",
+      round(sum(bld_det_ini$n_units_fuel) / 1e6, 0), "million units."))
+    rm(temp)
 
+    print("Calculating energy consumption at dwelling level")
+    # Calculate energy need at dwelling level
     if (en_method == "TABULA") {
 
       en_sav_ren <- d$en_sav_ren %>%
@@ -245,52 +282,13 @@ run_scenario <- function(run,
         d$area_floor,
         d$area_windows,
         d$hdd,
-        en_sav_ren,
+        en_sav_ren
       )
       d$en_int_heat <- en_int_heat
-      # Add energy saving from envelope renovation
     }
 
-    # Initialize housing stock (fun)
-    print(paste("Initialize scenario run", sector))
-
-    stock_aggr <- fun_stock_aggr(
-      sector,
-      yrs,
-      cat$geo_data,
-      bld_cases_fuel,
-      d$pop,
-      d$hh_size,
-      d$floor_cap,
-      cat$ct_eneff,
-      cat$ct_fuel,
-      d$shr_mat,
-      d$shr_arch
-    )
-    print(paste("Initialize scenario run", sector, "- completed!"))
-
-    # Initialize stock detailed ini
-    temp <- fun_stock_det_ini(sector,
-                           stock_aggr,
-                           d$stock_arch_base,
-                           cat$geo_data,
-                           cat$ct_eneff,
-                           cat$ct_fuel,
-                           d$ct_heat,
-                           d$shr_fuel_heat_base,
-                           d$hh_tenure,
-                           report_var)
-    # Extract dataframes from list
-    bld_det_ini <- temp$bld_det_i
-    report <- temp$report
-    print(paste("Initial building stock based on detailed data:",
-      round(sum(bld_det_ini$n_units_fuel) / 1e6, 0), "million units."))
-    rm(temp)
-
-
-
-    print(paste("Calculate energy demand intensities - for space heating and cooling"))
-    lst_en_i <- fun_en_sim(
+    # Calculation of energy demand demand for space heating and cooling
+    temp <- fun_en_sim(
       sector,
       yrs,
       1,
@@ -310,27 +308,65 @@ run_scenario <- function(run,
       d$hh_size,
       d$floor_cap,
       price_en,
+      price_en_wt,
       d$income,
+      d$pe_conversion_factor,
+      bill_rebates = NULL,
       en_method = en_method,
-      path_out = path_out
+      path_out = path_out,
+      alpha = NULL,
+      short_term_price_elasticity = param$short_term_price_elasticity
     )
-    # Extract dataframes from list
-    en_m2_scen_heat <- lst_en_i$en_m2_scen_heat
-    en_m2_scen_cool <- lst_en_i$en_m2_scen_cool
-    en_hh_tot <- lst_en_i$en_hh_tot
-    rm(lst_en_i)
+    en_m2_scen_heat <- temp$en_m2_scen_heat
+    en_m2_scen_cool <- temp$en_m2_scen_cool
+    en_hh_tot <- temp$en_hh_tot
+    rm(temp)
 
     # Calibration of energy consumption at base year
-    shr_en <- fun_calibration_consumption(bld_det_ini,
+    print("Calibrating energy consumption function at the country level")
+    alpha <- fun_calibration_consumption(bld_det_ini,
                                           en_hh_tot,
                                           d$hh_size,
                                           d$floor_cap,
                                           d$en_consumption,
                                           path_out)
-    # shr_en <- mutate(shr_en, shr_en = 1)
+
+    print("Recalculating energy consumption with new calibration")
+    temp <- fun_en_sim(
+      sector,
+      yrs,
+      1,
+      bld_cases_fuel,
+      d$en_int_heat,
+      d$en_int_cool,
+      d$days_cool,
+      d$eff_cool,
+      d$eff_heat,
+      d$hours_heat,
+      d$shr_floor_heat,
+      d$hours_cool,
+      d$shr_floor_cool,
+      d$hours_fans,
+      d$power_fans,
+      d$shr_acc_cool,
+      d$hh_size,
+      d$floor_cap,
+      price_en,
+      price_en_wt,
+      d$income,
+      d$pe_conversion_factor,
+      bill_rebates = NULL,
+      en_method = en_method,
+      path_out = path_out,
+      alpha = alpha,
+      short_term_price_elasticity = param$short_term_price_elasticity
+    )
+    en_m2_scen_heat <- temp$en_m2_scen_heat
+    en_m2_scen_cool <- temp$en_m2_scen_cool
+    en_hh_tot <- temp$en_hh_tot
+    rm(temp)
     
-    # Energy demand intensities - hot water
-    print(paste("Calculate energy demand intensities for hot water"))
+    # Calculation of energy demand demand for hot water heating
     en_hh_hw_scen <- fun_hw_resid(
       yrs, 1,
       bld_cases_fuel,
@@ -341,12 +377,13 @@ run_scenario <- function(run,
     )
 
     # Calibration energy poverty
+    print("Calibrating energy poverty function at the country level")
     threshold_poverty <- fun_calibration_poverty(bld_det_ini,
                                                 en_hh_tot,
                                                 d$energy_poverty,
                                                 path_out)
 
-
+    # Formatting output
     report <- fun_format_output(1,
                     yrs,
                     stp,
@@ -371,29 +408,29 @@ run_scenario <- function(run,
                     emission_factors,
                     d$emission_factors_embodied,
                     d$income,
-                    threshold_poverty = threshold_poverty,
-                    shr_en = shr_en)
+                    d$pe_conversion_factor,
+                    threshold_poverty = threshold_poverty)
 
     # Initial quantity to quantify learning
     techno_heat_ini <- bld_det_ini %>%
       group_by_at("fuel_heat") %>%
       summarize(n_i = sum(n_units_fuel)) %>%
       ungroup()
-
-    # Loop over timesteps
-    print(paste("Start scenario run", sector))
+    
+    # Initializing calibration parameters for energy-efficiency decisions
     parameters_renovation <- NULL
     parameters_heater <- NULL
-    # Initialize carbon revenu in case of recycling
+    # Initializing carbon revenu in case of recycling
     carbon_revenue <- NULL
     renovation_ambition <- NULL
-    # Initialize sub_report
+    bill_rebates <- NULL
+
+    # Initializing sub_report
     sub_report <- data.frame(value = numeric(),
       resolution = character(),
       variable = character(),
       type = character(),
       stringsAsFactors = FALSE)
-
 
     # Data store vintage of heating system by countries
     heater_vintage <- bld_det_ini %>%
@@ -403,7 +440,6 @@ run_scenario <- function(run,
       left_join(d$lifetime_heater) %>%
       select(-c("bld_age_min"))
 
-    # Add all yrs with heater_vintage
     stp <- yrs[2] - yrs[1]
     heater_vintage <- heater_vintage %>%
       crossing(yrs[2:length(yrs)]) %>%
@@ -416,25 +452,25 @@ run_scenario <- function(run,
 
     if (FALSE) {
       # Testing consistency of vintage stock
-      t <- heater_vintage %>%
-        group_by(region_bld, fuel_heat) %>%
-        summarise(n_vintage = sum(n_vintage)) %>%
-        ungroup()
-
       test <- bld_det_ini %>%
         group_by_at(c("region_bld", "fuel_heat")) %>%
-        summarise(n_units_fuel = sum(n_units_fuel)) %>%
+        summarize(n_units_fuel = sum(n_units_fuel)) %>%
         ungroup() %>%
-        left_join(t)
+        left_join(heater_vintage %>%
+          group_by_at(c("region_bld", "fuel_heat")) %>%
+          summarize(n_vintage = sum(n_vintage)) %>%
+          ungroup())
     }
 
-
+    print("End of initialization")
+    # --------------------------------------------------------------
+    # Loop over timesteps
     bld_det_i <- bld_det_ini
     for (i in 2:length(yrs)) {
-      print(paste("Start scenario run", sector, "for year", yrs[i]))
+      print(paste("0. Starting scenario run for year", yrs[i]))
       stp <- yrs[i] - yrs[i - 1]
 
-      # Calculating revenue carbon tax
+      # Calculating carbon tax revenues in Billion euro
       if (!is.null(d$carbon_tax)) {
         carbon_revenue <- d$carbon_tax %>%
           filter(year == yrs[i]) %>%
@@ -443,12 +479,14 @@ run_scenario <- function(run,
             filter(variable == "heat_tCO2") %>%
             rename(fuel = resolution)) %>%
           filter(region_bld %in% unique(cat$geo_data$region_bld)) %>%
-          mutate(revenue = carbon_tax * value) %>%
-          filter(!is.na(revenue))
-        carbon_revenue <- sum(carbon_revenue$revenue) * stp / 1e9
+          mutate(revenue = carbon_tax * value * stp / 1e9) %>%
+          filter(!is.na(revenue)) %>%
+          group_by_at(c("region_bld")) %>%
+          summarize(revenue = sum(revenue)) %>%
+          ungroup()
       }
 
-      # Learning rate
+      # Learning rate and reduction of investment costs
       learning_heat <- bld_det_i %>%
         group_by_at("fuel_heat") %>%
         summarize(n = sum(n_units_fuel)) %>%
@@ -461,13 +499,65 @@ run_scenario <- function(run,
         mutate(learning_heat = ifelse(learning_heat > 1, 1, learning_heat)) %>%
         select(c("fuel_heat_f", "learning_heat"))
 
+      # Add floor cost for heat-pumps. Cannot be lower than gas boilers.
       cost_invest_heat <- d$cost_invest_heat %>%
         left_join(learning_heat, by = "fuel_heat_f") %>%
         mutate(cost_invest_heat = cost_invest_heat * learning_heat) %>%
         select(-learning_heat)
+      
+      if (param$heat_pump_floor_cost) {
+        cost_invest_heat <- cost_invest_heat %>%
+          group_by(region_bld) %>%
+          # Get cost_invest_heat for 'gas'
+          mutate(cost_gas = ifelse(fuel_heat_f == "gas",
+            cost_invest_heat, NA_real_)) %>%
+          # Replace NA values with the cost_invest_heat of 'gas' for the region
+          mutate(cost_gas = max(cost_gas, na.rm = TRUE)) %>%
+          # Adjust cost_invest_heat for 'heat_pump'
+          mutate(cost_invest_heat = ifelse(fuel_heat_f == "heat_pump",
+              max(cost_invest_heat, cost_gas), cost_invest_heat)) %>%
+          select(-cost_gas) %>%
+          ungroup()
+      }
+      
+      print("Calculating energy demand")
+      if (!is.null(param$sh_recycling_rebates)) {
+        # Budget rebates is the carbon revenue for 5 years
+        if (is.numeric(carbon_revenue)) {
+            budget_rebates <- data.frame(
+              year = yrs[i - 1],
+              budget_rebates = param$sh_recycling_rebates *
+                carbon_revenue * 1e9 / stp
+          )
+        } else {
+          budget_rebates <- carbon_revenue %>%
+            mutate(budget_rebates = revenue *
+              param$sh_recycling_rebates * 1e9 / stp) %>%
+            select(-revenue)
 
-      print("Calculate energy demand intensities for space heating and cooling")
-      lst_en_i <- fun_en_sim(
+        }
+      } else {
+        budget_rebates <- data.frame(
+          region_bld = unique(bld_det_i$region_bld),
+          budget_rebates = 0
+        )
+      }
+
+      bill_rebates <- bld_det_i %>%
+        left_join(budget_rebates) %>%
+        mutate(recycling_rebates = param$recycling_rebates) %>%
+        group_by_at(names(budget_rebates)[names(budget_rebates) != "budget_rebates"]) %>%
+        mutate(bill_rebates =
+          ifelse(recycling_rebates == "lump_sum",
+            budget_rebates / sum(n_units_fuel),
+          ifelse((recycling_rebates == "low_income") & (inc_cl == "q1"),
+            budget_rebates / sum(ifelse(inc_cl == "q1", n_units_fuel, 0)), 0))) %>%
+        ungroup() %>%
+        select(c("region_bld", "inc_cl", "bill_rebates")) %>%
+        distinct()
+      
+      # Calculating energy demand intensities for hot water
+      temp <- fun_en_sim(
         sector,
         yrs,
         i,
@@ -487,17 +577,20 @@ run_scenario <- function(run,
         d$hh_size,
         d$floor_cap,
         price_en,
+        price_en_wt,
         d$income,
+        d$pe_conversion_factor,
+        bill_rebates = bill_rebates,
         en_method = en_method,
+        alpha = alpha,
+        short_term_price_elasticity = param$short_term_price_elasticity
       )
-      # Extract dataframes from list
-      en_m2_scen_heat <- lst_en_i$en_m2_scen_heat
-      en_m2_scen_cool <- lst_en_i$en_m2_scen_cool
-      en_hh_tot <- lst_en_i$en_hh_tot
-      rm(lst_en_i)
+      en_m2_scen_heat <- temp$en_m2_scen_heat
+      en_m2_scen_cool <- temp$en_m2_scen_cool
+      en_hh_tot <- temp$en_hh_tot
+      rm(temp)
 
-      # Energy demand intensities - hot water
-      print("Calculate energy demand intensities for hot water")
+      # Calculating energy demand intensities for hot water
       en_hh_hw_scen <- fun_hw_resid(
         yrs, i,
         bld_cases_fuel,
@@ -507,7 +600,19 @@ run_scenario <- function(run,
         d$en_int_heat
       )
 
-      # Market share - new construction options
+      # Calculating renovation potential
+      renovation_potential <- bld_det_i %>%
+        mutate(year = yrs[i]) %>%
+        filter(bld_age %in% c("p1", "p2", "p3")) %>%
+        filter(eneff == "avg") %>%
+        left_join(en_hh_tot) %>%
+        # Only buildings with energy consumption > 80 kWh/m2
+        filter(en_pe_hh_std > 80) %>%
+        group_by_at(c("region_bld", "year")) %>%
+        summarize(renovation_potential = sum(n_units_fuel)) %>%
+        ungroup()
+
+      # Calculating market share for new construction options
       print("Calculate market share for new construction")
       ms_new_i <- fun_ms_new_exogenous(
                     yrs,
@@ -522,7 +627,9 @@ run_scenario <- function(run,
       try(if (nrow(ms_new_i) == 0)
         stop("Error in new construction calculation! Empty dataframe ms_new_i"))
 
+      # Calculating stock turnover
       print(paste("1. Running stock turnover year:", yrs[i]))
+      print("1.1 Accounting for demolition and empty buildings")
       temp <- fun_stock_turnover_dyn(i, yrs, bld_cases_fuel, cat$ct_bld_age,
                                     stock_aggr, bld_det_i, d$prob_dem,
                                     path_out = path_out,
@@ -542,11 +649,27 @@ run_scenario <- function(run,
         mutate(n_vintage = n_vintage - n_dem) %>%
         select(-n_dem)
 
-      print("2. Shell renovation decisions")
+      if (TRUE) {
+        # Testing consistency of vintage stock
+        test <- bld_det_i %>%
+          group_by_at(c("region_bld", "fuel_heat")) %>%
+          summarize(n_units_fuel_exst = sum(n_units_fuel_exst)) %>%
+          ungroup() %>%
+          left_join(heater_vintage %>%
+            group_by_at(c("region_bld", "fuel_heat")) %>%
+            summarize(n_vintage = sum(n_vintage)) %>%
+            ungroup())
+      }
+
+      # Calculating stock for new construction options
+      print("1.2 Calculating construction of new buildings")
       new_det_i <- fun_stock_construction_dyn(bld_aggr_i,
                                               ms_new_i,
                                               cat$ct_fuel)
 
+      # Endogenous energy efficiency decisions
+      print("2. Shell renovation decisions")
+      # Calibrating renovation decision function
       if (energy_efficiency == "endogenous" && i == 2) {
         print("2.0 Calibration of renovation rate")
         if ("parameters_renovation" %in% names(d)) {
@@ -570,16 +693,20 @@ run_scenario <- function(run,
                           stp,
                           path_out,
                           d$discount_rate,
-                          param$social_discount_rate
+                          param$social_discount_rate,
+                          d$income,
+                          credit_constraint = param$credit_constraint
                         )
         }
       }
+      # Calculating renovation decisions
       if (energy_efficiency == "endogenous") {
         print("2.1 Calculation of renovation rate")
-
+        # Calculating subsidies to meet objectives
         sub <- NULL
-        if (!is.null(param$objective_type) && i >= 3) {
-          if (param$objective_type == "deep_renovation" && i == 3) {
+        if (!is.null(param$objective_renovation) && i >= 3) {
+          print("Determining subsidies renovation to meet objectives")
+          if (grepl("deep", param$objective_renovation) && i == 3) {
             print("Removing barriers for deep renovation")
             # Assigning constant value of "std" to "adv" parameters
             parameters_std <- filter(parameters_renovation,
@@ -589,38 +716,74 @@ run_scenario <- function(run,
             parameters_renovation <- bind_rows(parameters_std,
               parameters_adv)
           }
+          objectives_endogenous <- NULL
+          if (grepl("endogenous", param$objective_renovation)) {
+            objectives_endogenous <- d$objectives_renovation %>%
+              left_join(renovation_potential) %>%
+              filter(year == yrs[i]) %>%
+              mutate(objectives_renovation = objectives_renovation * renovation_potential
+                / sum(renovation_potential)) %>%
+              select(-renovation_potential)
 
-          for (region in unique(bld_det_i$region_bld)) {
-            print(region)
-            bld_det_i_region <- filter(bld_det_i, region_bld == region)
+          }
 
-            temp <- fun_subsidies_insulation(i,
-                        yrs,
-                        stp,
-                        param$objective_type,
-                        param$budget_constraint_insulation,
-                        carbon_revenue,
-                        param$sub_ren_shell_type,
-                        param$sub_ren_shell_household_target,
-                        d,
-                        cat,
-                        param,
-                        bld_det_i_region,
-                        en_hh_tot,
-                        parameters_renovation,
-                        emission_factors,
-                        param$anticipate_renovation,
-                        region = region)
+          if ("region_bld" %in% names(d$objectives_renovation) | !is.null(objectives_endogenous)) {
+            print("Objectives for renovation are set per country")
+            for (region in unique(bld_det_i$region_bld)) {
+              print(region)
+              bld_det_i_region <- filter(bld_det_i, region_bld == region)
 
-            sub_region <- temp$sub %>%
-              mutate(region_bld = region)
-            sub <- bind_rows(sub, sub_region)
-            sub_report_region <- temp$sub_report %>%
-              mutate(region_bld = region)
-            sub_report <- bind_rows(sub_report, sub_report_region)
+              temp <- fun_subsidies_renovation(i,
+                          yrs,
+                          stp,
+                          param$objective_renovation,
+                          param$budget_constraint_insulation,
+                          carbon_revenue,
+                          param$subsidies_renovation_type,
+                          d$subsidies_renovation_target,
+                          d,
+                          cat,
+                          param,
+                          bld_det_i_region,
+                          en_hh_tot,
+                          parameters_renovation,
+                          emission_factors,
+                          param$anticipate_renovation,
+                          region = region,
+                          objectives_endogenous = objectives_endogenous)
+
+              sub_region <- temp$sub %>%
+                mutate(region_bld = region)
+              sub <- bind_rows(sub, sub_region)
+              sub_report_region <- temp$sub_report %>%
+                mutate(region_bld = region)
+              sub_report <- bind_rows(sub_report, sub_report_region)
+            }
+          } else {
+            print("Objectives for renovation are set for all EU")
+            temp <- fun_subsidies_renovation(i,
+                          yrs,
+                          stp,
+                          param$objective_renovation,
+                          param$budget_constraint_insulation,
+                          carbon_revenue,
+                          param$subsidies_renovation_type,
+                          d$subsidies_renovation_target,
+                          d,
+                          cat,
+                          param,
+                          bld_det_i,
+                          en_hh_tot,
+                          parameters_renovation,
+                          emission_factors,
+                          param$anticipate_renovation,
+                          region = NULL)
+            sub <- temp$sub
+            sub_report <- bind_rows(sub_report, temp$sub_report)
           }
         } else {
-          sub <- filter(d$sub_ren_shell, year == yrs[i])
+          print("Using exogenous subsidies renovation")
+          sub <- filter(d$subsidies_renovation, year == yrs[i])
         }
 
         temp <- fun_ms_ren_shell_endogenous(yrs,
@@ -636,7 +799,9 @@ run_scenario <- function(run,
                           d$lifetime_ren,
                           d$discount_rate,
                           param$social_discount_rate,
-                          sub_ren_shell_type = param$sub_ren_shell_type,
+                          d$income,
+                          param$credit_constraint,
+                          subsidies_renovation_type = param$subsidies_renovation_type,
                           parameters = parameters_renovation,
                           emission_factors = emission_factors,
                           anticipate_renovation = param$anticipate_renovation)
@@ -650,12 +815,12 @@ run_scenario <- function(run,
                       d$rate_shell_ren_exo,
                       d$ms_shell_ren_exo)
       }
-      # Extract dataframes from list
       ms_ren_i <- temp$ms_ren_i
       rate_ren_i <- temp$rate_ren_i
       anticipate <- temp$anticipate
       rm(temp)
 
+      # Integration of renovation in the existing stock
       print("2.2 Integration of renovation in the existing stock")
       temp <- fun_stock_renovation_dyn(bld_det_i,
                                       rate_ren_i,
@@ -673,12 +838,14 @@ run_scenario <- function(run,
         stop("Error in stock turnover calculation! 
           Sum of new and existing buildings is not equal to the total stock.")
       } else {
-        print("Test stock turnover passed")
+        print("Test stock passed. Stock update.")
       }
       
-      print("3. Switch heating system decisions")
+      # Calculating replacement of heating system decisions
+      print("3. Replacement heating system decisions")
+      # Calibrating switch heating system function
       if (energy_efficiency == "endogenous" && i == 2) {
-        print("3.0 Calibration of market shares switch fuel")
+        print("3.0 Calibration of market shares installation boilers")
         if ("parameters_heater" %in% names(d)) {
           parameters_heater <- d$parameters_heater %>%
             rename(constant = parameters_heater)
@@ -708,23 +875,23 @@ run_scenario <- function(run,
                     d$ct_heat_new,
                     path_out,
                     d$discount_rate,
-                    lifetime_heat = 20,
+                    heater_vintage,
                     inertia = d$inertia,
                     emission_factors = emission_factors)
           parameters_heater <- temp$parameters_heater
           d$ct_fuel_excl_reg <- temp$ct_fuel_excl_reg
         }
       }
-
+      # Calculating switch heating system decisions
       if (energy_efficiency == "endogenous") {
         print("3.1 Calculate market share for fuel switches")
-
+        # Calculating subsidies to meet objectives
         budget <- NULL
         if (!is.null(param$budget_constraint_heater)) {
           if (param$budget_constraint_heater == "carbon_revenue") {
-            budget <- carbon_revenue
+            budget <- sum(carbon_revenue$revenue)
             if (!is.null(budget)) {
-              budget <- budget * param$share_recycling
+              budget <- budget * param$sh_recycling_subsidies
             }
           } else if (budget_constraint_heater == "exogenous") {
             budget <- d$budget_constraint_heater
@@ -749,7 +916,7 @@ run_scenario <- function(run,
                                         en_hh_tot,
                                         cost_invest_heat,
                                         parameters_heater,
-                                        lifetime_heater,
+                                        heater_vintage,
                                         emission_factors,
                                         param$premature_replacement,
                                         sub_report)
@@ -780,8 +947,8 @@ run_scenario <- function(run,
                           sub_heater_type = param$sub_heater_type,
                           emission_factors = emission_factors,
                           premature_replacement = param$premature_replacement)
-          ms_sw_i <- temp$ms_i
-          premature <- temp$premature
+        ms_sw_i <- temp$ms_i
+        premature <- temp$premature
 
       } else {
         ms_sw_i <- fun_ms_fuel_sw_exogenous(yrs,
@@ -790,8 +957,8 @@ run_scenario <- function(run,
                           cat$ct_bld_age,
                           d$ms_switch_fuel_exo)
       }
+      # Integration of switch fuel in the stock
       print("3.2 Integration of switch fuel in the stock")
-      # Check if there is at least one 1 in d$ban_fuel
       temp <- fun_stock_switch_fuel_dyn(
         bld_det_i,
         heater_vintage,
@@ -804,6 +971,28 @@ run_scenario <- function(run,
         premature = premature)
       bld_det_i <- temp$bld_det_i
       bld_det_i_sw <- temp$bld_det_i_sw
+      premature <- temp$premature
+      rm(temp)
+
+      # Remove from the vintage tracker heater that were replaced
+      heater_vintage <- filter(heater_vintage, vintage > yrs[i])
+
+      # Remove from the vintage tracker heater that were prematurely replaced
+      if (!is.null(premature)) {
+        temp <- premature %>%
+          group_by(region_bld, fuel_heat) %>%
+          summarize(n_dem = sum(n_premature)) %>%
+          ungroup()
+
+        heater_vintage <- heater_vintage %>%
+          left_join(temp) %>%
+          group_by(region_bld, fuel_heat) %>%
+          mutate(n_dem = n_dem * n_vintage / sum(n_vintage)) %>%
+          ungroup() %>%
+          mutate(n_dem = ifelse(is.na(n_dem), 0, n_dem)) %>%
+          mutate(n_vintage = n_vintage - n_dem) %>%
+          select(-n_dem)
+      }
 
       # Updating vintage to consider new installation
       temp <- bld_det_i_sw %>%
@@ -814,21 +1003,32 @@ run_scenario <- function(run,
         mutate(vintage = yrs[i] + lifetime_heater) %>%
         select(c("region_bld", "fuel_heat", "vintage",
           "n_vintage", "lifetime_heater"))
+          
       heater_vintage <- bind_rows(heater_vintage, temp) %>%
-        filter(vintage > yrs[i]) %>%
         arrange(region_bld, fuel_heat, vintage)
-      
+
+      if (FALSE) {
+        test <- bld_det_i %>%
+          group_by_at(c("region_bld", "fuel_heat")) %>%
+          summarize(n_units_fuel = sum(n_units_fuel)) %>%
+          ungroup() %>%
+          left_join(heater_vintage %>%
+            group_by_at(c("region_bld", "fuel_heat")) %>%
+            summarize(n_vintage = sum(n_vintage)) %>%
+            ungroup())
+      }
+
       # Test consistency of stock turnover
       if (round(sum(bld_det_i$n_units_fuel) / 1e6, 0) !=
         round(sum(filter(stock_aggr, year == yrs[i])$n_units_aggr) / 1e6, 0)) {
         stop("Error in stock turnover calculation! 
           Sum of new and existing buildings is not equal to the total stock.")
       } else {
-        print("Test stock turnover passed")
+        print("Test stock passed. Stock turnover is consistent.")
       }
 
 
-      # Extract dataframes from list
+      # Creating report from detailed stock
       report <- fun_format_output(i,
                               yrs,
                               stp,
@@ -853,12 +1053,14 @@ run_scenario <- function(run,
                               emission_factors,
                               d$emission_factors_embodied,
                               d$income,
+                              d$pe_conversion_factor,
                               threshold_poverty = threshold_poverty,
                               new_det_i = new_det_i,
                               ren_det_i = ren_det_i,
                               bld_det_i_sw = bld_det_i_sw,
-                              shr_en = shr_en,
-                              report_turnover = report_turnover)
+                              report_turnover = report_turnover,
+                              alpha = alpha,
+                              utility_money = distinct(select(parameters_renovation, c(region_bld, scaling_factor))))
 
 
       if (is.null(renovation_ambition)) {
@@ -875,146 +1077,22 @@ run_scenario <- function(run,
     }
   }
 
-  ### COMMERCIAL SECTOR
-  if (sector == "comm") {
-    # Initialize housing stock (fun)
-    print(paste("Initialize scenario run", sector))
+  #-#-#-#-#-#-#-#-#-#-#-#-#-#-#
+  # Report results
 
-    lst_stock_init <- fun_stock_init_fut(
-      sector, "stock",
-      yrs,
-      geo_data, "region_bld",
-      bld_cases_eneff, bld_cases_fuel,
-      pop_fut,
-      hh_size, # used for residential
-      floor_cap, # used for commercial
-      ct_hh_inc,
-      ct_eneff, ct_fuel,
-      stock_arch_base,
-      shr_mat, shr_arch, shr_fuel_heat_base, shr_distr_heat,
-      # eff_cool_scen, eff_heat_scen,eff_hotwater_scen,
-      # ren_en_sav_scen,
-      # heat_hours_scen,cool_data_scen, heat_floor, shr_acc_cool,
-      # en_m2_sim_r, price_en
-      report_var
-    )
-
-    # Extract dataframes from list
-    stock_aggr <- lst_stock_init$stock_aggr
-    bld_det_age_i <- lst_stock_init$bld_det_age_i
-    report <- lst_stock_init$report
-    rm(lst_stock_init)
-
-    # Loop over timesteps
-    print(paste("Start scenario run", sector))
-
-    for (i in 2:length(yrs)) {
-      # Energy demand intensities
-      lst_en_i <- fun_en_sim(sector,
-        yrs, i,
-        bld_cases_fuel,
-        en_m2_sim_r,
-        eff_cool_scen, eff_heat_scen,
-        en_sav_ren,
-        heat_hours_scen, heat_floor,
-        cool_data_scen,
-        shr_acc_cool,
-        hh_size = NULL, # not used for commercial
-        floor_cap,
-        price_en = NULL # not used for commercial
-      )
-
-      # Extract dataframes from list
-      en_m2_scen_heat <- lst_en_i$en_m2_scen_heat
-      en_m2_scen_cool <- lst_en_i$en_m2_scen_cool
-      ## Additional output not needed for commercial
-      # en_hh_tot = lst_en_i$en_hh_tot #
-      # en_hh_tot_ren_init = lst_en_i$en_hh_tot_ren_init
-      # en_hh_tot_ren_fin = lst_en_i$en_hh_tot_ren_fin
-
-      # Energy demand intensities - hot water
-      en_m2_hw_scen <- fun_hw_comm(
-        yrs, i,
-        bld_cases_fuel,
-        eff_hotwater_scen,
-        en_m2_dhw
-      )
-
-      # Market share - new construction options
-      ms_new_i <- fun_ms_new_target(
-        yrs, i,
-        bld_cases_eneff, bld_cases_fuel,
-        ct_bld_age,
-        shr_eneff_new, shr_fuel_new
-      )
-
-      # Market share - renovation options
-      ms_ren_i <- fun_ms_ren_target(
-        yrs, i,
-        bld_cases_fuel, ct_bld_age,
-        shr_eneff_ren, shr_fuel_ren
-      )
-
-      # Market share - fuel switches
-      ms_sw_i <- fun_ms_fuel_sw(
-        yrs, i,
-        bld_cases_fuel, ct_bld_age,
-        # ms_fuel_sw_target
-        shr_fuel_sw
-      )
-
-      # Stock turnover
-      lst_stock_i <- fun_stock_dyn(sector,
-        yrs, i,
-        run, ssp_r,
-        "region_bld", "region_gea",
-        bld_cases_fuel, bld_cases_eneff,
-        ct_bld_age, ct_fuel,
-        hh_size = NULL, # Not used for commercial
-        floor_cap,
-        stock_aggr, bld_det_age_i, # bld_det,
-        # bld_eneff_age, # keep track of age
-        bld_dyn_par,
-        rate_ren_low, rate_ren_high, # ren_rate,
-        rate_switch_fuel_heat,
-        # ms_new, ms_ren,
-        ms_new_i, ms_ren_i, rate_ren_i,
-        ms_sw_i,
-        # shr_acc_cool,
-        shr_distr_heat, shr_need_heat,
-        en_m2_scen_heat, en_m2_scen_cool,
-        en_hh_hw_scen, en_m2_hw_scen, en_m2_others,
-        # en_stock,
-        mat_int,
-        # mat_stock,
-        report_var,
-        report
-      )
-
-      # Extract dataframes from list
-      report <- lst_stock_i$report
-      stock_aggr <- lst_stock_i$stock_aggr
-      bld_det_age_i <- lst_stock_i$bld_det_age_i
-
-      rm(lst_stock_i)
-    }
-  }
-
-  ### REPORTING ###
-
-  ## MESSAGE report -  Aggregate results for reporting
-  if ("MESSAGE" %in% report_type) {
-    output <- fun_report_MESSAGE(sector, report_var, report,
-      cat$geo_data, "region_bld", geo_level_report)
-  }
-
-  ## STURM basic report (results written as csv)
+  # STURM basic report (results written as csv)
   if ("STURM" %in% report_type) {
     output <- fun_report_basic(report, report_var, cat$geo_data,
       "region_bld", geo_level_report, sector, scenario_name, path_out)
 
     write.csv(sub_report,
       paste0(path_out, "report_subsidies_", scenario_name, ".csv"))
+  }
+
+  ## MESSAGE report -  Aggregate results for reporting
+  if ("MESSAGE" %in% report_type) {
+    output <- fun_report_MESSAGE(sector, report_var, report,
+      cat$geo_data, "region_bld", geo_level_report)
   }
 
   ## Report results - IRP template (results written as csv)
@@ -1037,7 +1115,6 @@ run_scenario <- function(run,
       cat$ct_bld,cat$ct_ren_eneff, ren_en_sav_scen)
   }
 
-  # Tracking time
   print("Scenario run completed!")
   print(paste("Time to run scenario:",
     round(Sys.time() - start_time, 0), "seconds."))
