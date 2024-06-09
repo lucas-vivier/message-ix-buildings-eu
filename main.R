@@ -86,10 +86,10 @@ runs <- c("EU",
 "EU_barriers_renovation",
 "EU_realization_rate")
 
-runs <- c("EU", "EU_carbon_tax", "EU_carbon_tax_social")
+# runs <- c("EU", "EU_carbon_tax", "EU_carbon_tax_social")
 
 runs <- c("EU")
-parallel <- FALSE
+parallel <- TRUE
 
 report <- list(var = c("energy"),
                type = c("STURM"),
