@@ -516,7 +516,8 @@ stacked_plots <- function(data,
                           color_list = NULL,
                           y_label_suffix = "",
                           presentation = FALSE,
-                          legend = TRUE) {
+                          legend = TRUE,
+                          horizontal = FALSE) {
 
   if (!is.null(subplot_column)) {
     data <- data %>%
@@ -536,7 +537,7 @@ stacked_plots <- function(data,
 
     } else {
       size_text <- 8
-      size_point <- 3
+      size_point <- 5
       nudge_y <- 0.15
     }
 
@@ -549,6 +550,18 @@ stacked_plots <- function(data,
     geom_text(aes(x = scenario,
       label = paste(round(total_value, round)), y = total_value),
       vjust = -0.5, nudge_y = nudge_y, size = size_text)
+    if ("total_value_private" %in% names(data)) {
+      # make red diamonds for private investments
+      p <- p +
+        geom_point(aes(x = scenario, y = total_value_private),
+          color = "red", size = size_point, shape = 18, show.legend = FALSE)
+
+        #geom_point(aes(x = scenario, y = total_value_private), color = "red", size = size_point, , show.legend = FALSE)
+    }
+
+  if (horizontal) {
+    p <- p + coord_flip()
+  }
 
   if (!is.null(color_list)) {
     p <- p + scale_fill_manual(values = color_list)
@@ -566,14 +579,23 @@ stacked_plots <- function(data,
         geom_hline(yintercept = 0, color = "black", size = 1) +
         message_building_theme_presentation +
         theme(axis.line.y = element_blank(),
-              axis.line.x = element_blank(),
-              axis.text.x = element_blank()
+              axis.line.x = element_blank()
                 )
+        if (horizontal) {
+          p <- p + theme(axis.text.y = element_blank())
+
+        } else {
+          p <- p + theme(axis.text.x = element_blank())
+
+        }
     } else {
       p <- p +
         message_building_theme +
-        theme(axis.line.y = element_blank()) +
-        theme(axis.text.x = element_text(angle = 20, hjust = 1))
+        theme(axis.line.y = element_blank())
+
+      if (!horizontal) {
+        p <- p + theme(axis.text.x = element_text(angle = 20, hjust = 1))
+      }
     }
 
   }
@@ -586,8 +608,13 @@ stacked_plots <- function(data,
   custom_label <- function(x) {
     label_comma()(x) %>% paste0(" ", y_label_suffix)
   }
-  p <- p +
-    scale_y_continuous(labels = custom_label)
+  if (horizontal) {
+    p <- p +
+      scale_y_continuous(labels = custom_label)
+  } else {
+    p <- p +
+      scale_y_continuous(labels = custom_label)
+  }
 
   print(p)
   if (!is.null(save_path)) {
@@ -693,6 +720,18 @@ output_table <- function(data,
   table <- left_join(table, temp, by = c("region_bld", "scenario")) %>%
     mutate(replacement_heater =
       ifelse(is.na(replacement_heater), 0, replacement_heater))
+
+  # revenues from taxes
+  temp <- data %>%
+    filter(year <= end_year) %>%
+    filter(resolution == "all") %>%
+    filter(variable == "taxes_revenues_EUR") %>%
+    group_by_at(c("region_bld", "scenario")) %>%
+    summarize(taxes_revenues_EUR = sum(value) * stp) %>%
+    ungroup()
+  table <- left_join(table, temp, by = c("region_bld", "scenario")) %>%
+    mutate(taxes_revenues_EUR =
+      ifelse(is.na(taxes_revenues_EUR), 0, taxes_revenues_EUR))
 
   # cost renovation
   temp <- data %>%
@@ -920,6 +959,7 @@ output_table <- function(data,
       sub_renovation_EUR = round(sub_renovation_EUR / 1e9, 2),
       cost_heater_EUR = round(cost_heater_EUR / 1e9, 2),
       sub_heater_EUR = round(sub_heater_EUR / 1e9, 2),
+      taxes_revenues_EUR = round(taxes_revenues_EUR / 1e9, 2),
       population = round(population / 1e6, 2),
       `Advanced performance` = round(`Advanced performance` / 1e6, 2),
       `Basic performance` = round(`Basic performance` / 1e6, 2),
@@ -937,7 +977,7 @@ output_table <- function(data,
       "renovated_building", "advanced_renovated_building",
       "replacement_heater", "energy_poverty_thresh",
       "cost_renovation_EUR", "sub_renovation_EUR",
-      "cost_heater_EUR", "sub_heater_EUR",
+      "cost_heater_EUR", "sub_heater_EUR", "taxes_revenues_EUR",
       "Advanced performance", "Basic performance", 
       "Bad performance", "No performance", "No consumption")) %>%
     mutate(low_carbon_building_rate = low_carbon_building / stock_building,
@@ -946,6 +986,10 @@ output_table <- function(data,
       heat_kWh_fossil_rate = heat_kWh_fossil / heat_kWh,
       sh_sub_renovation = sub_renovation_EUR / cost_renovation_EUR,
       sh_sub_heater = sub_heater_EUR / cost_heater_EUR,
+      total_cost = cost_renovation_EUR + cost_heater_EUR,
+      total_subsidies = sub_renovation_EUR + sub_heater_EUR,
+      government_expenditures = - taxes_revenues_EUR + total_subsidies,
+      consumption_hh = heat_kWh / stock_building,
       consumption_capita = heat_kWh / population,
       emission_capita = heat_tCO2 / population
       ) %>%
@@ -963,6 +1007,7 @@ output_table <- function(data,
       "Replacement heating system (Million)" = replacement_heater,
       "Heating intensity (Percent)" = heating_intensity,
       "Space heating consumption (TWh)" = heat_kWh,
+      "Space heating consumption (MWh/hh)" = consumption_hh,
       "Space heating consumption (MWh/capita)" = consumption_capita,
       "Space heating consumption fossil (TWh)" = heat_kWh_fossil,
       "Share fossil-fuels (Percent)" = heat_kWh_fossil_rate,
@@ -973,12 +1018,16 @@ output_table <- function(data,
       "Emission (tCO2/capita)" = emission_capita,
       "Member states" = region_bld,
       "Scenario" = scenario,
+      "Total cost (Billion EUR)" = total_cost,
+      "Total subsidies (Billion EUR)" = total_subsidies,
       "Cost renovation (Billion EUR)" = cost_renovation_EUR,
       "Subsidies renovation (Billion EUR)" = sub_renovation_EUR,
       "Share subsidies renovation (Percent)" = sh_sub_renovation,
       "Cost heater (Billion EUR)" = cost_heater_EUR,
       "Subsidies heater (Billion EUR)" = sub_heater_EUR,
-      "Share subsidies heater (Percent)" = sh_sub_heater
+      "Share subsidies heater (Percent)" = sh_sub_heater,
+      "Taxes revenues (Billion EUR)" = taxes_revenues_EUR,
+      "Government expenditures (Billion EUR)" = government_expenditures
       )
 
   consumption_ini <- format_temp %>%
@@ -1010,6 +1059,7 @@ output_table <- function(data,
     "Stock building (Million)",
     "Space heating consumption (TWh)",
     "Space heating consumption standard (TWh)",
+    "Space heating consumption (MWh/hh)",
     "Space heating consumption (MWh/capita)",
     "Consumption saving (%)",
     "Space heating consumption fossil (TWh)",
@@ -1022,12 +1072,16 @@ output_table <- function(data,
     "Renovated buildings (Million)",
     "Renovated buildings advanced (Million)",
     "Renovated buildings (Percent)",
+    "Total cost (Billion EUR)",
+    "Total subsidies (Billion EUR)",
     "Cost heater (Billion EUR)",
     "Subsidies heater (Billion EUR)",
     "Share subsidies heater (Percent)",
     "Cost renovation (Billion EUR)",
     "Subsidies renovation (Billion EUR)",
     "Share subsidies renovation (Percent)",
+    "Taxes revenues (Billion EUR)",
+    "Government expenditures (Billion EUR)",
     "Emission (MtCO2)",
     "Emission saving (%)",
     "Emission cumulated (GtCO2)",

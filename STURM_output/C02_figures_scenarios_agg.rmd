@@ -16,55 +16,31 @@ print(paste("Working directory is:", getwd()))
 # Loding figures setttings and functions
 source("STURM_output/C00_plots.R")
 
+run <- "standalone"
 
-
-
-run <- "scenarios_report"
 
 scenarios <- c(
     "EU" = "Current policies",
-    "EU_mix" = "Base Mix",
-    "EU_mix_ambitious" = "Enhanced Mix",
-    "EU_mix_ban" = "Fossil-Ban Mix"
-)
-
-run <- "policy_detail"
-
-scenarios <- c(
-    "EU" = "Current policies",
+    "EU_high_elasticity" = "High elasticity",
+    "EU_no_learning" = "No learning",
+    "EU_low_realization_rate" = "Low realization rate",
+    "EU_no_barriers" = "No barriers",
+    "EU_counterfactual" = "Counterfactual",
+    "EU_first_best" = "First best",
+    "EU_carbon_tax_social" = "Carbon tax social",
     "EU_carbon_tax" = "Carbon tax",
-    "EU_carbon_tax_rebates" = "Carbon tax lump-sum",
-    "EU_carbon_tax_rebates_q1" = "Carbon tax low-income",
-    "EU_carbon_tax_heat_pump" = "Carbon tax subsidies",
-    "EU_carbon_tax_dual" = "Carbon tax dual"
-)
-scenarios <- c(
-    "EU" = "Current policies",
-    "EU_reno" =  "Reno",
-    "EU_reno_lowincome" =  "Reno lowincome",
-    "EU_reno_performance" =  "Reno performance",
-    "EU_reno_all" =  "Reno all",
-    "EU_reno_all_lowincome" =  "Reno all lowincome",
-    "EU_reno_all_performance" = "Reno all performance"
-)
-  scenarios <- c(
-    "EU" = "Current policies",
-    "EU_reno" = "Reno non-coordinated",
-    "EU_reno_endogenous" = "Reno coordinated",
-    "EU_reno_lowincome" = "Reno low-income",
-    "EU_reno_performance" = "Reno performance",
-    "EU_deep_reno" = "Deep renovation",
-    "EU_carbon_tax" = "Carbon tax",
-    "EU_carbon_tax_dual" = "Carbon tax dual",
     "EU_carbon_tax_rebates" = "Carbon tax rebates",
-    "EU_mix" = "Base Mix",
-    "EU_mix_enhance" = "Enhanced Mix"
+    "EU_heat_pump_social" = "Heat pump social",
+    "EU_reno" = "Renovation wave",
+    "EU_reno_endogenous" = "Renovation wave endo",
+    "EU_reno_endogenous_old" = "Renovation wave old endo",
+    "EU_deep_reno" = "Deep renovation wave"
 )
 
-run <- "test"
 scenarios <- c(
-    "EU" = "Current policies",
-    "EU_carbon_tax" = "Carbon tax"
+  "EU" = "Counterfactual",
+  "EU_carbon_tax_social" = "Carbon tax social",
+  "EU_carbon_tax" = "Carbon tax EUETS"
 )
 
 colors_scenarios <- c(
@@ -122,7 +98,7 @@ for (scenario in names(scenarios)) {
 # Reconstuction flows
 flows <- c("n_renovation", "cost_renovation_EUR", "sub_renovation_EUR",
   "n_replacement", "cost_heater_EUR", "sub_heater_EUR",
-  "to_pay_renovation", "to_pay_heater")
+  "to_pay_renovation", "to_pay_heater", "taxes_revenues_EUR")
 
 data <- data %>%
   mutate(scenario = scenarios[.data[["scenario"]]])
@@ -140,9 +116,11 @@ data <- distinct(data)
 ## Processing output
 ### Table summary
 ```{r}
+# print(head(filter(data, region_bld == "C-WEU-HRV")))
+
 source("STURM_output/C00_plots.R")
 
-ref <- "Current policies"
+ref <- "Counterfactual"
 base_year <- 2015
 
 output_table(data, save_dir = save_dir, end_year = 2030, base_year = 2015)
@@ -276,32 +254,12 @@ plot_map(df,
 ## Figure
 ## Figures comparison scenario
 ```{r}
-sub_scenarios <- c(
-  "Current policies" = "Current policies",
-  "Base Mix" = "Base",
-  "Enhanced Mix" = "Enhanced",
-  "Fossil-Ban Mix" = "Fossil-Ban")
 
 sub_scenarios <- c(
-    "Current policies" = "Current policies",
-    "Carbon tax" = "Carbon tax",
-    "Carbon tax lump-sum" = "Carbon tax lump-sum",
-    "Carbon tax low-income" = "Carbon tax low-income"
+  "EU" = "Counterfactual",
+  "EU_carbon_tax_social" = "Carbon tax social",
+  "EU_carbon_tax" = "Carbon tax EUETS"
 )
-
-sub_scenarios <- c(
-    "Current policies" = "Current policies",
-    "Reno" = "Reno",
-    "Reno all" = "Reno all",
-    "Reno lowincome" = "Reno lowincome",
-    "Reno performance" = "Reno performance",
-    "Reno all lowincome" = "Reno all lowincome",
-    "Reno all performance" = "Reno all performance"
-)
-sub_scenarios <- c(
-    "Current policies" = "Current policies",
-    "Reno" = "Reno",
-    "Reno all" = "Reno all")
 ```
 
 ### Clustered stack bar plot by countries
@@ -312,8 +270,8 @@ years <- c(2050)
 region <- c("C-WEU-DEU", "C-WEU-FRA", "C-WEU-SWE", "C-EEU-POL")
 
 df <- data %>%
-  filter(scenario %in% names(sub_scenarios)) %>%
-  mutate(scenario = sub_scenarios[.data[["scenario"]]]) %>%
+  #filter(scenario %in% names(sub_scenarios)) %>%
+  #mutate(scenario = sub_scenarios[.data[["scenario"]]]) %>%
   filter(resolution %in% names(rename_fuels)) %>%
   filter(variable == var) %>%
   filter(region_bld %in% region) %>%
@@ -359,8 +317,8 @@ if (percent) {
 file <- "_dwelling_pe_year_scenario_stack.png"
 
 df <- data %>%
-  filter(scenario %in% names(sub_scenarios)) %>%
-  mutate(scenario = sub_scenarios[.data[["scenario"]]]) %>%
+  #filter(scenario %in% names(sub_scenarios)) %>%
+  #mutate(scenario = sub_scenarios[.data[["scenario"]]]) %>%
   filter(resolution %in% names(breakdown)) %>%
   filter(variable == var)
 
@@ -433,8 +391,8 @@ var <- "stock_building"
 years <- c(2015, 2030, 2050)
 
 df <- data %>%
-  filter(scenario %in% names(sub_scenarios)) %>%
-  mutate(scenario = sub_scenarios[.data[["scenario"]]]) %>%
+  #filter(scenario %in% names(sub_scenarios)) %>%
+  #mutate(scenario = sub_scenarios[.data[["scenario"]]]) %>%
   filter(resolution %in% names(rename_fuels)) %>%
   filter(variable == var) %>%
   filter(region_bld == "EU") %>%

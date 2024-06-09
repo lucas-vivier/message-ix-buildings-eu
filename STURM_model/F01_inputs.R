@@ -106,6 +106,41 @@ fun_inputs_csv <- function(path_in, file_inputs, file_scenarios, sector, run,
 }
 
 read_parameters <- function(scen_param, param) {
+
+  if ("_remove_barriers_renovation" %in% scen_param$name_parameter) {
+    remove_barriers_renovation <- scen_param %>%
+      filter(name_parameter == "_remove_barriers_renovation") %>%
+      pull(scenario)
+    param$remove_barriers_renovation <- remove_barriers_renovation
+  }
+
+    if ("_remove_barriers_heater" %in% scen_param$name_parameter) {
+    remove_barriers_heater <- scen_param %>%
+      filter(name_parameter == "_remove_barriers_heater") %>%
+      pull(scenario)
+    param$remove_barriers_heater <- remove_barriers_heater
+  }
+
+  if ("_realization_rate_renovation" %in% scen_param$name_parameter) {
+    realization_rate_renovation <- scen_param %>%
+      filter(name_parameter == "_realization_rate_renovation") %>%
+      pull(scenario)
+    param$realization_rate_renovation <- as.numeric(realization_rate_renovation)
+  }
+
+  if ("_elasticity_renovation" %in% scen_param$name_parameter) {
+    elasticity_renovation <- scen_param %>%
+      filter(name_parameter == "_elasticity_renovation") %>%
+      pull(scenario)
+    param$elasticity_renovation <- as.numeric(elasticity_renovation)
+  }
+
+  if ("_elasticity_heat_pump" %in% scen_param$name_parameter) {
+    elasticity_heat_pump <- scen_param %>%
+      filter(name_parameter == "_elasticity_heat_pump") %>%
+      pull(scenario)
+    param$elasticity_heat_pump <- as.numeric(elasticity_heat_pump)
+  }
   
   if ("_subsidies_renovation_type" %in% scen_param$name_parameter) {
     subsidies_renovation_type <- scen_param %>%
@@ -119,6 +154,13 @@ read_parameters <- function(scen_param, param) {
       filter(name_parameter == "_objective_renovation") %>%
       pull(scenario)
     param$objective_renovation <- objective_renovation
+  }
+
+  if ("_objective_heat_pump" %in% scen_param$name_parameter) {
+    objective_heat_pump <- scen_param %>%
+      filter(name_parameter == "_objective_heat_pump") %>%
+      pull(scenario)
+    param$objective_heat_pump <- objective_heat_pump
   }
 
   if ("_sub_heat_type" %in% scen_param$name_parameter) {
@@ -557,12 +599,17 @@ parse_share_fuels <- function(d,
       rename(fuel_heat_f = fuel_heat) %>%
       select(-shr_fuel_heat_base)
   } else {
+
     d$ms_switch_fuel_exo <- d$ms_switch_fuel_exo %>%
+        filter(ms_switch_fuel_exo > 0) %>%
         filter(!((fuel_heat_f == "heat_pump") & (ms_switch_fuel_exo == 0))) %>%
         bind_rows(hp_missing_rows %>%
           rename(
             ms_switch_fuel_exo = shr_fuel_heat_base,
             fuel_heat_f = fuel_heat)) %>%
+        group_by_at(c("region_bld", "fuel_heat_f")) %>%
+        filter(ms_switch_fuel_exo == max(ms_switch_fuel_exo)) %>%
+        ungroup() %>%
         group_by_at("region_bld") %>%
           mutate(ms_switch_fuel_exo =
             ms_switch_fuel_exo / sum(ms_switch_fuel_exo)) %>%

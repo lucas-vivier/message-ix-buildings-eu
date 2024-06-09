@@ -3,6 +3,9 @@ library(rstudioapi)
 library(tidyverse, quietly = TRUE)
 library(readxl)
 library(dplyr)
+# Load the parallel package
+library(parallel)
+
 
 suppressPackageStartupMessages(library(tidyverse))
 
@@ -12,28 +15,37 @@ options(dplyr.show_progress = FALSE)
 
 start_script_time <- Sys.time()
 
+# Define the number of CPU cores to use
+num_cores <- detectCores() - 2  # Or specify the desired number of cores
+
 # Parameters
 rnd <- 5 # rounding (number of decimals)
 u_EJ_GWa <- 31.71
 min_shr_fuel <- 0.01
 
-param <- list(subsidies_renovation_type = "ad_valorem",
+param <- list(subsidies_renovation_type = "per_kWh",
             objective_renovation = NULL,
+            objective_heat_pump = NULL,
             budget_constraint_insulation = NULL,
             premature_replacement = 3,
-            anticipate_renovation = 3,
-            sub_heater_type = "ad_valorem",
+            anticipate_renovation = 5,
+            sub_heater_type = "per_CO2",
             budget_constraint_heater = NULL,
             recycling_rebates = "lump_sum",
             rate_dem_target = NULL,
             mandatory_switch = FALSE,
             inertia_wtp = 4.3,
             social_discount_rate = 0.03,
-            heat_pump_floor_cost = FALSE,
+            heat_pump_floor_cost = TRUE,
             short_term_price_elasticity = -0.2,
             credit_constraint = 0.05,
             duration_remboursment = 10,
             nzeb = FALSE,
+            realization_rate_renovation = 1,
+            elasticity_renovation = -1,
+            elasticity_heat_pump = -1,
+            remove_barriers_renovation = FALSE,
+            remove_barriers_heater = FALSE,
             tol = 1e-2)
 
 source("./STURM_model/F10_scenario_run.R")
@@ -59,45 +71,24 @@ file_scenarios <- "scenarios_EU.csv"
 en_method <- "TABULA" # "VDD", "TABULA"
 
 run <- "policies"
-if (run == "test") {
-    file_scenarios <- "scenarios_test_EU.csv"
-    energy_efficiency <- "exogenous"
-    runs <- c(
-        "EU_no",
-        "EU",
-        "EU_double",
-        "EU_double_emission_1p5c")
-} else if (run == "full") {
-    file_scenarios <- "scenarios_full_EU.csv"
-    energy_efficiency <- "endogenous"
-    runs <- c(
-        "EU",
-        "EU_constant",
-        "EU_1p5c",
-        "EU_ambitious_shell",
-        "EU_ambitious_heat",
-        "EU_carbon_tax_medium",
-        "EU_carbon_tax_ambitious",
-        "EU_carbon_tax",
-        "EU_carbon_tax_policies"
-        )
-} else if (run == "policies") {
-    file_scenarios <- "scenarios_EU.csv"
-    energy_efficiency <- "endogenous"
-    runs <- c("EU", "EU_mix", "EU_mix_ambitious", "EU_mix_ban")
-    runs <- c(
-        "EU_carbon_tax_heat_pump", "EU_carbon_tax_dual",
-        "EU_carbon_tax", "EU_carbon_tax_rebates", "EU_carbon_tax_rebates_q1",
-        "EU")
-    runs <- c(
-        "EU_reno", "EU_reno_lowincome", "EU_reno_performance",
-        "EU_reno_all", "EU_reno_all_lowincome", "EU_reno_all_performance")
-    runs <- c("EU_reno_endogenous")
-    runs <- c("EU_reno_endogenous")
-    runs <- c(
-        "EU", "EU_carbon_tax"
-    )
-}
+
+runs <- c("EU",
+"EU_carbon_tax_low",
+"EU_carbon_tax",
+"EU_carbon_tax_social",
+"EU_carbon_tax_rebates",
+"EU_hp_subsidies",
+# "EU_hp_high_elasticity",
+"EU_hp_learning",
+"EU_barriers_heater",
+"EU_reno",
+"EU_deep_reno",
+"EU_barriers_renovation",
+"EU_realization_rate")
+
+runs <- c("EU", "EU_carbon_tax", "EU_carbon_tax_social")
+
+parallel <- TRUE
 
 report <- list(var = c("energy"),
                type = c("STURM"),
@@ -105,31 +96,65 @@ report <- list(var = c("energy"),
 
 yrs <- seq(base_year, end_year, step_year)
 
-for (run in runs) {
+if (!parallel) {
 
-    if (energy_efficiency == "exogenous") {
-        run <- paste(run, energy_efficiency, sep = "_")
+    for (run in runs) {
+
+        if (energy_efficiency == "exogenous") {
+            run <- paste(run, energy_efficiency, sep = "_")
+        }
+
+        sturm_scenarios <- run_scenario(
+            run = run,
+            scenario_name = run,
+            sector = sector,
+            path_in = path_in,
+            path_rcode = path_rcode,
+            path_out = path_out,
+            file_inputs = file_inputs,
+            file_scenarios = file_scenarios,
+            geo_level_report = report$geo_level,
+            yrs = yrs,
+            report_var = report$var,
+            report_type = report$type,
+            region = region,
+            energy_efficiency = energy_efficiency,
+            en_method = en_method
+        )
+
+    end_script_time <- Sys.time()
+    print(paste("Time to run script:",
+        round(end_script_time - start_script_time, 0), "seconds."))
     }
+} else {
 
-    sturm_scenarios <- run_scenario(
-        run = run,
-        scenario_name = run,
-        sector = sector,
-        path_in = path_in,
-        path_rcode = path_rcode,
-        path_out = path_out,
-        file_inputs = file_inputs,
-        file_scenarios = file_scenarios,
-        geo_level_report = report$geo_level,
-        yrs = yrs,
-        report_var = report$var,
-        report_type = report$type,
-        region = region,
-        energy_efficiency = energy_efficiency,
-        en_method = en_method
-    )
+    run_scenario_wrapper <- function(run) {
+        tryCatch({
+            result <- run_scenario(
+            run = run,
+            scenario_name = run,
+            sector = sector,
+            path_in = path_in,
+            path_rcode = path_rcode,
+            path_out = path_out,
+            file_inputs = file_inputs,
+            file_scenarios = file_scenarios,
+            geo_level_report = report$geo_level,
+            yrs = yrs,
+            report_var = report$var,
+            report_type = report$type,
+            region = region,
+            energy_efficiency = energy_efficiency,
+            en_method = en_method
+            )
+            return(result)
+        }, error = function(e) {
+            message(sprintf("Error in run '%s': %s", run, e$message))
+            return(NULL)  # Return NULL in case of error
+        })
+    }
+    # Run in parallel
+    sturm_scenarios <- mclapply(runs, run_scenario_wrapper, mc.cores = num_cores)
 
-end_script_time <- Sys.time()
-print(paste("Time to run script:",
-    round(end_script_time - start_script_time, 0), "seconds."))
 }
+

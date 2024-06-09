@@ -43,7 +43,7 @@ fun_subsidies_renovation <- function(i,
             sub,
             en_hh_tot,
             d$lifetime_ren,
-            d$discount_rate,
+            d$discount_rate_renovation,
             param$social_discount_rate,
             d$income,
             param$credit_constraint,
@@ -223,7 +223,7 @@ fun_subsidies_heater <- function(i,
                       en_hh_tot,
                       d$ct_heat,
                       d$ct_heat_new,
-                      d$discount_rate,
+                      d$discount_rate_heat,
                       param$social_discount_rate,
                       lifetime_heat = 20,
                       inertia = d$inertia,
@@ -257,8 +257,20 @@ fun_subsidies_heater <- function(i,
     return(rslt - budget)
   }
 
+  if (sub_heater_type == "ad_valorem") {
+    interval <- c(0, 1)
+  } else if (sub_heater_type == "per_CO2") {
+    interval <- c(0, 2000)
+  } else if (sub_heater_type == "per_kWh") {
+    interval <- c(0.01, 1)
+  } else {
+    print("NOT IMPLEMENTED: subsidies_renovation_type")
+  }
+
+  # budget_switch_function(0, budget=0)
+
   root <- uniroot(budget_switch_function,
-    interval = c(0, 1), budget = budget, tol = 0.01)
+    interval = interval, budget = budget, tol = 0.01)
 
   if (sub_heater_type == "ad_valorem") {
     print(paste0("Subsidies heater: ",
@@ -273,6 +285,7 @@ fun_subsidies_heater <- function(i,
 
   sub <- data.frame(sub_heat = root$root,
                     fuel_heat_f = "heat_pump",
+                    fuel_heat = c("oil", "gas", "coal"),
                     year = yrs[i])
   temp <- sub %>%
     rename(resolution = fuel_heat_f,

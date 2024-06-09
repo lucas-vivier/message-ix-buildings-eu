@@ -253,7 +253,7 @@ fun_calibration_ren_shell <- function(yrs,
     root <- multiroot(objective_function, start = x,
         maxiter = 1e3, utility = u, tgt = t, stp = stp,
         b_mfh = b_mfh, b_rent = b_rent,
-        elasticity = -1, scale = NULL)
+        elasticity = param$elasticity_renovation, scale = NULL)
 
     constant <- root$root[1:nrow(t)]
     scale <- root$root[nrow(t) + 1]
@@ -424,8 +424,8 @@ fun_calibration_switch_heat <- function(yrs,
         summarise(n_vintage = sum(n_vintage)) %>%
         ungroup()
 
-    # We only use 1/20 which is the average lifetime of a heater (only work for calibration)
-
+    # print(filter(ms_switch_fuel, region_bld == "C-EEU-CZE"))
+    if (TRUE) {
     # Calculate market-share objectives
     ms_switch_fuel <- bld_stock %>%
         filter(!is.na(fuel_heat)) %>%
@@ -439,9 +439,11 @@ fun_calibration_switch_heat <- function(yrs,
         # group_by_at(c("region_bld", "fuel_heat")) %>%
         # mutate(rate_switch = n_vintage / sum(n_before)) %>%
         # ungroup() %>%
-        mutate(rate_switch = 1 / 20) %>%
-        mutate(n_break_down = rate_switch * n_before) %>%
+        # mutate(rate_switch = 1 / 20) %>%
+        # mutate(n_break_down = rate_switch * n_before) %>%
         left_join(ms_switch_fuel_exo %>% rename(fuel_heat = fuel_heat_f)) %>%
+        # If NaN, set to 0
+        mutate(ms_switch_fuel_exo = ifelse(is.na(ms_switch_fuel_exo), 0, ms_switch_fuel_exo)) %>%
         # Minimum share of 5% for all segments
         mutate(ms_switch_fuel_exo = ifelse(
                 !fuel_heat %in% c("heat_pump") &
@@ -482,29 +484,32 @@ fun_calibration_switch_heat <- function(yrs,
         select(c("region_bld", "fuel_heat", "ms_switch_fuel_exo")) %>%
         rename(fuel_heat_f = fuel_heat)
 
-        if (FALSE) {
-            # Start something new
-            group_by_at(c("region_bld")) %>%
-            mutate(n_total = sum(n_before)) %>%
-            ungroup() %>%
-            mutate(n_after = n_total * ms_switch_fuel_exo) %>%
-            mutate(n_installation = n_after - n_before + n_break_down) %>%
-            mutate(n_installation =
-                ifelse(n_installation < 0, 0, n_installation)) %>%
-            group_by_at(c("region_bld")) %>%
-            mutate(sum_installation = sum(n_installation)) %>%
-            ungroup() %>%
-            mutate(n_replacement = n_total *  1 / lifetime_heat) %>%
-            mutate(ms = n_installation / sum_installation) %>%
-            select(c("region_bld", "fuel_heat", "ms")) %>%
-            rename(fuel_heat_f = fuel_heat, ms_switch_fuel_exo = ms)
-        }
+        ms_switch_fuel_exo <- ms_switch_fuel
+
+    }
+
+    if (FALSE) {
+        # Start something new
+        group_by_at(c("region_bld")) %>%
+        mutate(n_total = sum(n_before)) %>%
+        ungroup() %>%
+        mutate(n_after = n_total * ms_switch_fuel_exo) %>%
+        mutate(n_installation = n_after - n_before + n_break_down) %>%
+        mutate(n_installation =
+            ifelse(n_installation < 0, 0, n_installation)) %>%
+        group_by_at(c("region_bld")) %>%
+        mutate(sum_installation = sum(n_installation)) %>%
+        ungroup() %>%
+        mutate(n_replacement = n_total *  1 / lifetime_heat) %>%
+        mutate(ms = n_installation / sum_installation) %>%
+        select(c("region_bld", "fuel_heat", "ms")) %>%
+        rename(fuel_heat_f = fuel_heat, ms_switch_fuel_exo = ms)
+    }
     
 
-    ms_switch_fuel_exo <- ms_switch_fuel
 
     # simplification
-    if (TRUE) {
+    if (FALSE) {
 
         print("Manual adjustment to make calibration easier")
         ms_switch_fuel_exo <- ms_switch_fuel_exo %>%
@@ -624,7 +629,7 @@ fun_calibration_switch_heat <- function(yrs,
             left_join(tgt, by = c("region_bld", "fuel_heat_f")) %>%
             filter(target != max(target))
 
-        objective <- c(ms_agg$target - ms_agg$ms, output$elasticity - (-1.5))
+        objective <- c(ms_agg$target - ms_agg$ms, output$elasticity - param$elasticity_heat_pump)
 
         return(objective)
     }

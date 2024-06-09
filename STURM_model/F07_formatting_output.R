@@ -70,6 +70,8 @@ fun_format_output <- function(i,
                               short_term_price_elasticity = -0.2,
                               utility_money = NULL
                               ) {
+
+    # print(head(filter(shr_need_heat, region_bld == "C-WEU-HRV")))                           
     if ("energy" %in% report_var) {
         en_stock_i <- fun_format_bld_stock_energy(
             i,
@@ -95,8 +97,6 @@ fun_format_output <- function(i,
         report$en_stock <- bind_rows(report$en_stock, en_stock_i)
         
 
-        # cost_energy_hh_at calculate net government expenditures
-
         # Aggregate results at fuel level
         det_rows <- en_stock_i %>%
             group_by_at(c("region_bld", "year", "fuel_heat")) %>%
@@ -111,7 +111,7 @@ fun_format_output <- function(i,
                 hotwater_EJ = sum(hotwater_TJ) / 1e6,
                 heat_tCO2 = sum(heat_tCO2),
                 hotwater_tCO2 = sum(hotwater_tCO2),
-                cost_heat_EUR = sum(cost_energy_hh),
+                cost_heat_EUR = sum(cost_energy_hh_wt),
                 floor_m2 = sum(floor_Mm2) * 1e6) %>%
             ungroup() %>%
             rename(resolution = fuel_heat) %>%
@@ -145,14 +145,16 @@ fun_format_output <- function(i,
         # Adding taxes revenues
         t <- en_stock_i %>%
             group_by_at(c("region_bld", "year")) %>%
-            summarize(value = sum(cost_energy_hh_at) - sum(cost_energy_hh)) %>%
+            summarize(value = (sum(cost_energy_hh) - sum(cost_energy_hh_wt)) * stp) %>%
             ungroup() %>%
             mutate(resolution = "all", variable = "taxes_revenues_EUR")
-        
+        temp <- bind_rows(temp, t)
+
         # Calculating thermal comfort
         if (!is.null(alpha)) {
             thermal_comfort <- en_hh_tot %>%
                 left_join(bld_det_i) %>%
+                filter(n_units_fuel > 0) %>%
                 left_join(alpha) %>%
                 left_join(utility_money) %>%
                 mutate(rho = - 1 / short_term_price_elasticity) %>%
@@ -160,7 +162,14 @@ fun_format_output <- function(i,
                 mutate(thermal_comfort =
                     A * heating_intensity**(1 - rho) / (1 - rho)) %>%
                 mutate(thermal_comfort = thermal_comfort / scaling_factor * 1e3) %>%
-                mutate(thermal_comfort = thermal_comfort * n_units_fuel) %>%
+                mutate(thermal_comfort = thermal_comfort * n_units_fuel)
+
+
+            # name <- paste("thermal_comfort", yrs[[i]], run, sep = "_")
+            # t <- filter(thermal_comfort, region_bld == "C-EEU-SVN")
+            # write.csv(t, paste(path_out, name, ".csv", sep = ""))
+
+            thermal_comfort <- thermal_comfort %>%
                 mutate(thermal_comfort =
                     ifelse(is.na(thermal_comfort), 0, thermal_comfort)) %>%
                 group_by_at(c("region_bld", "year")) %>%
@@ -168,10 +177,9 @@ fun_format_output <- function(i,
                 ungroup() %>%
                 mutate(resolution = "all", variable = "thermal_comfort_EUR")
                 
+                
             temp <- bind_rows(temp, thermal_comfort)
         }
-
-
         
         # Aggregating at eneff level
         det_rows <- en_stock_i %>%
@@ -190,7 +198,7 @@ fun_format_output <- function(i,
                 heat_tCO2 = sum(heat_tCO2),
                 hotwater_tCO2 = sum(hotwater_tCO2),
                 cool_tCO2 = sum(cool_tCO2),
-                cost_heat_EUR = sum(cost_energy_hh),
+                cost_heat_EUR = sum(cost_energy_hh_wt),
                 floor_m2 = sum(floor_Mm2) * 1e6
             ) %>%
             ungroup() %>%
@@ -239,7 +247,7 @@ fun_format_output <- function(i,
             heat_tCO2 = sum(heat_tCO2),
             hotwater_tCO2 = sum(hotwater_tCO2),
             cool_tCO2 = sum(cool_tCO2),
-            cost_heat_EUR = sum(cost_energy_hh),
+            cost_heat_EUR = sum(cost_energy_hh_wt),
             floor_m2 = sum(floor_Mm2) * 1e6
           ) %>%
           ungroup() %>%
@@ -260,7 +268,7 @@ fun_format_output <- function(i,
                 stock_building = sum(stock_M) * 1e6,
                 energy_poverty_10 = sum(energy_poverty_10),
                 energy_poverty_thresh = sum(energy_poverty_thresh),
-                cost_energy = sum(cost_energy_hh),
+                cost_energy = sum(cost_energy_hh_wt),
                 income = sum(income * stock_M) * 1e6,
                 ) %>%
             ungroup() %>%
@@ -735,7 +743,7 @@ fun_format_bld_stock_energy <- function(
             # left_join(shr_acc_cool) %>%
             # left_join(en_m2_scen_heat) %>%
             left_join(en_m2_scen_cool) %>%
-            left_join(en_hh_tot %>% rename(cost_energy_hh = cost_op_wt, cost_energy_hh_at = cost_op))
+            left_join(en_hh_tot %>% rename(cost_energy_hh_wt = cost_op_wt, cost_energy_hh = cost_op))
 
         # Calculate the weighted median budget_share for each country
         median_budget_share <- en_stock_i %>%
@@ -770,8 +778,8 @@ fun_format_bld_stock_energy <- function(
             mutate(energy_poverty_thresh =
                 ifelse(budget_share >= threshold_poverty,
                 n_units_fuel, 0)) %>%
+            mutate(cost_energy_hh_wt = cost_energy_hh_wt * n_units_fuel) %>%
             mutate(cost_energy_hh = cost_energy_hh * n_units_fuel) %>%
-            mutate(cost_energy_hh_at = cost_energy_hh_at * n_units_fuel) %>%
             left_join(en_hh_hw_scen) %>%
             # convert n. units to millions
             mutate(floor_Mm2 = n_units_fuel / 1e6 * hh_size * floor_cap) %>%
@@ -820,10 +828,10 @@ fun_format_bld_stock_energy <- function(
                     ifelse(fuel_heat == "v_no_heat", 0,
                             hotwater_TJ * emission_factors_heat)) %>%
             mutate(cool_tCO2 = cool_TJ * emission_factors_cool) %>%
+            mutate(cost_energy_hh_wt = ifelse(is.na(cost_energy_hh_wt),
+                0, cost_energy_hh_wt)) %>%
             mutate(cost_energy_hh = ifelse(is.na(cost_energy_hh),
                 0, cost_energy_hh)) %>%
-            mutate(cost_energy_hh_at = ifelse(is.na(cost_energy_hh_at),
-                0, cost_energy_hh_at)) %>%
             filter(stock_M > 0 & !is.na(stock_M)) %>%
             select_at(c("region_gea", "region_bld",
                 "urt", "clim", "inc_cl", "arch", "mat",
@@ -831,7 +839,7 @@ fun_format_bld_stock_energy <- function(
                 "scenario", "year", "stock_M", "floor_Mm2",
                 "heat_TJ", "heat_pe_TJ","heat_std_TJ", "cool_TJ", "cool_ac_TJ", "cool_fans_TJ",
                 "hotwater_TJ", "other_uses_TJ", "cost_energy_hh",
-                "cost_energy_hh_at",
+                "cost_energy_hh_wt",
                 "heat_tCO2","hotwater_tCO2", "cool_tCO2", "energy_poverty_median",
                 "energy_poverty_10", "energy_poverty_thresh",
                 "heating_intensity", "insulation_level", "energy_class"

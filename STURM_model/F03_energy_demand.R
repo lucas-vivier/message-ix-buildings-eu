@@ -247,11 +247,11 @@ fun_en_sim <- function(sector,
     }
 
     if (is.null(alpha)) {
-    # put one value for alpha for all countries
-    alpha <- bld_cases_fuel %>%
-      select("region_bld") %>%
-      distinct() %>%
-      mutate(coeff_alpha = 1)
+      # put one value for alpha for all countries
+      alpha <- bld_cases_fuel %>%
+        select("region_bld") %>%
+        distinct() %>%
+        mutate(coeff_alpha = 1)
   }
 
     # Calculating household energy cost (residential only)
@@ -280,7 +280,7 @@ fun_en_sim <- function(sector,
       # Calculating heating intensity (household heating behavior)
       mutate(en_hh = en_hh_std * heating_intensity) %>%
       mutate(en_m2 = en_hh / m2) %>%
-      mutate(cost_op = en_hh * price_en) %>%
+      mutate(cost_op = en_hh * price_en - bill_rebates) %>%
       left_join(price_en_wt) %>%
       mutate(cost_op_wt = en_hh * price_en_wt) %>%
       select(-c(hh_size, floor_cap, price_en, fuel, income,

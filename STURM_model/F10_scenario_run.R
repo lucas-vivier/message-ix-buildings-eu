@@ -129,11 +129,26 @@ run_scenario <- function(run,
   # Reading discount rate
   if (energy_efficiency == "endogenous") {
     if (!"tenr" %in% names(d$discount_rate)) {
-      d$discount_rate <- crossing(d$discount_rate, cat$ct_hh_tenr) %>%
+      d$discount_rate_renovation <- d$discount_rate_renovation %>%
+        rename(discount_rate = discount_rate_renovation)
+
+      d$discount_rate_renovation <- crossing(d$discount_rate_renovation, cat$ct_hh_tenr) %>%
         rename(tenr = "cat$ct_hh_tenr") %>%
+        # assuming that landlords have the same discount rate as high income
         mutate(discount_rate =
-          ifelse(tenr == "own",
-          filter(d$discount_rate, inc_cl == "q3",
+          ifelse(tenr == "rent",
+          filter(d$discount_rate_renovation, inc_cl == "q3",
+          region_bld == region_bld)$discount_rate,  discount_rate))
+
+      d$discount_rate_heat <- d$discount_rate_heat %>%
+        rename(discount_rate = discount_rate_heat)
+
+      d$discount_rate_heat <- crossing(d$discount_rate_heat, cat$ct_hh_tenr) %>%
+        rename(tenr = "cat$ct_hh_tenr") %>%
+        # assuming that landlords have the same discount rate as high income
+        mutate(discount_rate =
+          ifelse(tenr == "rent",
+          filter(d$discount_rate_heat, inc_cl == "q3",
           region_bld == region_bld)$discount_rate,  discount_rate))
     }
   }
@@ -192,6 +207,10 @@ run_scenario <- function(run,
       mutate(price_en = price_en + carbon_tax) %>%
       select(-carbon_tax)
   }
+
+  # Realization rate of renovation
+  d$en_sav_ren <- d$en_sav_ren %>%
+    mutate(en_sav_ren = en_sav_ren * param$realization_rate_renovation)
 
   # Adding year column to start subsidies after calibration
   if (!"year" %in% names(d$subsidies_renovation)) {
@@ -386,7 +405,7 @@ run_scenario <- function(run,
     # Formatting output
     report <- fun_format_output(1,
                     yrs,
-                    stp,
+                    1,
                     sector,
                     run,
                     bld_det_ini,
@@ -470,7 +489,7 @@ run_scenario <- function(run,
       print(paste("0. Starting scenario run for year", yrs[i]))
       stp <- yrs[i] - yrs[i - 1]
 
-      # Calculating carbon tax revenues in Billion euro
+      # Calculating carbon tax revenues for a period of stp years in Billion euro
       if (!is.null(d$carbon_tax)) {
         carbon_revenue <- d$carbon_tax %>%
           filter(year == yrs[i]) %>%
@@ -484,6 +503,9 @@ run_scenario <- function(run,
           group_by_at(c("region_bld")) %>%
           summarize(revenue = sum(revenue)) %>%
           ungroup()
+
+        print(paste("Carbon revenue starting from year", yrs[i] - stp + 1, "until", yrs[i],"is",
+          round(sum(carbon_revenue$revenue), 0), "Billion euro"))
       }
 
       # Learning rate and reduction of investment costs
@@ -502,6 +524,7 @@ run_scenario <- function(run,
       # Add floor cost for heat-pumps. Cannot be lower than gas boilers.
       cost_invest_heat <- d$cost_invest_heat %>%
         left_join(learning_heat, by = "fuel_heat_f") %>%
+        mutate(learning_heat = ifelse(is.na(learning_heat), 1, learning_heat)) %>%
         mutate(cost_invest_heat = cost_invest_heat * learning_heat) %>%
         select(-learning_heat)
       
@@ -512,11 +535,12 @@ run_scenario <- function(run,
           mutate(cost_gas = ifelse(fuel_heat_f == "gas",
             cost_invest_heat, NA_real_)) %>%
           # Replace NA values with the cost_invest_heat of 'gas' for the region
-          mutate(cost_gas = max(cost_gas, na.rm = TRUE)) %>%
+          mutate(cost_floor = max(cost_gas, na.rm = TRUE)) %>%
           # Adjust cost_invest_heat for 'heat_pump'
           mutate(cost_invest_heat = ifelse(fuel_heat_f == "heat_pump",
-              max(cost_invest_heat, cost_gas), cost_invest_heat)) %>%
-          select(-cost_gas) %>%
+              ifelse(cost_invest_heat < cost_floor,
+                cost_floor, cost_invest_heat), cost_invest_heat)) %>%
+          select(-c("cost_gas", "cost_floor")) %>%
           ungroup()
       }
       
@@ -600,18 +624,6 @@ run_scenario <- function(run,
         d$en_int_heat
       )
 
-      # Calculating renovation potential
-      renovation_potential <- bld_det_i %>%
-        mutate(year = yrs[i]) %>%
-        filter(bld_age %in% c("p1", "p2", "p3")) %>%
-        filter(eneff == "avg") %>%
-        left_join(en_hh_tot) %>%
-        # Only buildings with energy consumption > 80 kWh/m2
-        filter(en_pe_hh_std > 80) %>%
-        group_by_at(c("region_bld", "year")) %>%
-        summarize(renovation_potential = sum(n_units_fuel)) %>%
-        ungroup()
-
       # Calculating market share for new construction options
       print("Calculate market share for new construction")
       ms_new_i <- fun_ms_new_exogenous(
@@ -692,13 +704,27 @@ run_scenario <- function(run,
                           d$barriers_rent,
                           stp,
                           path_out,
-                          d$discount_rate,
+                          d$discount_rate_renovation,
                           param$social_discount_rate,
                           d$income,
                           credit_constraint = param$credit_constraint
                         )
         }
       }
+
+      if (param$remove_barriers_renovation) {
+        print("Removing barriers for renovation")
+        # Assigning constant value of "std" to "adv" parameters
+        parameters_renovation <- parameters_renovation %>%
+          mutate(barrier_rent = 0, barrier_mfh = 0)
+        param$credit_constraint <- FALSE
+        # put minimum value by region
+        d$discount_rate_renovation <- d$discount_rate_renovation %>%
+          group_by(region_bld) %>%
+          mutate(discount_rate = min(discount_rate)) %>%
+          ungroup()
+      }
+
       # Calculating renovation decisions
       if (energy_efficiency == "endogenous") {
         print("2.1 Calculation of renovation rate")
@@ -718,6 +744,26 @@ run_scenario <- function(run,
           }
           objectives_endogenous <- NULL
           if (grepl("endogenous", param$objective_renovation)) {
+              # Calculating renovation potential
+              renovation_potential <- bld_det_i %>%
+                mutate(year = yrs[i]) %>%
+                filter(bld_age %in% c("p1", "p2", "p3")) %>%
+                filter(eneff == "avg") %>%
+                left_join(en_hh_tot) %>%
+                left_join(d$objectives_renovation) %>%
+                # Only buildings with energy consumption > 80 kWh/m2
+                filter(en_pe_hh_std > 80) %>%
+                # Sort by energy consumption higher consumption first
+                arrange(desc(en_hh)) %>%
+                # Cumulated number of dwellings
+                mutate(n_units_fuel_exst_cum = cumsum(n_units_fuel_exst)) %>%
+                # Filter to the number of renovation objectives_renovation
+                filter(n_units_fuel_exst_cum <= objectives_renovation) %>%
+                group_by_at(c("region_bld", "year")) %>%
+                summarize(renovation_potential = sum(n_units_fuel_exst)) %>%
+                ungroup()
+
+
             objectives_endogenous <- d$objectives_renovation %>%
               left_join(renovation_potential) %>%
               filter(year == yrs[i]) %>%
@@ -729,7 +775,7 @@ run_scenario <- function(run,
 
           if ("region_bld" %in% names(d$objectives_renovation) | !is.null(objectives_endogenous)) {
             print("Objectives for renovation are set per country")
-            for (region in unique(bld_det_i$region_bld)) {
+            for (region in unique(objectives_endogenous$region_bld)) {
               print(region)
               bld_det_i_region <- filter(bld_det_i, region_bld == region)
 
@@ -797,7 +843,7 @@ run_scenario <- function(run,
                           sub,
                           en_hh_tot,
                           d$lifetime_ren,
-                          d$discount_rate,
+                          d$discount_rate_renovation,
                           param$social_discount_rate,
                           d$income,
                           param$credit_constraint,
@@ -874,7 +920,7 @@ run_scenario <- function(run,
                     d$ct_heat,
                     d$ct_heat_new,
                     path_out,
-                    d$discount_rate,
+                    d$discount_rate_heat,
                     heater_vintage,
                     inertia = d$inertia,
                     emission_factors = emission_factors)
@@ -882,6 +928,19 @@ run_scenario <- function(run,
           d$ct_fuel_excl_reg <- temp$ct_fuel_excl_reg
         }
       }
+
+      if (param$remove_barriers_heater) {
+        print("Removing barriers for renovation")
+        # Assigning constant value of "std" to "adv" parameters
+        d$inertia <- d$inertia %>%
+          mutate(inertia = 0)
+        d$discount_rate_heat <- d$discount_rate_heat %>%
+          group_by(region_bld) %>%
+          mutate(discount_rate = min(discount_rate)) %>%
+          ungroup()
+      }
+
+
       # Calculating switch heating system decisions
       if (energy_efficiency == "endogenous") {
         print("3.1 Calculate market share for fuel switches")
@@ -926,6 +985,7 @@ run_scenario <- function(run,
         } else {
           sub <- filter(d$sub_heat, year == yrs[i])
         }
+
         temp <- fun_ms_switch_heat_endogenous(yrs,
                           i,
                           bld_det_i,
@@ -937,7 +997,7 @@ run_scenario <- function(run,
                           en_hh_tot,
                           d$ct_heat,
                           d$ct_heat_new,
-                          d$discount_rate,
+                          d$discount_rate_heat,
                           param$social_discount_rate,
                           lifetime_heat = 20,
                           inertia = d$inertia,
