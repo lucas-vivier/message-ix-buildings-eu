@@ -16,7 +16,17 @@ options(dplyr.show_progress = FALSE)
 start_script_time <- Sys.time()
 
 # Define the number of CPU cores to use
-num_cores <- detectCores() - 2  # Or specify the desired number of cores
+# Get command line arguments
+args <- commandArgs(trailingOnly = TRUE)
+
+# Set num_cores based on the argument or use the default value
+if (length(args) == 0) {
+  num_cores <- detectCores() - 2
+} else {
+  num_cores <- as.numeric(args[1])
+}
+# Print the number of cores to be used
+print(paste("Number of cores to be used:", num_cores))
 
 # Parameters
 rnd <- 5 # rounding (number of decimals)
@@ -63,11 +73,12 @@ base_year <- 2015
 end_year <- 2050
 step_year <- 5
 
+file_scenarios <- "all_scenarios.csv"
+
 # configuration file STURM
 region <- c("WEU", "EEU")
 sector <- "resid"
 file_inputs <- "input_list_resid_EU.csv"
-file_scenarios <- "scenarios_EU.csv"
 en_method <- "TABULA" # "VDD", "TABULA"
 energy_efficiency <- "endogenous"
 run <- "policies"
@@ -89,6 +100,16 @@ runs <- c("EU",
 # runs <- c("EU", "EU_carbon_tax", "EU_carbon_tax_social")
 
 runs <- c("EU")
+
+runs <- "all"
+
+
+# read file_scenarios
+if (runs == "all") {
+    runs <- read.csv2(paste0(path_in, file_scenarios), sep = ',')$scenario_name
+}
+
+
 parallel <- TRUE
 
 report <- list(var = c("energy"),
