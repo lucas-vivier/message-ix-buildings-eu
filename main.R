@@ -69,7 +69,7 @@ sector <- "resid"
 file_inputs <- "input_list_resid_EU.csv"
 file_scenarios <- "scenarios_EU.csv"
 en_method <- "TABULA" # "VDD", "TABULA"
-
+energy_efficiency <- "endogenous"
 run <- "policies"
 
 runs <- c("EU",
@@ -88,7 +88,8 @@ runs <- c("EU",
 
 runs <- c("EU", "EU_carbon_tax", "EU_carbon_tax_social")
 
-parallel <- TRUE
+runs <- c("EU")
+parallel <- FALSE
 
 report <- list(var = c("energy"),
                type = c("STURM"),
