@@ -23,15 +23,30 @@ parser <- ArgumentParser(description = "Script to set number of cores")
 parser$add_argument("-c", "--cores", type = "integer", default = NULL,
                     help = "Number of cores to use")
 
+parser$add_argument("-s", "--scenarios_file", type = "character", default = NULL,
+                    help = "Name of scenario file")
+
+parser$add_argument("-a", "--all_scenarios", default = FALSE,
+                    help = "Run all scenarios in the file")
+# make boolean argument
+
+
 # Parse the arguments
 args <- parser$parse_args()
 
 # Set num_cores based on the argument or use the default value
-if (is.null(args$cores)) {
-  num_cores <- detectCores() - 2
-} else {
-  num_cores <- args$cores
+parallel <- FALSE
+num_cores <- detectCores() - 2
+if (!is.null(args$cores)) {
+    num_cores <- args$cores
+    parallel <- TRUE
 }
+
+file_scenarios <- "all_scenarios.csv"
+if (!is.null(args$scenarios_file)) {
+  file_scenarios <- args$scenarios_file
+}
+
 
 # Print the number of cores to be used
 print(paste("Number of cores to be used:", num_cores))
@@ -81,7 +96,6 @@ base_year <- 2015
 end_year <- 2050
 step_year <- 5
 
-file_scenarios <- "all_scenarios.csv"
 
 # configuration file STURM
 region <- c("WEU", "EEU")
@@ -107,24 +121,23 @@ runs <- c("EU",
 
 # runs <- c("EU", "EU_carbon_tax", "EU_carbon_tax_social")
 
-runs <- c("EU")
+runs <- c("EU", "EU_carbon_tax")
 
-runs <- "all"
+if (args$all_scenarios) {
+    runs <- "all"
+}
 
-
-# read file_scenarios
-if (runs == "all") {
+# check if run is a vector or a string
+if (is.character(runs) && length(runs) == 1) {
     runs <- read.csv2(paste0(path_in, file_scenarios), sep = ',')$scenario_name
     # Create name_dir
     name_dir <- paste0(Sys.Date(), "_", format(Sys.time(), "%H%M%S"), "/")
-    path_out <- paste(path_out, name_dir)
+    path_out <- paste0(path_out, name_dir)
     if (!dir.exists(path_out)) {
         dir.create(path_out)
     }
 }
 
-
-parallel <- FALSE
 
 report <- list(var = c("energy"),
                type = c("STURM"),
@@ -140,7 +153,7 @@ if (!parallel) {
             run <- paste(run, energy_efficiency, sep = "_")
         }
 
-        sturm_scenarios <- run_scenario(
+        run_scenario(
             run = run,
             scenario_name = run,
             sector = sector,
@@ -164,6 +177,14 @@ if (!parallel) {
     }
 } else {
 
+    # Function to log messages
+    log_message <- function(message, log_file) {
+        cat(message, file = log_file, append = TRUE, sep = "\n")
+    }
+
+    # Path to the log file
+    log_file <- paste0(path_out, "run_scenario_log.txt")
+
     run_scenario_wrapper <- function(run) {
         tryCatch({
             result <- run_scenario(
@@ -183,14 +204,16 @@ if (!parallel) {
             energy_efficiency = energy_efficiency,
             en_method = en_method
             )
+            log_message(sprintf("Completed run '%s'", run), log_file)
             return(result)
         }, error = function(e) {
-            message(sprintf("Error in run '%s': %s", run, e$message))
+            error_message <- sprintf("Error in run '%s': %s", run, e$message)
+            log_message(error_message, log_file)
             return(NULL)  # Return NULL in case of error
         })
     }
     # Run in parallel
-    sturm_scenarios <- mclapply(runs, run_scenario_wrapper, mc.cores = num_cores)
+    mclapply(runs, run_scenario_wrapper, mc.cores = num_cores)
 
 }
 

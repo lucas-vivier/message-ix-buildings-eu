@@ -1,4 +1,4 @@
-scenario_id,scenario_name,carbon_tax,_objective_renovation,_sub_heat,learning_rate_heat,_realization_rate,_remove_barriers_renovation,_remove_barriers_heater
+scenario_id,scenario_name,carbon_tax,_objective_renovation,sub_heat,learning_rate_heat,_realization_rate_renovation,_remove_barriers_renovation,_remove_barriers_heater
 1,S1,,,,constant,0.5,FALSE,FALSE
 2,S2,EUETSII,,,constant,0.5,FALSE,FALSE
 3,S3,EUETS,,,constant,0.5,FALSE,FALSE

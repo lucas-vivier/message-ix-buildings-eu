@@ -1124,11 +1124,15 @@ run_scenario <- function(run,
     }
   }
 
+  write.csv(report$agg_result,
+      paste0(path_out, "report_agg_", scenario_name, ".csv"))
+
+  write.csv(sub_report,
+    paste0(path_out, "report_subsidies_", scenario_name, ".csv"))
 
   print("Scenario run completed!")
   print(paste("Time to run scenario:",
     round(Sys.time() - start_time, 0), "seconds."))
   rm(start_time)
 
-  return(output)
 }

@@ -17,28 +17,43 @@ print(paste("Working directory is:", getwd()))
 source("STURM_output/C00_plots.R")
 
 dir <- "test"
-file <- paste("STURM_ouput", dir, "results.csv", sep = "/")
+file <- paste("STURM_output", "figures", dir, "results.csv", sep = "/")
+data <- read.csv(file,  check.names = FALSE, stringsAsFactors = FALSE, header = TRUE, row.names = NULL)
+data <- data[, -1]
 
 ```
 
-## Read data
+
+#### Scenarios
 
 ```{r}
-data <- read_csv(file, check.names = FALSE)
-```
+scenario <- paste("STURM_data", "all_scenarios.csv", sep = "/")
+# no row number
+scenario <- read.csv(scenario, check.names = FALSE, stringsAsFactors = FALSE, header = TRUE, row.names = NULL)
 
+data <- data %>%
+    pivot_longer(cols=-variable, names_to = "scenario_name", values_to = "value") %>%
+    pivot_wider(names_from = variable, values_from = value)
 
-## Plotting
+scenario <- scenario %>%
+    left_join(data, by = "scenario_name")
 
-```{r}
-
+write.csv(scenario, paste("STURM_output", "figures", dir, "test.csv", sep = "/"), row.names = FALSE)
 
 ````
 
 ```{r}
-manual_sobol_analysis
+
 ```
 
 ```{r}
+
+
+
+```
+
+```{r}
+# histograms
+manual_sobol_analysis
 horizontal_bar_plot
 ```

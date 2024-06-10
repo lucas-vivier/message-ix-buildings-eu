@@ -22,6 +22,9 @@ parser$add_argument("-c", "--counterfactual", type = "character", default = NULL
 parser$add_argument("-n", "--names_scenarios", type = "character", default = NULL,
                     help = "Name of the scenario file")
 
+parser$add_argument("-f", "--figures", type = "character", default = NULL,
+                    help = "Display or not the figures")
+
 # Parse the arguments
 args <- parser$parse_args()
 
@@ -66,7 +69,7 @@ if (!is.null(args$path)) {
 
   # only capture the name of the file
   scenarios <- list.files(path_results, pattern = "report_agg_STURM_.*_resid_region_bld_energy.csv")
-  scenarios <- sub("report_agg_STURM_(.*)_resid_region_bld_energy.csv", "\\1", scenarios)
+  scenarios <- sub("report_agg_(.*).csv", "\\1", scenarios)
   scenarios <- setNames(scenarios, scenarios)
 
   run <- args$path
@@ -190,7 +193,7 @@ wide_data <- wide_data %>%
     cost_heat_EUR + cost_emission_EUR + thermal_comfort_EUR) %>%
   mutate(running_cost_private = running_cost - cost_emission_EUR)
 
-write.csv(filter(wide_data, region_bld == "EU"), paste0(save_dir, "/cba_calculation_eu.csv"))
+# write.csv(filter(wide_data, region_bld == "EU"), paste0(save_dir, "/cba_calculation_eu.csv"))
 
 long_data <- wide_data %>%
   select("region_bld", "year", "scenario", "cost_renovation_EUR_cumsum",
@@ -373,19 +376,20 @@ df <- df %>%
 presentation <- FALSE
 legend <- TRUE
 
-stacked_plots(df, subplot_column = "region_bld",
-  save_path = paste0(save_dir, "/cba_countries.png"),
-  color_list = color_list)
+if (args$figures) {
+  stacked_plots(df, subplot_column = "region_bld",
+    save_path = paste0(save_dir, "/cba_countries.png"),
+    color_list = color_list)
 
-stacked_plots(filter(df, region_bld == "EU"),
-  save_path = paste0(save_dir, "/cba_eu.png"),
-  color_list = color_list, y_label_suffix = "EUR/(year.hh)",
-  presentation = presentation, legend = legend)
+  stacked_plots(filter(df, region_bld == "EU"),
+    save_path = paste0(save_dir, "/cba_eu.png"),
+    color_list = color_list, y_label_suffix = "EUR/(year.hh)",
+    presentation = presentation, legend = legend)
 
-stacked_plots(filter(df, region_bld == "EU"),
-  save_path = paste0(save_dir, "/cba_eu_horizontal.png"),
-  color_list = color_list, y_label_suffix = "EUR/(year.hh)",
-  presentation = presentation, legend = legend, horizontal = TRUE)
-
+  stacked_plots(filter(df, region_bld == "EU"),
+    save_path = paste0(save_dir, "/cba_eu_horizontal.png"),
+    color_list = color_list, y_label_suffix = "EUR/(year.hh)",
+    presentation = presentation, legend = legend, horizontal = TRUE)
+  }
 
 

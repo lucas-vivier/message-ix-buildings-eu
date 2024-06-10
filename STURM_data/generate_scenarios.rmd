@@ -18,9 +18,9 @@ print(paste("Working directory is:", getwd()))
 variables <- list(
   "carbon_tax" = as.character(c("", "EUETSII", "EUETS", "social")),
   "_objective_renovation" = as.character(c("", "renovation_endogenous", "deep_renovation_endogenous")),
-  "_sub_heat" = as.character(c("", "carbon")),
+  "sub_heat" = as.character(c("", "carbon")),
   "learning_rate_heat" = as.character(c("constant", "")),
-  "_realization_rate" = as.character(c(0.5, 1)),
+  "_realization_rate_renovation" = as.character(c(0.5, 1)),
   "_remove_barriers_renovation" = as.character(c(FALSE, TRUE)),
   "_remove_barriers_heater" = as.character(c(FALSE, TRUE))
 )
