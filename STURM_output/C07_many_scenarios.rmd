@@ -1,0 +1,44 @@
+---
+output: reprex::reprex_document
+knit: reprex::reprex_render
+---
+
+Notebook to run STURM Ouput.
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(stringr)
+
+print(paste("Working directory is:", getwd()))
+
+# Loding figures setttings and functions
+source("STURM_output/C00_plots.R")
+
+dir <- "test"
+file <- paste("STURM_ouput", dir, "results.csv", sep = "/")
+
+```
+
+## Read data
+
+```{r}
+data <- read_csv(file, check.names = FALSE)
+```
+
+
+## Plotting
+
+```{r}
+
+
+````
+
+```{r}
+manual_sobol_analysis
+```
+
+```{r}
+horizontal_bar_plot
+```

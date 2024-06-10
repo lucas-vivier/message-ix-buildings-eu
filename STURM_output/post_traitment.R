@@ -6,7 +6,6 @@ library(tidyr)
 library(argparse)
 
 
-
 # Loding figures setttings and functions
 source("STURM_output/C00_plots.R")
 
@@ -21,7 +20,7 @@ parser$add_argument("-c", "--counterfactual", type = "character", default = NULL
                     help = "Name of the counterfactual scenario")
 
 parser$add_argument("-n", "--names_scenarios", type = "character", default = NULL,
-                    help = "Name of the counterfactual scenario")
+                    help = "Name of the scenario file")
 
 # Parse the arguments
 args <- parser$parse_args()
@@ -79,7 +78,7 @@ if (!is.null(args$path)) {
     ref <- names(scenarios)[1]
   }
 
-  if (!is.nunll(args$n)) {
+  if (!is.null(args$n)) {
     # columns are characters and not factors
     names_scenarios <- read.csv(args$n, header = TRUE, stringsAsFactors = FALSE, check.names = FALSE)
   }

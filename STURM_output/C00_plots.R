@@ -30,7 +30,6 @@ plot_settings <- list(
     order_hh, order_cost, order_insulation, order_primary)
 )
 
-
 message_building_theme_presentation <- theme_minimal() +
     theme(text = element_text(size = plot_settings[["big_size_text"]],
                               family = plot_settings[["font_family"]]),
@@ -1305,4 +1304,83 @@ plot_map <- function(data,
     print(p)
   }
 
+}
+
+manual_sobol_analysis <- function(scenarios, list_features, y) {
+  # Computes manually the Sobol indices for a given set of scenarios and a given output variable y
+  
+  # scenarios: DataFrame
+  #     DataFrame containing the scenarios
+  # list_features: list
+  #     List of features to consider
+  # y: str
+  #     Output variable
+  
+  # Create a data frame to store Sobol indices
+  sobol_df <- data.frame(
+    `First order` = numeric(length(list_features)),
+    `Total order` = numeric(length(list_features)),
+    row.names = list_features
+  )
+  
+  # Calculate expectation and variance
+  expectation <- mean(scenarios[[y]])
+  variance <- var(scenarios[[y]])
+  
+  for (col in list_features) {
+    # First order Sobol index
+    conditional_means <- aggregate(scenarios[[y]], by = list(scenarios[[col]]), FUN = mean)[, 2]
+    counts <- table(scenarios[[col]]) / nrow(scenarios)
+    sobol_first_order <- sum(counts * (conditional_means - expectation)^2) / variance
+    sobol_df[col, 'First order'] <- sobol_first_order
+    
+    # Total order Sobol index
+    list_features_minus_i <- setdiff(list_features, col)
+    conditional_means <- aggregate(scenarios[[y]], by = scenarios[list_features_minus_i], FUN = mean)[, ncol(list_features_minus_i) + 1]
+    counts <- table(do.call(paste, scenarios[list_features_minus_i])) / nrow(scenarios)
+    sobol_total_order <- 1 - sum(counts * (conditional_means - expectation)^2) / variance
+    sobol_df[col, 'Total order'] <- sobol_total_order
+  }
+  
+  return(sobol_df)
+}
+
+
+horizontal_bar_plot <- function(df, columns = NULL, title = NULL, order = NULL, save_path = NULL) {
+
+  # If no specific columns are provided, use all columns in the DataFrame
+  if (is.null(columns)) {
+    columns <- colnames(df)
+  }
+
+  # Order the DataFrame if the order parameter is provided
+  if (!is.null(order)) {
+    df <- df %>% arrange(!!sym(order))
+  }
+
+  # Convert the DataFrame to long format for ggplot2
+  df_long <- df %>%
+    rownames_to_column(var = "Feature") %>%
+    pivot_longer(cols = all_of(columns), names_to = "Metric", values_to = "Value")
+
+  # Create the horizontal bar plot
+  p <- ggplot(df_long, aes(x = Feature, y = Value, fill = Metric)) +
+    geom_bar(stat = "identity", position = position_dodge(width = 0.8), width = 0.7) +
+    coord_flip() +
+    theme_minimal() +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          axis.text = element_text(size = 18),
+          plot.title = element_text(size = 22, face = "bold"),
+          legend.title = element_blank(),
+          legend.text = element_text(size = 18)) +
+    labs(title = title) +
+    scale_fill_brewer(palette = "Set3")
+
+  # Save the plot if a save path is provided
+  if (!is.null(save_path)) {
+    ggsave(filename = save_path, plot = p, width = 14, height = 9.6)
+  }
+
+  return(p)
 }
