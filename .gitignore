@@ -5,12 +5,17 @@ STURM_output/results/
 STURM_output/results.zip
 STURM_output/results_240124.zip
 STURM_output/ressources/
+STURM_data/input_csv/_input_price
+STURM_data/input_csv/_input_emissions
+STURM_data/input_csv/_input_comm
 
 STURM_model/test.R
 
 # History files
 .Rhistory
 .Rapp.history
+.Rproj.user
+.Rhistory
 
 # Session Data files
 .RData

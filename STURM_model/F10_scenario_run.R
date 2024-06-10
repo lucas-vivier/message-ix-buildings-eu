@@ -55,19 +55,6 @@ run_scenario <- function(run,
   source(file.path(path_rcode, "F07_formatting_output.R"))
   source(file.path(path_rcode, "F08_calibration.R"))
 
-  if ("STURM" %in% report_type) {
-    source(file.path(path_rcode, "R00_report_basic.R"))
-  }
-  if ("MESSAGE" %in% report_type) {
-    source(file.path(path_rcode, "R01_report_MESSAGE.R"))
-  }
-  if ("IRP" %in% report_type) {
-    source(file.path(path_rcode, "R02_report_IRP.R"))
-  }
-  if ("NGFS" %in% report_type) {
-    source(file.path(path_rcode, "R03_report_NGFS.R"))
-  }
-  source(file.path(path_rcode, "R05_report_NAVIGATE.R"))
   print("Functions loaded.")
   # --------------------------------------------------------------
   print("Load data")
@@ -1137,43 +1124,6 @@ run_scenario <- function(run,
     }
   }
 
-  #-#-#-#-#-#-#-#-#-#-#-#-#-#-#
-  # Report results
-
-  # STURM basic report (results written as csv)
-  if ("STURM" %in% report_type) {
-    output <- fun_report_basic(report, report_var, cat$geo_data,
-      "region_bld", geo_level_report, sector, scenario_name, path_out)
-
-    write.csv(sub_report,
-      paste0(path_out, "report_subsidies_", scenario_name, ".csv"))
-  }
-
-  ## MESSAGE report -  Aggregate results for reporting
-  if ("MESSAGE" %in% report_type) {
-    output <- fun_report_MESSAGE(sector, report_var, report,
-      cat$geo_data, "region_bld", geo_level_report)
-  }
-
-  ## Report results - IRP template (results written as csv)
-  if ("IRP" %in% report_type) {
-    output <- fun_report_IRP(report, report_var, cat$geo_data, "region_bld",
-      geo_level_report, sector, scenario_name, yrs, path_out)
-  }
-
-  ## Report results - NGFS template (results written as csv)
-  if ("NGFS" %in% report_type) {
-    output <- fun_report_NGFS(report, report_var, geo_data, "region_bld",
-      geo_level_report, sector, scenario_name, yrs, path_out)
-  }
-
-  ## Report results - NGFS template (results written as csv)
-  if ("NAVIGATE" %in% report_type) {
-    output <- fun_report_NAVIGATE(report, report_var,
-      cat$geo_data, "region_bld",
-      geo_level_report, sector, scenario_name, yrs, path_out, path_in,
-      cat$ct_bld,cat$ct_ren_eneff, ren_en_sav_scen)
-  }
 
   print("Scenario run completed!")
   print(paste("Time to run scenario:",

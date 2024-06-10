@@ -297,7 +297,7 @@ fun_en_sim <- function(sector,
         "arch", "bld_age", "eneff", "fuel_heat",
         "tenr", "inc_cl", "en_m2_std", "en_m2", "en_hh_std", "en_hh",
         "budget_share", "heating_intensity", "cost_op")
-    write.csv(temp, paste0(path_out, "/detail_energy.csv"))
+    # write.csv(temp, paste0(path_out, "/detail_energy.csv"))
   }
 
   en_hh <- en_hh %>%

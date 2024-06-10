@@ -5,6 +5,7 @@ library(readxl)
 library(dplyr)
 # Load the parallel package
 library(parallel)
+library(argparse)
 
 
 suppressPackageStartupMessages(library(tidyverse))
@@ -15,16 +16,23 @@ options(dplyr.show_progress = FALSE)
 
 start_script_time <- Sys.time()
 
-# Define the number of CPU cores to use
-# Get command line arguments
-args <- commandArgs(trailingOnly = TRUE)
+# Create a parser object
+parser <- ArgumentParser(description = "Script to set number of cores")
+
+# Add argument for number of cores
+parser$add_argument("-c", "--cores", type = "integer", default = NULL,
+                    help = "Number of cores to use")
+
+# Parse the arguments
+args <- parser$parse_args()
 
 # Set num_cores based on the argument or use the default value
-if (length(args) == 0) {
+if (is.null(args$cores)) {
   num_cores <- detectCores() - 2
 } else {
-  num_cores <- as.numeric(args[1])
+  num_cores <- args$cores
 }
+
 # Print the number of cores to be used
 print(paste("Number of cores to be used:", num_cores))
 
@@ -107,10 +115,16 @@ runs <- "all"
 # read file_scenarios
 if (runs == "all") {
     runs <- read.csv2(paste0(path_in, file_scenarios), sep = ',')$scenario_name
+    # Create name_dir
+    name_dir <- paste0(Sys.Date(), "_", format(Sys.time(), "%H%M%S"), "/")
+    path_out <- paste(path_out, name_dir)
+    if (!dir.exists(path_out)) {
+        dir.create(path_out)
+    }
 }
 
 
-parallel <- TRUE
+parallel <- FALSE
 
 report <- list(var = c("energy"),
                type = c("STURM"),

@@ -3,22 +3,28 @@ library(dplyr)
 library(ggplot2)
 library(stringr)
 library(tidyr)
+library(argparse)
+
 
 
 # Loding figures setttings and functions
 source("STURM_output/C00_plots.R")
 
-ref <- "Counterfactual"
-base_year <- 2015
-run <- "standalone"
-stp <- 5
+# Create a parser object
+parser <- ArgumentParser(description = "Script to set number of cores")
 
-# costs-benefits analysis parameters
-lifetime_renovation <- 30 #30 # years
-lifetime_heater <- 20 # years
-social_discount <- 0.02 # % per year
+# Add argument for number of cores
+parser$add_argument("-p", "--path", type = "character", default = NULL,
+                    help = "Name of the path to the results directory")
 
+parser$add_argument("-c", "--counterfactual", type = "character", default = NULL,
+                    help = "Name of the counterfactual scenario")
 
+parser$add_argument("-n", "--names_scenarios", type = "character", default = NULL,
+                    help = "Name of the counterfactual scenario")
+
+# Parse the arguments
+args <- parser$parse_args()
 
 
 scenarios <- c("EU" = "Counterfactual",
@@ -36,16 +42,48 @@ scenarios <- c("EU" = "Counterfactual",
     "EU_realization_rate" = "Quality renovation"
     )
 
-scenarios <- c(
-  "EU" = "Counterfactual",
-  "EU_carbon_tax_social" = "Carbon tax social",
-  "EU_carbon_tax" = "Carbon tax EUETS"
-)
+
+ref <- "Counterfactual"
+base_year <- 2015
+run <- "standalone"
+stp <- 5
+
+path_results <- "STURM_output/results"
+
+# costs-benefits analysis parameters
+lifetime_renovation <- 30 #30 # years
+lifetime_heater <- 20 # years
+social_discount <- 0.02 # % per year
 
 
 path <- "STURM_data/input_csv/input_resid/macro/social_cost_carbon_20.csv"
 social_cost_carbon <- read.csv(path) %>%
   rename(social_cost_carbon = value)
+
+names_scenarios <- NULL
+# if scenarios is str then we take all scenarios
+if (!is.null(args$path)) {
+  path_results <- paste(path_results, args$path, sep = "/")
+
+  # only capture the name of the file
+  scenarios <- list.files(path_results, pattern = "report_agg_STURM_.*_resid_region_bld_energy.csv")
+  scenarios <- sub("report_agg_STURM_(.*)_resid_region_bld_energy.csv", "\\1", scenarios)
+  scenarios <- setNames(scenarios, scenarios)
+
+  run <- args$path
+
+  if (!is.null(args$c)) {
+    ref <- args$c
+  } else {
+    # first scenario is the reference
+    ref <- names(scenarios)[1]
+  }
+
+  if (!is.nunll(args$n)) {
+    # columns are characters and not factors
+    names_scenarios <- read.csv(args$n, header = TRUE, stringsAsFactors = FALSE, check.names = FALSE)
+  }
+}
 
 # reading data
 save_dir <- paste("STURM_output", "figures", run, sep = "/")
@@ -58,7 +96,7 @@ data <- data.frame(NULL)
 for (scenario in names(scenarios)) {
   print(paste("Scenario:", scenario))
   file <- paste0("report_agg_STURM_", scenario, "_resid_region_bld_energy.csv")
-  file <- paste("STURM_output/results", file, sep = "/")
+  file <- paste(path_results, file, sep = "/")
 
   if (!file.exists(file)) {
     print("Check file name or directory!")
@@ -242,8 +280,6 @@ file <- paste0(save_dir, "/", run, "_2050_summary_eu.csv")
 if (file.exists(file)) {
   # read file column as character
 
-
-
   summary_2050 <- read.csv(file, check.names = FALSE) %>%
     # select only rows who variables are in list_variables
     filter(variable %in% list_variables) %>%
@@ -260,7 +296,7 @@ if (file.exists(file)) {
   cost_renovation_sum = "Delta cost renovation (euro/hh/year)",
   cost_heater_sum = "Delta cost heating system (euro/hh/year)",
   cost_heat_sum = "Delta cost fuel (euro/hh/year)",
-  thermal_comfort_sum = "Delta thermal comfort (euro/hh/year)",
+  thermal_comfort_sum = "Delta cost thermal comfort (euro/hh/year)",
   running_cost_private = "Delta total cost private (euro/hh/year)",
   cost_emission_sum = "Delta cost emission (euro/hh/year)",
   running_cost = "Delta total cost (euro/hh/year)"
@@ -274,21 +310,29 @@ if (file.exists(file)) {
     , thermal_comfort_sum, running_cost_private, cost_emission_sum, running_cost) %>%
     mutate(variable = rename_list[.data[["variable"]]]) %>%
     # put scneario in column
-    pivot_wider(names_from = scenario, values_from = value) 
+    pivot_wider(names_from = scenario, values_from = value)
 
   
-  test <- bind_rows(summary_2050, temp) %>%
+  results <- bind_rows(summary_2050, temp) %>%
       select(variable, all_of(ref), everything()) %>%
       # if na put nothing
       mutate(across(-variable, ~ ifelse(is.na(.), "", formatC(., format = "f", digits = 2)))) 
 
-  write.csv(test, paste0(save_dir, "/results.csv"))
+  if (!is.null(names_scenarios)) {
 
+    results <- results %>%
+      pivot_longer(-variable, names_to = "scenario_name", values_to = "value") %>%
+      pivot_wider(names_from = variable, values_from = value) %>%
+      left_join(names_scenarios, by = "scenario_name")
+  }
+
+  write.csv(results, paste0(save_dir, "/results.csv"))
+}
 rename_list <- c(
   cost_renovation_sum = "Cost renovation",
   cost_heater_sum = "Cost heating system",
   cost_heat_sum = "Cost fuel",
-  thermal_comfort_sum = "Thermal comfort",
+  thermal_comfort_sum = "Cost thermal comfort",
   running_cost_private = "Total cost private",
   cost_emission_sum = "Cost emission",
   running_cost = "Total cost"
@@ -299,7 +343,7 @@ color_list <- c(
   "Cost heating system" = "#62c5c0",
   "Cost fuel" = "#00589d",
   "Cost emission" = "#fdbb40",
-  "Thermal comfort" = "lightblue"
+  "Cost thermal comfort" = "lightblue"
 )
 
 df <- summary %>%
@@ -345,4 +389,4 @@ stacked_plots(filter(df, region_bld == "EU"),
   presentation = presentation, legend = legend, horizontal = TRUE)
 
 
-}
+
