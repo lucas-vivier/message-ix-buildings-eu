@@ -28,8 +28,6 @@ parser$add_argument("-s", "--scenarios_file", type = "character", default = NULL
 
 parser$add_argument("-a", "--all_scenarios", default = FALSE,
                     help = "Run all scenarios in the file")
-# make boolean argument
-
 
 # Parse the arguments
 args <- parser$parse_args()
@@ -40,16 +38,14 @@ num_cores <- detectCores() - 2
 if (!is.null(args$cores)) {
     num_cores <- args$cores
     parallel <- TRUE
+    print(paste("Number of cores to be used:", num_cores))
+
 }
 
 file_scenarios <- "all_scenarios.csv"
 if (!is.null(args$scenarios_file)) {
   file_scenarios <- args$scenarios_file
 }
-
-
-# Print the number of cores to be used
-print(paste("Number of cores to be used:", num_cores))
 
 # Parameters
 rnd <- 5 # rounding (number of decimals)

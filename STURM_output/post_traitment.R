@@ -22,7 +22,7 @@ parser$add_argument("-c", "--counterfactual", type = "character", default = NULL
 parser$add_argument("-n", "--names_scenarios", type = "character", default = NULL,
                     help = "Name of the scenario file")
 
-parser$add_argument("-f", "--figures", type = "character", default = NULL,
+parser$add_argument("-f", "--figures", default = TRUE,
                     help = "Display or not the figures")
 
 # Parse the arguments
@@ -68,7 +68,7 @@ if (!is.null(args$path)) {
   path_results <- paste(path_results, args$path, sep = "/")
 
   # only capture the name of the file
-  scenarios <- list.files(path_results, pattern = "report_agg_STURM_.*_resid_region_bld_energy.csv")
+  scenarios <- list.files(path_results, pattern = "report_agg_.*.csv")
   scenarios <- sub("report_agg_(.*).csv", "\\1", scenarios)
   scenarios <- setNames(scenarios, scenarios)
 
@@ -81,9 +81,9 @@ if (!is.null(args$path)) {
     ref <- names(scenarios)[1]
   }
 
-  if (!is.null(args$n)) {
+  if (!is.null(args$names_scenarios)) {
     # columns are characters and not factors
-    names_scenarios <- read.csv(args$n, header = TRUE, stringsAsFactors = FALSE, check.names = FALSE)
+    names_scenarios <- read.csv(args$names_scenarios, header = TRUE, stringsAsFactors = FALSE, check.names = FALSE)
   }
 }
 
@@ -97,7 +97,7 @@ data <- data.frame(NULL)
 
 for (scenario in names(scenarios)) {
   print(paste("Scenario:", scenario))
-  file <- paste0("report_agg_STURM_", scenario, "_resid_region_bld_energy.csv")
+  file <- paste0("report_agg_", scenario, ".csv")
   file <- paste(path_results, file, sep = "/")
 
   if (!file.exists(file)) {
@@ -325,7 +325,9 @@ if (file.exists(file)) {
     results <- results %>%
       pivot_longer(-variable, names_to = "scenario_name", values_to = "value") %>%
       pivot_wider(names_from = variable, values_from = value) %>%
-      left_join(names_scenarios, by = "scenario_name")
+      left_join(names_scenarios, by = "scenario_name") %>%
+      # put names_scenarios columns first
+      select(colnames(names_scenarios), everything())
   }
 
   write.csv(results, paste0(save_dir, "/results.csv"))

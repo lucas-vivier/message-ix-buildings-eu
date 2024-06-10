@@ -112,6 +112,28 @@ message_building_subplot_theme <- theme_minimal() +
 
 # Function to create Message-ix-Buidling Figures
 
+# Function to build and save histogram
+plot_histogram <- function(data, column, save_path) {
+  # Check if the column exists in the data
+  if (!column %in% colnames(data)) {
+    stop(sprintf("Column '%s' does not exist in the data", column))
+  }
+
+  # Create the histogram plot
+  p <- data %>%
+    ggplot(aes(x = .data[[column]])) +
+    geom_histogram(binwidth = 1, fill = "blue", color = "black", alpha = 0.7) +
+    labs(title = sprintf("Histogram of %s", column), x = column, y = "Frequency") +
+    message_building_theme
+
+  # Save the plot to the specified path
+  ggsave(filename = save_path, plot = p,
+    width = plot_settings[["width"]],
+    height = plot_settings[["height"]],
+    dpi = plot_settings[["dpi"]])
+}
+
+
 plot_stacked_bars <- function(data,
                               fill_column,
                               x_column,
@@ -489,12 +511,30 @@ scatter_plots <- function(df,
   custom_label <- function(x, suffix) {
     label_comma()(x) %>% paste0(" ", suffix)
   }
+
+  y_max <- max(df[[y_column]], na.rm = TRUE) * 1.1
+  y_min <- min(df[[y_column]], na.rm = TRUE) * 1.1
+
+  if (y_min < 0) {
+    y_min <- y_min * 1.1
+  } else {
+    y_min <- y_min * 0.9
+  }
+
+  if (y_max > 0) {
+    y_max <- y_max * 1.1
+  } else {
+    y_max <- y_max * 0.9
+  }
+  print(y_max)
+
+
   p <- p +
-    labs(title = y_label, x = x_label) +
+    labs(y = y_label, x = x_label) +
     scale_x_continuous(labels =
       function(x) custom_label(x, suffix = x_label_suffix)) +
     scale_y_continuous(labels =
-      function(x) custom_label(x, suffix = y_label_suffix))
+      function(x) custom_label(x, suffix = y_label_suffix), limits = c(y_min, y_max))
 
 
   if (!legend) {
@@ -1306,45 +1346,61 @@ plot_map <- function(data,
 
 }
 
+# Define the manual Sobol analysis function
 manual_sobol_analysis <- function(scenarios, list_features, y) {
-  # Computes manually the Sobol indices for a given set of scenarios and a given output variable y
-  
-  # scenarios: DataFrame
-  #     DataFrame containing the scenarios
-  # list_features: list
-  #     List of features to consider
-  # y: str
-  #     Output variable
-  
-  # Create a data frame to store Sobol indices
-  sobol_df <- data.frame(
-    `First order` = numeric(length(list_features)),
-    `Total order` = numeric(length(list_features)),
-    row.names = list_features
+  # Initialize a tibble to store the results
+  sobol_df <- tibble(
+    Feature = list_features,
+    First_Order = numeric(length(list_features)),
+    Total_Order = numeric(length(list_features))
   )
   
-  # Calculate expectation and variance
-  expectation <- mean(scenarios[[y]])
-  variance <- var(scenarios[[y]])
+  # Calculate the expectation and variance of the output variable
+  expectation <- mean(scenarios[[y]], na.rm = TRUE)
+  variance <- var(scenarios[[y]], na.rm = TRUE)
+
+  nrow_scenarios = nrow(scenarios)
   
   for (col in list_features) {
     # First order Sobol index
-    conditional_means <- aggregate(scenarios[[y]], by = list(scenarios[[col]]), FUN = mean)[, 2]
-    counts <- table(scenarios[[col]]) / nrow(scenarios)
-    sobol_first_order <- sum(counts * (conditional_means - expectation)^2) / variance
-    sobol_df[col, 'First order'] <- sobol_first_order
+    conditional_means <- scenarios %>%
+      group_by_at(col) %>%
+      summarize(mean_y = mean(.data[[y]], na.rm = TRUE)) %>%
+      ungroup()
+    
+    counts <- scenarios %>%
+        group_by_at(col) %>%
+        summarize(n = n()) %>%
+      mutate(prop = n / nrow_scenarios) %>%
+      select(prop) %>%
+      pull()
+    
+    sobol_first_order <- sum(counts * (conditional_means$mean_y - expectation) ^ 2) / variance
+    sobol_df <- sobol_df %>%
+      mutate(First_Order = if_else(Feature == col, sobol_first_order, First_Order))
     
     # Total order Sobol index
     list_features_minus_i <- setdiff(list_features, col)
-    conditional_means <- aggregate(scenarios[[y]], by = scenarios[list_features_minus_i], FUN = mean)[, ncol(list_features_minus_i) + 1]
-    counts <- table(do.call(paste, scenarios[list_features_minus_i])) / nrow(scenarios)
-    sobol_total_order <- 1 - sum(counts * (conditional_means - expectation)^2) / variance
-    sobol_df[col, 'Total order'] <- sobol_total_order
+    
+    conditional_means <- scenarios %>%
+      group_by_at(list_features_minus_i) %>%
+      summarize(mean_y = mean(.data[[y]], na.rm = TRUE)) %>%
+      ungroup()
+    
+    counts <- scenarios %>%
+        group_by_at(list_features_minus_i) %>%
+        summarize(n = n()) %>%
+        mutate(prop = n / nrow_scenarios) %>%
+        select(prop) %>%
+        pull()
+    
+    sobol_total_order <- 1 - sum(counts * (conditional_means$mean_y - expectation) ^ 2) / variance
+    sobol_df <- sobol_df %>%
+      mutate(Total_Order = if_else(Feature == col, sobol_total_order, Total_Order))
   }
   
   return(sobol_df)
 }
-
 
 horizontal_bar_plot <- function(df, columns = NULL, title = NULL, order = NULL, save_path = NULL) {
 
