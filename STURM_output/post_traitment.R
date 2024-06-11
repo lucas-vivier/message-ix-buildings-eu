@@ -66,10 +66,12 @@ names_scenarios <- NULL
 # if scenarios is str then we take all scenarios
 if (!is.null(args$path)) {
   path_results <- paste(path_results, args$path, sep = "/")
+  print(paste("Loading resuls from:", path_results))
 
   # only capture the name of the file
   scenarios <- list.files(path_results, pattern = "report_agg_.*.csv")
   scenarios <- sub("report_agg_(.*).csv", "\\1", scenarios)
+  print(scenarios)
   scenarios <- setNames(scenarios, scenarios)
 
   run <- args$path
@@ -83,6 +85,7 @@ if (!is.null(args$path)) {
 
   if (!is.null(args$names_scenarios)) {
     # columns are characters and not factors
+    print(paste("Reading:", args$names_scenarios))
     names_scenarios <- read.csv(args$names_scenarios, header = TRUE, stringsAsFactors = FALSE, check.names = FALSE)
   }
 }
@@ -114,7 +117,7 @@ for (scenario in names(scenarios)) {
 flows <- c("n_renovation", "cost_renovation_EUR", "sub_renovation_EUR",
   "n_replacement", "cost_heater_EUR", "sub_heater_EUR",
   "to_pay_renovation", "to_pay_heater")
-  
+
 data <- data %>%
   mutate(scenario = scenarios[scenario])
 
