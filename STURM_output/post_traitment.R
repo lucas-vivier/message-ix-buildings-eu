@@ -27,7 +27,7 @@ parser$add_argument("-f", "--figures", default = TRUE,
 
 # Parse the arguments
 args <- parser$parse_args()
-#args <- list(path = "test", names_scenarios = "STURM_data/all_scenarios.csv")
+args <- list(path = "test", names_scenarios = "STURM_data/all_scenarios.csv")
 
 scenarios <- c("EU" = "Counterfactual",
     "EU_carbon_tax_low" = "Carbon tax EUETS2",
@@ -114,9 +114,9 @@ for (scenario in names(scenarios)) {
 flows <- c("n_renovation", "cost_renovation_EUR", "sub_renovation_EUR",
   "n_replacement", "cost_heater_EUR", "sub_heater_EUR",
   "to_pay_renovation", "to_pay_heater")
-
+  
 data <- data %>%
-  mutate(scenario = scenarios[.data[["scenario"]]])
+  mutate(scenario = scenarios[scenario])
 
 stp <- 5
 
