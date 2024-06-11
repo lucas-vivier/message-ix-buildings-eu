@@ -699,11 +699,6 @@ output_table <- function(data,
   base_year = 2015
   ) {
 
-  save_file <- paste(save_dir,
-    paste0(run, "_", end_year, "_summary_countries.csv"), sep = "/")
-  save_file_eu <- paste(save_dir,
-    paste0(run, "_", end_year, "_summary_eu.csv"), sep = "/")
-
   variables <- c("heat_kWh", "heat_std_kWh", "heat_tCO2",
       "energy_poverty_thresh", "stock_building",
         "heating_intensity", "population")
@@ -1153,15 +1148,20 @@ output_table <- function(data,
   final_df <- final_df %>%
     select(variable, `Member states`, "Initial", everything())
 
+  if (!is.null(save_dir)) {
 
-  write.csv(final_df, save_file, row.names = FALSE)
+    save_file <- paste(save_dir,
+      paste0(run, "_", end_year, "_summary_countries.csv"), sep = "/")
+    save_file_eu <- paste(save_dir,
+      paste0(run, "_", end_year, "_summary_eu.csv"), sep = "/")
+    write.csv(final_df, save_file, row.names = FALSE)
 
-  final_df_eu <- final_df %>%
-    filter(`Member states` == "EU") %>%
-    select(-c("Member states"))
+    final_df_eu <- final_df %>%
+      filter(`Member states` == "EU") %>%
+      select(-c("Member states"))
 
-  write.csv(final_df_eu, save_file_eu, row.names = FALSE)
-  
+    write.csv(final_df_eu, save_file_eu, row.names = FALSE)
+  }
   return(format_temp)
 }
 

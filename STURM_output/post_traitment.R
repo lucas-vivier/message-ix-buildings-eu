@@ -27,6 +27,8 @@ parser$add_argument("-f", "--figures", default = TRUE,
 
 # Parse the arguments
 args <- parser$parse_args()
+print("TO REMOVE")
+args <- list(path = "test", names_scenarios = "STURM_data/all_scenarios.csv")
 
 
 scenarios <- c("EU" = "Counterfactual",
@@ -113,7 +115,7 @@ for (scenario in names(scenarios)) {
 # Reconstuction flows
 flows <- c("n_renovation", "cost_renovation_EUR", "sub_renovation_EUR",
   "n_replacement", "cost_heater_EUR", "sub_heater_EUR",
-  "to_pay_renovation", "to_pay_heater", "taxes_revenues_EUR", "thermal_comfort_EUR")
+  "to_pay_renovation", "to_pay_heater")
 
 data <- data %>%
   mutate(scenario = scenarios[.data[["scenario"]]])
@@ -127,20 +129,28 @@ data <- data %>%
 data <- distinct(data)
 
 # Output table
-output_table(data, save_dir = save_dir, end_year = 2030, base_year = 2015)
-format_temp <- output_table(data, save_dir = save_dir,
-  end_year = 2050, base_year = 2015)
+# output_table(data, save_dir = save_dir, end_year = 2030, base_year = 2015)
 
-format_temp_eu <- format_temp %>%
-  filter(Scenario != "Initial") %>%
+end_year <- 2050
+df <- output_table(data, save_dir = NULL, end_year = end_year, base_year = 2015)
+
+if (!is.null(names_scenarios)) {
+  df <- df %>%
+    rename(scenario_name = Scenario) %>%
+    left_join(names_scenarios, by = "scenario_name") %>%
+    select(colnames(names_scenarios), everything())
+}
+
+save_file <- paste(save_dir,  paste0(run, "_", end_year, "_summary_countries.csv"), sep = "/")
+write.csv(df, save_file, row.names = FALSE)
+
+save_file <- paste(save_dir, paste0(run, "_", end_year, "_summary_eu.csv"), sep = "/")
+final_df_eu <- df %>%
   filter(`Member states` == "EU") %>%
-  mutate(`Energy poverty (Percent)` = `Energy poverty (Percent)` * 100) %>%
-  mutate(`Cost total (Billion EUR)` =
-    `Cost renovation (Billion EUR)` + `Cost heater (Billion EUR)`) %>%
-  mutate(`Cost total (Billion EUR per year)` =
-    `Cost total (Billion EUR)` / 35) %>%
-  mutate(Scenario = factor(Scenario), levels = unname(Scenario))
+  select(-c("Member states"))
+write.csv(final_df_eu, save_file, row.names = FALSE)
 
+# ----------------------------------------------------------------------
 # Cost-benefits analysis
 data_raw <- data
 
@@ -283,8 +293,10 @@ if (file.exists(file)) {
   # read file column as character
 
   summary_2050 <- read.csv(file, check.names = FALSE) %>%
+    select(all_of(c("scenario_name", list_variables))) %>%
+    pivot_longer(cols = list_variables, names_to = "variable", values_to = "value") %>%
+    pivot_wider(names_from = scenario_name, values_from = value) %>%
     # select only rows who variables are in list_variables
-    filter(variable %in% list_variables) %>%
     # remove column "Initial"
     select(-Initial) %>%
     mutate(across(-c(variable, all_of(ref)), ~ . - .data[[ref]])) %>%
@@ -292,16 +304,15 @@ if (file.exists(file)) {
 
 
   # Calculate difference of each column with the column "Current policies"
-  
 
   rename_list <- c(
-  cost_renovation_sum = "Delta cost renovation (euro/hh/year)",
-  cost_heater_sum = "Delta cost heating system (euro/hh/year)",
-  cost_heat_sum = "Delta cost fuel (euro/hh/year)",
-  thermal_comfort_sum = "Delta cost thermal comfort (euro/hh/year)",
-  running_cost_private = "Delta total cost private (euro/hh/year)",
-  cost_emission_sum = "Delta cost emission (euro/hh/year)",
-  running_cost = "Delta total cost (euro/hh/year)"
+    cost_renovation_sum = "Delta cost renovation (euro/hh/year)",
+    cost_heater_sum = "Delta cost heating system (euro/hh/year)",
+    cost_heat_sum = "Delta cost fuel (euro/hh/year)",
+    thermal_comfort_sum = "Delta cost thermal comfort (euro/hh/year)",
+    running_cost_private = "Delta total cost private (euro/hh/year)",
+    cost_emission_sum = "Delta cost emission (euro/hh/year)",
+    running_cost = "Delta total cost (euro/hh/year)"
   )
 
 
@@ -330,7 +341,7 @@ if (file.exists(file)) {
       select(colnames(names_scenarios), everything())
   }
 
-  write.csv(results, paste0(save_dir, "/results.csv"))
+  write.csv(results, paste0(save_dir, "/results.csv"), row.names = FALSE)
 }
 rename_list <- c(
   cost_renovation_sum = "Cost renovation",

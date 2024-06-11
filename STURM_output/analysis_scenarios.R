@@ -29,7 +29,8 @@ write.csv(subset, paste(out_dir, "results_standalone.csv", sep = "/"), row.names
 
 # Make heatmap of the results
 cols <- c("Space heating consumption (TWh)", "Space heating consumption electricity (TWh)",
-    "Emission (MtCO2)", "Emission cumulated (GtCO2)", "Government expenditures (Billion EUR)",
+    "Emission (MtCO2)", "Emission cumulated (GtCO2)", "Total cost (Billion EUR)",
+    "Government expenditures (Billion EUR)",
     "Delta total cost private (euro/hh/year)", "Delta total cost (euro/hh/year)")
 
 temp <- subset %>%
