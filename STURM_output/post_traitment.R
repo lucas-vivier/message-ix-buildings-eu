@@ -27,9 +27,7 @@ parser$add_argument("-f", "--figures", default = TRUE,
 
 # Parse the arguments
 args <- parser$parse_args()
-print("TO REMOVE")
-args <- list(path = "test", names_scenarios = "STURM_data/all_scenarios.csv")
-
+#args <- list(path = "test", names_scenarios = "STURM_data/all_scenarios.csv")
 
 scenarios <- c("EU" = "Counterfactual",
     "EU_carbon_tax_low" = "Carbon tax EUETS2",
