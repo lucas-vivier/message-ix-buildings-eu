@@ -1083,6 +1083,18 @@ output_table <- function(data,
       (emission_ini - `Emission (MtCO2)`) / emission_ini) %>%
     select(-c("emission_ini"))
 
+
+  consumption_elec_ini <- format_temp %>%
+    filter(Scenario == "Initial") %>%
+    select(c("Member states", "Space heating consumption electricity (TWh)")) %>%
+    rename(consumption_elec_ini = "Space heating consumption electricity (TWh)")
+
+  format_temp <- format_temp %>%
+    left_join(consumption_elec_ini) %>%
+    mutate(`Consumption electricity variation (%)` =
+      (`Space heating consumption electricity (TWh)` - consumption_elec_ini) / consumption_elec_ini) %>%
+    select(-c("consumption_elec_ini"))
+
   # formatting
   
   select_order <- c(

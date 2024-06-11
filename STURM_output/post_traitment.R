@@ -27,7 +27,7 @@ parser$add_argument("-f", "--figures", default = TRUE,
 
 # Parse the arguments
 args <- parser$parse_args()
-# args <- list(path = "test", names_scenarios = "STURM_data/all_scenarios.csv")
+#args <- list(path = "test", names_scenarios = "STURM_data/all_scenarios.csv")
 
 scenarios <- c("EU" = "Counterfactual",
     "EU_carbon_tax_low" = "Carbon tax EUETS2",
@@ -286,7 +286,10 @@ list_variables <- c(
   "Emission (MtCO2)",
   "Emission cumulated (GtCO2)",
   "Total cost (Billion EUR)",
-  "Government expenditures (Billion EUR)"
+  "Government expenditures (Billion EUR)",
+  "Emission saving (%)",
+  "Consumption saving (%)",
+  "Consumption electricity variation (%)"
   )
 
 file <- paste0(save_dir, "/", run, "_2050_summary_eu.csv")
