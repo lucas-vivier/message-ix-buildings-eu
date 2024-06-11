@@ -113,7 +113,7 @@ for (scenario in names(scenarios)) {
 # Reconstuction flows
 flows <- c("n_renovation", "cost_renovation_EUR", "sub_renovation_EUR",
   "n_replacement", "cost_heater_EUR", "sub_heater_EUR",
-  "to_pay_renovation", "to_pay_heater", "taxes_revenues_EUR")
+  "to_pay_renovation", "to_pay_heater", "taxes_revenues_EUR", "thermal_comfort_EUR")
 
 data <- data %>%
   mutate(scenario = scenarios[.data[["scenario"]]])
@@ -392,6 +392,6 @@ if (args$figures) {
     save_path = paste0(save_dir, "/cba_eu_horizontal.png"),
     color_list = color_list, y_label_suffix = "EUR/(year.hh)",
     presentation = presentation, legend = legend, horizontal = TRUE)
-  }
+}
 
 

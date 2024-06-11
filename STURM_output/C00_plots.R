@@ -60,10 +60,10 @@ message_building_theme_presentation <- theme_minimal() +
 message_building_theme <- theme_minimal() +
     theme(text = element_text(size = plot_settings[["size_text"]],
                               family = plot_settings[["font_family"]]),
-          axis.title.x = element_blank(),
+          axis.title.x = element_text(margin = margin(t = 10)),
           axis.text.x = element_text(size = plot_settings[["size_text"]]),
           axis.text.y = element_text(size = plot_settings[["size_text"]]),
-          axis.title.y = element_blank(),
+          axis.title.y = element_text(margin = margin(r = 10)),
           axis.title = element_text(hjust = 0,
                                     size = plot_settings[["size_title"]]),
           panel.grid.major.x = element_blank(),
@@ -74,10 +74,7 @@ message_building_theme <- theme_minimal() +
           legend.text = element_text(size = plot_settings[["size_text"]]),
           legend.position = "right",
           # Top, Right, Bottom and Left margin
-          plot.margin = margin(t = 0,
-                      r = 0,
-                      b = 0,
-                      l = 0),
+          plot.margin = unit(c(1, 1, 1, 1), "cm"),
         axis.line.x =
           element_line(colour = "black", size = 1.5, linetype = "solid"),
         axis.line.y =
@@ -175,7 +172,7 @@ plot_stacked_areas <- function(data,
 
   # Create the stacked area plot
 
-  print(unique(data[[subplot_column]]))
+  #print(unique(data[[subplot_column]]))
 
   if (all(unique(data[[subplot_column]]) %in% names(plot_settings[["rename"]]))) {
     data <- data %>%
@@ -280,7 +277,7 @@ plot_clustered_barplot <- function(df,
   }
 
   if (!is.null(year_start)) {
-    print(year_start)
+    #print(year_start)
     df <- df %>%
       filter(!(year == year_start & scenario != "Current policies"))
   }
@@ -388,7 +385,7 @@ plot_multiple_lines <- function(df,
   }
 
   if (!is.null(line_order)) {
-    print(line_order)
+    #print(line_order)
     df <- df %>%
       mutate(!!sym(line_column) := factor(!!sym(line_column),
         levels = line_order))
@@ -499,7 +496,8 @@ scatter_plots <- function(df,
   if (!presentation) {
       p <- p +
         message_building_theme  +
-        theme(axis.title.x = element_text(size = 30, hjust = 0.5))
+        theme(axis.title.x = element_text(size = 30, hjust = 0.5),
+        axis.title.y = element_text(size = 30, vjust = 0))
 
       size_axis <- plot_settings[["size_text"]]
   } else {
@@ -526,7 +524,6 @@ scatter_plots <- function(df,
   } else {
     y_max <- y_max * 0.9
   }
-  print(y_max)
 
 
   p <- p +
@@ -1176,7 +1173,7 @@ budget_share_energy_plots <- function(data, years, sub_scenarios, ref, save_dir,
   discount <- 0.05
   lifetime_loan <- 10
   lifetime_renovation <- 35 # years
-  lifetime_heater <- 30 # years
+  lifetime_heater <- 20 # years
   stp <- 5
 
   temp <- data %>%
@@ -1246,9 +1243,7 @@ budget_share_energy_plots <- function(data, years, sub_scenarios, ref, save_dir,
   parse_data <- long_data %>%
     filter(region_bld == "EU") %>%
     filter(year %in% years) %>%
-    mutate(value = value) %>%
-    filter(scenario %in% names(sub_scenarios)) %>%
-    mutate(scenario = sub_scenarios[.data[["scenario"]]])
+    mutate(value = value)
 
   data_ref <- parse_data %>%
     filter(scenario == ref) %>%
@@ -1275,7 +1270,7 @@ budget_share_energy_plots <- function(data, years, sub_scenarios, ref, save_dir,
     year_start = NULL,
     save_path = paste(save_dir, paste0(run, "_cost_energy_2030.png"), sep = "/"),
     display_total = TRUE,
-    x_order = sub_scenarios,
+    x_order = scenarios,
     angle_x_label = angle_x_label)
 
   plot_clustered_barplot(
@@ -1287,7 +1282,7 @@ budget_share_energy_plots <- function(data, years, sub_scenarios, ref, save_dir,
     year_start = NULL,
     save_path = paste(save_dir, paste0(run, "_cost_energy_2050.png"), sep = "/"),
     display_total = TRUE,
-    x_order = sub_scenarios,
+    x_order = scenarios,
     angle_x_label = angle_x_label)
   }
 
@@ -1439,4 +1434,32 @@ horizontal_bar_plot <- function(df, columns = NULL, title = NULL, order = NULL, 
   }
 
   return(p)
+}
+
+sobol_figures <- function(df, list_features, y, rename_feature, save_path) {
+
+  df <- manual_sobol_analysis(df, list_features, y)
+
+  # order ascendng by Total_Order column
+  df <- df %>%
+      arrange(Total_Order) %>%
+      mutate(Feature = rename_feature[Feature]) %>%
+      mutate(Feature = factor(Feature, levels = unique(Feature)))
+
+  # make horizontal bar plot of the first order and total order indices
+
+  p <- df %>%
+      pivot_longer(cols = c(First_Order, Total_Order),
+                  names_to = "Order_Type", 
+                  values_to = "Value") %>%
+      ggplot(aes(x = Value, y = Feature, fill = Order_Type)) +
+      geom_bar(stat = "identity", position = "dodge") +
+      message_building_theme +
+      theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank()) 
+
+  ggsave(save_path, plot = p, width = plot_settings[["width"]],
+          height = plot_settings[["height"]],
+          dpi = plot_settings[["dpi"]])
+
 }

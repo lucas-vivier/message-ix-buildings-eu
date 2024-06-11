@@ -4,6 +4,7 @@ knit: reprex::reprex_render
 ---
 
 Notebook to run STURM Ouput.
+Analysis of one scenario for the EU region.
 
 ```{r}
 library(dplyr)
