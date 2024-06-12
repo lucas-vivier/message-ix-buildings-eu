@@ -9,7 +9,7 @@ print(paste("Working directory is:", getwd()))
 # Loding figures setttings and functions
 source("STURM_output/C00_plots.R")
 
-scenario <- "EU"
+scenario <- "S383"
 file <- paste0("report_agg_", scenario, ".csv")
 file <- paste("STURM_output/results", file, sep = "/")
 
@@ -339,6 +339,35 @@ plot_stacked_bars(my_data_reordered,
                   x_column = "region_bld",
                   y_column = "value",
                   save_path = save_path)
+
+x_column <- "region_bld"
+temp <- data %>%
+  filter(variable == "stock_building") %>%
+  filter(resolution %in% names(rename_insulation)) %>%
+  filter(year == 2050) %>%
+  group_by(region_bld) %>%
+  mutate(value = value / sum(value)) %>%
+  ungroup() %>%
+  mutate(region_bld = ifelse(region_bld %in% names(rename_countries_code), rename_countries_code[region_bld], region_bld))    # this reorders samples
+
+region_grouping <- temp %>%
+  filter(resolution %in% c("1.5-2", "1-1.5", ">2")) %>%
+  group_by_at(x_column) %>%
+  summarise(order_by = sum(value)) %>%
+  ungroup()
+
+my_data_reordered <- temp %>%
+  left_join(region_grouping, by = "region_bld") %>%
+  mutate(order_by = ifelse(is.na(order_by), 0, order_by)) %>%
+  mutate(region_bld = reorder(region_bld, -order_by))
+
+save_path <- paste(save_dir, paste0(scenario, "_share_insulation_stock_countries_2050.png"), sep = "/")
+
+plot_stacked_bars(my_data_reordered,
+                  fill_column = "resolution",
+                  x_column = "region_bld",
+                  y_column = "value",
+                  save_path = save_path)
 #--------------------------------------------------------------------------
 x_column <- "region_bld"
 temp <- data %>%
@@ -365,7 +394,7 @@ plot_stacked_bars(my_data_reordered,
                   fill_column = "resolution",
                   x_column = "region_bld",
                   y_column = "value",
-                  save_path = paste(save_dir, paste0(scenario, "_share_energy_stock_countries_ini.png"), sep = "/")
+                  save_path = paste(save_dir, paste0(scenario, "_share_energy_performance_countries_ini.png"), sep = "/")
                   )
 #--------------------------------------------------------------------------
 temp <- data %>%
@@ -386,7 +415,7 @@ plot_stacked_bars(my_data_reordered,
                   fill_column = "resolution",
                   x_column = "region_bld",
                   y_column = "value",
-                  save_path = paste(save_dir, paste0(scenario, "_share_energy_stock_countries_2050.png"), sep = "/")
+                  save_path = paste(save_dir, paste0(scenario, "_share_energy_performance_countries_2050.png"), sep = "/")
                   )
 
 #--------------------------------------------------------------------------
