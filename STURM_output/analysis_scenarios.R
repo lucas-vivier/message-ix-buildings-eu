@@ -16,9 +16,12 @@ if (!dir.exists(out_dir)) {
     dir.create(out_dir)
 }
 
-scenarios <- c("Counterfactual", "EU-ETS", "EU-ETS 2", "Social value of carbon",
-    "Subsidies heat pumps", "Market-failures heater", "Learning-by-doing heat pumps",
-    "Renovation wave", "Deep renovation wave", "Quality renovation", "Market-failures renovation")
+scenarios <- c(
+    "Counterfactual", "EU-ETS", "EU-ETS 2", "Social value of carbon",
+    "Subsidies heat pumps", "Market-failures heater",
+    "Learning-by-doing heat pumps",
+    "Renovation wave", "Deep renovation wave",
+    "Quality renovation", "Market-failures renovation")
 
 # Select scenario by rows
 subset <- data %>%
@@ -27,11 +30,16 @@ subset <- data %>%
 # Export as .csv
 write.csv(subset, paste(out_dir, "results_standalone.csv", sep = "/"), row.names = FALSE)
 
+#-----------------------------------
 # Make heatmap of the results
-cols <- c("Space heating consumption (TWh)", "Space heating consumption electricity (TWh)",
-    "Emission (MtCO2)", "Emission cumulated (GtCO2)", "Total cost (Billion EUR)",
+cols <- c(
+    "Space heating consumption (TWh)",
+    "Space heating consumption electricity (TWh)",
+    "Emission (MtCO2)", "Emission cumulated (GtCO2)",
+    "Total cost (Billion EUR)",
     "Government expenditures (Billion EUR)",
-    "Delta total cost private (euro/hh/year)", "Delta total cost (euro/hh/year)")
+    "Delta total cost private (euro/hh/year)",
+    "Delta total cost (euro/hh/year)")
 
 temp <- subset %>%
     select(all_of(c("group", cols))) %>%
@@ -57,22 +65,21 @@ temp$variable <- factor(temp$variable, levels = cols)
 # Reverse order compare to scenarios
 temp$scenario <- factor(temp$scenario, levels = rev(scenarios))
 
-
 # Create heatmap
 p <- temp %>%
   ggplot(aes(x = variable, y = scenario)) +
   #geom_tile(aes(fill = norm_value), color = "white") +
-    geom_tile(aes(fill = ifelse(scenario == "Counterfactual", NA, norm_value)), color = "white") +
-    geom_tile(data = subset(temp, scenario == "Counterfactual"), aes(x = variable, y = scenario), fill = "grey", color = "white") +
-    geom_text(aes(label = round(value, 1)), size=6) +
-    scale_fill_gradient2(low = "blue", mid = "grey", high = "red", midpoint = 0, na.value = "grey") +
-    theme_minimal() +
-      theme(axis.title.y = element_blank(),
-        axis.title.x.top = element_blank(),
-        axis.text.x.top = element_text(size = 15, angle = 90, face="bold"),
-        axis.text.y = element_text(size = 15, face="bold"),
-        legend.position = "none") +
-    scale_x_discrete(position = "top")
+  geom_tile(aes(fill = ifelse(scenario == "Counterfactual", NA, norm_value)), color = "white") +
+  geom_tile(data = subset(temp, scenario == "Counterfactual"), aes(x = variable, y = scenario), fill = "grey", color = "white") +
+  geom_text(aes(label = round(value, 1)), size=6) +
+  scale_fill_gradient2(low = "blue", mid = "grey", high = "red", midpoint = 0, na.value = "grey") +
+  theme_minimal() +
+    theme(axis.title.y = element_blank(),
+      axis.title.x.top = element_blank(),
+      axis.text.x.top = element_text(size = 15, angle = 90, face="bold"),
+      axis.text.y = element_text(size = 15, face="bold"),
+      legend.position = "none") +
+  scale_x_discrete(position = "top")
 
 # save plot
 ggsave(filename = paste(out_dir, "heatmap.png", sep = "/"), plot = p,
@@ -81,9 +88,8 @@ ggsave(filename = paste(out_dir, "heatmap.png", sep = "/"), plot = p,
     dpi = plot_settings[["dpi"]])
 
 
-
+#-----------------------------------
 # Make cost-benefits analysis
-
 rename_list <- c(
   `Delta cost renovation (euro/hh/year)` = "Cost renovation",
   `Delta cost heating system (euro/hh/year)` = "Cost heating system",
@@ -103,12 +109,12 @@ color_list <- c(
 )
 
 df <- subset %>%
-    rename(scenario = group) %>%
+  rename(scenario = group) %>%
     # Select only the relevant columns based on the rename_list
-    select(scenario, `Delta cost renovation (euro/hh/year)`,
-           `Delta cost heating system (euro/hh/year)`, `Delta cost fuel (euro/hh/year)`,
-           `Delta cost thermal comfort (euro/hh/year)`, `Delta total cost (euro/hh/year)`, 
-           `Delta total cost private (euro/hh/year)`, `Delta cost emission (euro/hh/year)`) %>%
+  select(scenario, `Delta cost renovation (euro/hh/year)`,
+          `Delta cost heating system (euro/hh/year)`, `Delta cost fuel (euro/hh/year)`,
+          `Delta cost thermal comfort (euro/hh/year)`, `Delta total cost (euro/hh/year)`, 
+          `Delta total cost private (euro/hh/year)`, `Delta cost emission (euro/hh/year)`) %>%
   gather(variable, value, `Delta cost renovation (euro/hh/year)`,
          `Delta cost heating system (euro/hh/year)`, `Delta cost fuel (euro/hh/year)`,
          `Delta cost thermal comfort (euro/hh/year)`, `Delta total cost (euro/hh/year)`, 

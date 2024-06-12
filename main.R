@@ -39,7 +39,6 @@ if (!is.null(args$cores)) {
     num_cores <- args$cores
     parallel <- TRUE
     print(paste("Number of cores to be used:", num_cores))
-
 }
 
 file_scenarios <- "all_scenarios.csv"

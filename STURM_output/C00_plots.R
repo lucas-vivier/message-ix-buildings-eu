@@ -63,7 +63,7 @@ message_building_theme <- theme_minimal() +
           axis.title.x = element_text(margin = margin(t = 10)),
           axis.text.x = element_text(size = plot_settings[["size_text"]]),
           axis.text.y = element_text(size = plot_settings[["size_text"]]),
-          axis.title.y = element_text(margin = margin(r = 10)),
+          axis.title.y = element_text(margin = margin(r = 10), vjust = 0.5),
           axis.title = element_text(hjust = 0,
                                     size = plot_settings[["size_title"]]),
           panel.grid.major.x = element_blank(),
@@ -482,22 +482,22 @@ scatter_plots <- function(df,
   p <- ggplot(df, aes(x = .data[[x_column]], y = .data[[y_column]],
     color = .data[[color_column]], size = .data[[size_column]])) +
     geom_point(alpha = 1) +
-    expand_limits(y = 0, x = 0) +
+    # expand_limits(y = 0, x = 0) +
     scale_color_manual(values = colors_scenarios) +
     scale_size(range = c(5, 10),
-              breaks = c(
+                breaks = c(
                 min(df[[size_column]]),
                 (min(df[[size_column]]) + max(df[[size_column]])) / 2,
                 max(df[[size_column]])),
               labels = function(x) paste0(round(x, 0), legend_suffix)) +
-    guides(color = guide_legend(override.aes = list(size = 5)))
+    guides(color = guide_legend(override.aes = list(size = 5)), size = "none")
 
 
   if (!presentation) {
       p <- p +
-        message_building_theme  +
-        theme(axis.title.x = element_text(size = 30, hjust = 0.5),
-        axis.title.y = element_text(size = 30, vjust = 0))
+        message_building_theme +
+        theme(axis.title.y = element_text(size = 30, vjust = 0.5, hjust = 0.5),
+              axis.title.x = element_text(size = 30, hjust = 0.5))
 
       size_axis <- plot_settings[["size_text"]]
   } else {
@@ -510,28 +510,27 @@ scatter_plots <- function(df,
     label_comma()(x) %>% paste0(" ", suffix)
   }
 
-  y_max <- max(df[[y_column]], na.rm = TRUE) * 1.1
-  y_min <- min(df[[y_column]], na.rm = TRUE) * 1.1
+  # y_max <- max(df[[y_column]], na.rm = TRUE) * 1.1
+  # y_min <- min(df[[y_column]], na.rm = TRUE) * 1.1
 
-  if (y_min < 0) {
-    y_min <- y_min * 1.1
-  } else {
-    y_min <- y_min * 0.9
-  }
+  # if (y_min < 0) {
+  #   y_min <- y_min * 1.1
+  # } else {
+  #   y_min <- y_min * 0.9
+  # }
 
-  if (y_max > 0) {
-    y_max <- y_max * 1.1
-  } else {
-    y_max <- y_max * 0.9
-  }
-
-
+  # if (y_max > 0) {
+  #   y_max <- y_max * 1.1
+  # } else {
+  #   y_max <- y_max * 0.9
+  # }
   p <- p +
     labs(y = y_label, x = x_label) +
     scale_x_continuous(labels =
       function(x) custom_label(x, suffix = x_label_suffix)) +
     scale_y_continuous(labels =
-      function(x) custom_label(x, suffix = y_label_suffix), limits = c(y_min, y_max))
+      function(x) custom_label(x, suffix = y_label_suffix)) 
+  # , limits = c(y_min, y_max)
 
 
   if (!legend) {
@@ -1305,15 +1304,24 @@ plot_map <- function(data,
                     save_path = NULL,
                     legend_title = "",
                     subplot_column = NULL,
-                    ncol = 2) {
+                    ncol = 2,
+                    key = "iso_a3_eh") {
   
-  data <- data %>%
-    mutate(iso_a3_eh = substr(region_bld, nchar(region_bld)-2, nchar(region_bld)))
-
   eu_countries <- ne_countries(continent = "Europe", returnclass = "sf")
 
-  merged_data <- merge(eu_countries, data, by = "iso_a3_eh") %>%
-    filter(!is.na(value))
+  if (key == "iso_a3_eh") {
+    data <- data %>%
+      mutate(iso_a3_eh = substr(region_bld, nchar(region_bld)-2, nchar(region_bld)))
+
+    merged_data <- merge(eu_countries, data, by = "iso_a3_eh") %>%
+      filter(!is.na(value))
+  }
+
+  if (key == "name") {
+    merged_data <- merge(eu_countries, data, by = "name") %>%
+      filter(!is.na(value))
+  }
+
 
   merged_data <- st_crop(merged_data, xmin = -20, xmax = 45,
                                       ymin = 30, ymax = 73)
@@ -1339,7 +1347,8 @@ plot_map <- function(data,
       legend.title = element_text(size = plot_settings[["size_text"]]),
       legend.text = element_text(size = plot_settings[["size_text"]]),
       strip.background = element_blank(),
-      strip.text = element_text(size = 20, face = "bold")) +
+      strip.text = element_text(size = 20, face = "bold"),
+      plot.margin = unit(c(0.5, 0.5, 0.5, 0.5), "cm")) +  # Adjust the plot margins
     labs(title = figure_title) +
     guides(fill = guide_legend(title = legend_title))
 

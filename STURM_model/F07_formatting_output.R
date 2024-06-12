@@ -277,6 +277,13 @@ fun_format_output <- function(i,
                 energy_poverty_thresh,
                 cost_energy, income, stock_building)
 
+        agg_rows <- det_rows %>%
+            group_by_at(setdiff(names(det_rows), c("resolution", "value"))) %>%
+            summarize(value = sum(value)) %>%
+            ungroup() %>%
+            mutate(resolution = "all")
+        det_rows <- bind_rows(det_rows, agg_rows)
+        
         temp <- bind_rows(temp, det_rows)
 
         if (!is.null(new_det_i)) {
