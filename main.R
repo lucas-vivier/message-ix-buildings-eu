@@ -42,7 +42,6 @@ if (!is.null(args$cores)) {
 }
 
 file_scenarios <- "all_scenarios.csv"
-file_scenarios <- "scenarios_EU.csv"
 if (!is.null(args$scenarios_file)) {
   file_scenarios <- args$scenarios_file
 }
