@@ -12,7 +12,7 @@ barriers_rent,barriers_rent,activity
 barriers_mfh,barriers_mfh,activity
 learning_rate_heat,learning_inv_heat_EU,activity
 learning_rate_shell,learning_inv_ren_shell_EU,activity
-objectives_renovation,objectives_renovation_EU,policies
+objectives_renovation,objectives_renovation,policies
 pop,pop_clim_ssp2_hrv,basic
 hh_size,hh_size_EU,basic
 parameters_renovation,parameters_renovation,calibration

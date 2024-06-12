@@ -33,7 +33,7 @@ parser$add_argument("-a", "--all_scenarios", default = FALSE,
 args <- parser$parse_args()
 
 # Set num_cores based on the argument or use the default value
-parallel <- FALSE
+parallel <- TRUE
 num_cores <- detectCores() - 2
 if (!is.null(args$cores)) {
     num_cores <- args$cores
@@ -42,6 +42,7 @@ if (!is.null(args$cores)) {
 }
 
 file_scenarios <- "all_scenarios.csv"
+file_scenarios <- "scenarios_EU.csv"
 if (!is.null(args$scenarios_file)) {
   file_scenarios <- args$scenarios_file
 }
@@ -100,23 +101,23 @@ en_method <- "TABULA" # "VDD", "TABULA"
 energy_efficiency <- "endogenous"
 run <- "policies"
 
-runs <- c("EU",
-"EU_carbon_tax_low",
-"EU_carbon_tax",
-"EU_carbon_tax_social",
-"EU_carbon_tax_rebates",
-"EU_hp_subsidies",
-# "EU_hp_high_elasticity",
-"EU_hp_learning",
-"EU_barriers_heater",
-"EU_reno",
-"EU_deep_reno",
-"EU_barriers_renovation",
-"EU_realization_rate")
+# runs <- c("EU",
+# "EU_carbon_tax_low",
+# "EU_carbon_tax",
+# "EU_carbon_tax_social",
+# "EU_carbon_tax_rebates",
+# "EU_hp_subsidies",
+# # "EU_hp_high_elasticity",
+# "EU_hp_learning",
+# "EU_barriers_heater",
+# "EU_reno",
+# "EU_deep_reno",
+# "EU_barriers_renovation",
+# "EU_realization_rate")
 
 # runs <- c("EU", "EU_carbon_tax", "EU_carbon_tax_social")
 
-runs <- c("EU", "EU_carbon_tax")
+runs <- c("EU")
 
 if (args$all_scenarios) {
     runs <- "all"
@@ -124,12 +125,14 @@ if (args$all_scenarios) {
 
 # check if run is a vector or a string
 if (is.character(runs) && length(runs) == 1) {
-    runs <- read.csv2(paste0(path_in, file_scenarios), sep = ',')$scenario_name
-    # Create name_dir
-    name_dir <- paste0(Sys.Date(), "_", format(Sys.time(), "%H%M%S"), "/")
-    path_out <- paste0(path_out, name_dir)
-    if (!dir.exists(path_out)) {
-        dir.create(path_out)
+    if (runs == "all") {
+        runs <- read.csv2(paste0(path_in, file_scenarios), sep = ',')$scenario_name
+        # Create name_dir
+        name_dir <- paste0(Sys.Date(), "_", format(Sys.time(), "%H%M%S"), "/")
+        path_out <- paste0(path_out, name_dir)
+        if (!dir.exists(path_out)) {
+            dir.create(path_out)
+        }
     }
 }
 

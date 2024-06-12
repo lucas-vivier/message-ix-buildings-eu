@@ -17,7 +17,7 @@ print(paste("Working directory is:", getwd()))
 # first variable is reference scenario
 variables <- list(
   "carbon_tax" = as.character(c("", "EUETSII", "EUETS", "social")),
-  "_objective_renovation" = as.character(c("", "renovation_endogenous", "deep_renovation_endogenous")),
+  "_objective_renovation" = as.character(c("", "renovation", "deep_renovation")),
   "_sub_heat" = as.character(c("", "carbon")),
   "learning_rate_heat" = as.character(c("constant", "")),
   "_realization_rate_renovation" = as.character(c(0.5, 1)),

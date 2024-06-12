@@ -172,8 +172,6 @@ plot_stacked_areas <- function(data,
 
   # Create the stacked area plot
 
-  #print(unique(data[[subplot_column]]))
-
   if (all(unique(data[[subplot_column]]) %in% names(plot_settings[["rename"]]))) {
     data <- data %>%
       mutate(!!subplot_column := plot_settings[["rename"]][.data[[subplot_column]]])
@@ -1333,7 +1331,9 @@ plot_map <- function(data,
     scale_fill_viridis_c(
       limits = limits,
       oob = scales::squish,
-      na.value = "grey50")
+      na.value = "grey50",
+      direction = -1
+      )
 
   if (!is.null(subplot_column)) {
     p <- p +

@@ -9,7 +9,7 @@ print(paste("Working directory is:", getwd()))
 # Loding figures setttings and functions
 source("STURM_output/C00_plots.R")
 
-scenario <- "S1"
+scenario <- "EU"
 file <- paste0("report_agg_", scenario, ".csv")
 file <- paste("STURM_output/results", file, sep = "/")
 
@@ -23,7 +23,7 @@ if (!dir.exists(save_dir)) {
 }
 
 # Read output files
-data <- read.csv(file, row.names = NULL)
+data <- read.csv(file, row.names = NULL)[, -1]
 
 # Reconstuction flows
 flows <- c("cost_renovation_EUR", "n_renovation", "n_out",
@@ -420,6 +420,36 @@ plot_stacked_bars(my_data_reordered,
                   save_path = save_path)
 
 #--------------------------------------------------------------------------
+temp <- data %>%
+  filter(variable == "stock_building") %>%
+  filter(resolution %in% names(rename_eneff)) %>%
+  filter(year == 2050) %>%
+  group_by(region_bld) %>%
+  mutate(value = value / sum(value)) %>%
+  ungroup() %>%
+  mutate(region_bld = ifelse(region_bld %in% names(rename_countries_code), rename_countries_code[region_bld], region_bld))    # this reorders samples
+
+region_grouping <- temp %>%
+  filter(resolution %in% c("p1")) %>%
+  group_by_at(x_column) %>% 
+  summarise(order_by = sum(value)) %>%
+  ungroup()
+
+my_data_reordered <- temp %>%
+  left_join(region_grouping, by = "region_bld") %>% 
+  mutate(order_by = ifelse(is.na(order_by), 1, order_by)) %>%
+  mutate(region_bld = reorder(region_bld, -order_by))    # this reorders samples
+
+save_path <- paste(save_dir, paste0(scenario, "_share_eneff_stock_countries_2050.png"), sep = "/")
+
+plot_stacked_bars(my_data_reordered,
+                  fill_column = "resolution",
+                  x_column = "region_bld",
+                  y_column = "value",
+                  save_path = save_path)
+
+
+#--------------------------------------------------------------------------
 ### Breakdown stock units
 #--------------------------------------------------------------------------
 # By fuel types
@@ -459,21 +489,28 @@ temp <- bind_rows(t, temp)
 # Plot the share of fuels for the countries
 legend <- TRUE
 temp <- temp %>%
-  mutate(value = value / 1e6)
+  mutate(value = value / 1e6) %>%
+  # If for one region or year one fuel is missing, add it with a value of 0
+  complete(region_bld, year, resolution, fill = list(value = 0))
+
+test <- temp %>%
+  group_by(region_bld, year) %>%
+  summarise(value = sum(value)) %>%
+  ungroup() %>%
+  filter(region_bld == "EU")
 
 plot_stacked_areas(temp, "year", "value", "resolution", "region_bld",
                     y_label = "Stock housing units",
                     save_path = paste(save_dir, paste0(scenario, "_share_fuels_stock_countries.png"),
                     sep = "/"), vertical = 2015, percent = FALSE, , legend = legend,
                     y_label_suffix = "M")
-
+#--------------------------------------------------------------------------
 # Plot the share of fuels for the EU
 temp <- temp %>%
   filter(region_bld == "EU")
 
 presentation <- FALSE
 legend <- TRUE
-
 plot_stacked_areas(temp, "year", "value", "resolution", "region_bld",
                     y_label = "Stock housing units",
                     save_path = paste(save_dir, paste0(scenario, "_share_fuels_stock_eu.png"),

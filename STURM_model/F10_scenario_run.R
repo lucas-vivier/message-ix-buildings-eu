@@ -728,6 +728,8 @@ run_scenario <- function(run,
             parameters_std <- mutate(parameters_std, "constant" = NA)
             parameters_renovation <- bind_rows(parameters_std,
               parameters_adv)
+          } else {
+            print("Using endogenous subsidies renovation")
           }
           objectives_endogenous <- NULL
           if (grepl("endogenous", param$objective_renovation)) {
@@ -758,9 +760,11 @@ run_scenario <- function(run,
                 / sum(renovation_potential)) %>%
               select(-renovation_potential)
 
+          } else {
+            objectives_endogenous <- d$objectives_renovation
           }
 
-          if ("region_bld" %in% names(d$objectives_renovation) | !is.null(objectives_endogenous)) {
+          if ("region_bld" %in% names(objectives_endogenous)) {
             print("Objectives for renovation are set per country")
             for (region in unique(objectives_endogenous$region_bld)) {
               print(region)

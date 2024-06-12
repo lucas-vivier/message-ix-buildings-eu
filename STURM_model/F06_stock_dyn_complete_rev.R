@@ -480,6 +480,7 @@ fun_stock_switch_fuel_dyn <- function(bld_det_i,
   bld_det_i_sw <- bld_det_i_sw %>%
     select(-c("n_premature"))
 
+
   # Remove buildings that have replaced their heating system
   bld_det_i <- bld_det_i %>%
     left_join(bld_det_i_sw %>%
