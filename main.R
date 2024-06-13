@@ -120,7 +120,7 @@ run <- "policies"
 
 # runs <- c("EU", "EU_carbon_tax", "EU_carbon_tax_social")
 
-runs <- c("EU", "EU_reno_endo", "EU_reno", "EU_deep")
+runs <- c("EU_reno_endo")#, "EU", "EU_reno", "EU_deep")
 
 if (args$all_scenarios) {
     runs <- "all"

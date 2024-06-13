@@ -760,8 +760,8 @@ run_scenario <- function(run,
                 if ("region_bld" %in% names(d$objectives_renovation)) {
                   print("Aggregating renovation objectives before using new repartition")
                   d$objectives_renovation <- d$objectives_renovation %>%
-                    groupby_at("year") %>%
-                    summarize(objectives_renovation = sum(objectives_renovation))
+                    group_by_at("year") %>%
+                    summarize(objectives_renovation = sum(objectives_renovation)) %>%
                     ungroup()
                 }
 

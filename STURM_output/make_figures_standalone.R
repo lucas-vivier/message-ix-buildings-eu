@@ -9,7 +9,7 @@ print(paste("Working directory is:", getwd()))
 # Loding figures setttings and functions
 source("STURM_output/C00_plots.R")
 
-scenario <- "S383"
+scenario <- "EU"
 file <- paste0("report_agg_", scenario, ".csv")
 file <- paste("STURM_output/results", file, sep = "/")
 
@@ -487,7 +487,7 @@ plot_stacked_bars(my_data_reordered,
 
 # Read the historic stock data
 data_stock_historic <- read.csv(
-  "STURM_output/ressources/stock_historic_data_jrcidees.csv")
+  "STURM_output/ressources/stock_historic_data_jrcidees_2021.csv")
 
 data_stock_historic <- data_stock_historic %>%
   filter(region_bld %in% unique(data$region_bld)) %>%
@@ -533,6 +533,8 @@ plot_stacked_areas(temp, "year", "value", "resolution", "region_bld",
                     save_path = paste(save_dir, paste0(scenario, "_share_fuels_stock_countries.png"),
                     sep = "/"), vertical = 2015, percent = FALSE, , legend = legend,
                     y_label_suffix = "M")
+
+xx
 #--------------------------------------------------------------------------
 # Plot the share of fuels for the EU
 temp <- temp %>%

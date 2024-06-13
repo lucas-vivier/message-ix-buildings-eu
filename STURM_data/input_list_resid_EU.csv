@@ -15,7 +15,7 @@ learning_rate_shell,learning_inv_ren_shell_EU,activity
 objectives_renovation,objectives_renovation,policies
 pop,pop_clim_ssp2_hrv,basic
 hh_size,hh_size_EU,basic
-parameters_renovation,,calibration
+parameters_renovation,parameters_renovation,calibration
 parameters_heater,parameters_heater,calibration
 hdd,hdd_tabula,climate
 cost_invest_heat,cost_invest_heater_EU,decision
