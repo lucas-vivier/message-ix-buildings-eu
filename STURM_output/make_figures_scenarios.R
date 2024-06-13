@@ -10,16 +10,13 @@ print(paste("Working directory is:", getwd()))
 # Loading figures setttings and functions
 source("STURM_output/C00_plots.R")
 
-run <- "renovation"
+run <- "renovation_bis"
 
 scenarios <- c(
     "EU" = "Counterfactual",
-    "EU_reno" = "EU_reno",
-    "EU_deep_reno" = "EU_deep_reno",
+    "EU_reno" = "EU_reno_country",
     "EU_reno_endo" = "EU_reno_endo",
-    "EU_deep_reno_endo" = "EU_deep_reno_endo",
-    "EU_reno_country" = "EU_reno_country",
-    "EU_deep_reno_country" = "EU_deep_reno_country")
+    "EU_deep" = "EU_deep")
 
 
 # Generate distinct colors using RColorBrewer

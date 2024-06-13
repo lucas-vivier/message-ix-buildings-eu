@@ -715,108 +715,130 @@ run_scenario <- function(run,
       # Calculating renovation decisions
       if (energy_efficiency == "endogenous") {
         print("2.1 Calculation of renovation rate")
+        if (isTRUE(param$renovation_intensity == "deep_renovation") && i == 3) {
+          print("Removing barriers for deep renovation")
+          # Assigning constant value of "std" to "adv" parameters
+          parameters_std <- filter(parameters_renovation,
+            eneff_f == "std")
+          parameters_adv <- mutate(parameters_std, "eneff_f" = "adv")
+          parameters_std <- mutate(parameters_std, "constant" = NA)
+          parameters_renovation <- bind_rows(parameters_std,
+            parameters_adv)
+        } else {
+          # Do nothing
+          print("No changes in renovation barriers")
+        }
+
         # Calculating subsidies to meet objectives
         sub <- NULL
-        if (!is.null(param$objective_renovation) && i >= 3) {
-          print("Determining subsidies renovation to meet objectives")
-          if (grepl("deep", param$objective_renovation) && i == 3) {
-            print("Removing barriers for deep renovation")
-            # Assigning constant value of "std" to "adv" parameters
-            parameters_std <- filter(parameters_renovation,
-              eneff_f == "std")
-            parameters_adv <- mutate(parameters_std, "eneff_f" = "adv")
-            parameters_std <- mutate(parameters_std, "constant" = NA)
-            parameters_renovation <- bind_rows(parameters_std,
-              parameters_adv)
-          } else {
-            print("Using endogenous subsidies renovation")
-          }
+        if (!is.null(param$objective_renovation)) {
+          print("Endogenous subsidies renovation")
           objectives_endogenous <- NULL
-          if (grepl("endogenous", param$objective_renovation)) {
-              # Calculating renovation potential
-              renovation_potential <- bld_det_i %>%
-                mutate(year = yrs[i]) %>%
-                filter(bld_age %in% c("p1", "p2", "p3")) %>%
-                filter(eneff == "avg") %>%
-                left_join(en_hh_tot) %>%
-                left_join(d$objectives_renovation) %>%
-                # Only buildings with energy consumption > 80 kWh/m2
-                filter(en_pe_hh_std > 80) %>%
-                # Sort by energy consumption higher consumption first
-                arrange(desc(en_hh)) %>%
-                # Cumulated number of dwellings
-                mutate(n_units_fuel_exst_cum = cumsum(n_units_fuel_exst)) %>%
-                # Filter to the number of renovation objectives_renovation
-                filter(n_units_fuel_exst_cum <= objectives_renovation) %>%
-                group_by_at(c("region_bld", "year")) %>%
-                summarize(renovation_potential = sum(n_units_fuel_exst)) %>%
-                ungroup()
+          if (!is.null(param$repartition_renovation) && i >= 3) {
+            print("Determining repartition of renovation objectives by region")
+            if (param$repartition_renovation == "potential_based") {
+                # Calculating renovation potential
+                renovation_potential <- bld_det_i %>%
+                  mutate(year = yrs[i]) %>%
+                  filter(bld_age %in% c("p1", "p2", "p3")) %>%
+                  filter(eneff == "avg") %>%
+                  left_join(en_hh_tot) %>%
+                  left_join(d$objectives_renovation) %>%
+                  # Only buildings with energy consumption > 80 kWh/m2
+                  filter(en_pe_hh_std > 80) %>%
+                  # Sort by energy consumption higher consumption first
+                  arrange(desc(en_hh)) %>%
+                  # Cumulated number of dwellings
+                  mutate(n_units_fuel_exst_cum = cumsum(n_units_fuel_exst)) %>%
+                  # Filter to the number of renovation objectives_renovation
+                  filter(n_units_fuel_exst_cum <= objectives_renovation) %>%
+                  group_by_at(c("region_bld", "year")) %>%
+                  summarize(renovation_potential = sum(n_units_fuel_exst)) %>%
+                  ungroup()
 
 
-            objectives_endogenous <- d$objectives_renovation %>%
-              left_join(renovation_potential) %>%
-              filter(year == yrs[i]) %>%
-              mutate(objectives_renovation = objectives_renovation * renovation_potential
-                / sum(renovation_potential)) %>%
-              select(-renovation_potential)
+                if ("region_bld" %in% names(d$objectives_renovation)) {
+                  print("Aggregating renovation objectives before using new repartition")
+                  d$objectives_renovation <- d$objectives_renovation %>%
+                    groupby_at("year") %>%
+                    summarize(objectives_renovation = sum(objectives_renovation))
+                    ungroup()
+                }
 
-          } else {
+                objectives_endogenous <- d$objectives_renovation %>%
+                  left_join(renovation_potential) %>%
+                  filter(year == yrs[i]) %>%
+                  mutate(objectives_renovation = objectives_renovation * renovation_potential
+                    / sum(renovation_potential)) %>%
+                  select(-renovation_potential)
+
+            } else {
+              print("Repartion is not implemented")
+            }
+          }
+          if (is.null(objectives_endogenous)) {
             objectives_endogenous <- d$objectives_renovation
           }
 
-          if ("region_bld" %in% names(objectives_endogenous)) {
-            print("Objectives for renovation are set per country")
-            for (region in unique(objectives_endogenous$region_bld)) {
-              print(region)
-              bld_det_i_region <- filter(bld_det_i, region_bld == region)
+          if (yrs[[i]] %in% unique(objectives_endogenous$year)) {
 
+            if ("region_bld" %in% names(objectives_endogenous)) {
+              print("Objectives for renovation are set per country")
+              for (region in unique(objectives_endogenous$region_bld)) {
+                print(region)
+                bld_det_i_region <- filter(bld_det_i, region_bld == region)
+
+                temp <- fun_subsidies_renovation(i,
+                            yrs,
+                            stp,
+                            param$objective_renovation,
+                            param$budget_constraint_insulation,
+                            carbon_revenue,
+                            param$subsidies_renovation_type,
+                            d$subsidies_renovation_target,
+                            d,
+                            cat,
+                            param,
+                            bld_det_i_region,
+                            en_hh_tot,
+                            parameters_renovation,
+                            emission_factors,
+                            param$anticipate_renovation,
+                            region = region,
+                            objectives_endogenous = objectives_endogenous)
+
+                sub_region <- temp$sub %>%
+                  mutate(region_bld = region)
+                sub <- bind_rows(sub, sub_region)
+                sub_report_region <- temp$sub_report %>%
+                  mutate(region_bld = region)
+                sub_report <- bind_rows(sub_report, sub_report_region)
+              }
+            } else {
+              print("Objectives for renovation are set for all EU and based on subsidies")
               temp <- fun_subsidies_renovation(i,
-                          yrs,
-                          stp,
-                          param$objective_renovation,
-                          param$budget_constraint_insulation,
-                          carbon_revenue,
-                          param$subsidies_renovation_type,
-                          d$subsidies_renovation_target,
-                          d,
-                          cat,
-                          param,
-                          bld_det_i_region,
-                          en_hh_tot,
-                          parameters_renovation,
-                          emission_factors,
-                          param$anticipate_renovation,
-                          region = region,
-                          objectives_endogenous = objectives_endogenous)
-
-              sub_region <- temp$sub %>%
-                mutate(region_bld = region)
-              sub <- bind_rows(sub, sub_region)
-              sub_report_region <- temp$sub_report %>%
-                mutate(region_bld = region)
-              sub_report <- bind_rows(sub_report, sub_report_region)
+                            yrs,
+                            stp,
+                            param$objective_renovation,
+                            param$budget_constraint_insulation,
+                            carbon_revenue,
+                            param$subsidies_renovation_type,
+                            d$subsidies_renovation_target,
+                            d,
+                            cat,
+                            param,
+                            bld_det_i,
+                            en_hh_tot,
+                            parameters_renovation,
+                            emission_factors,
+                            param$anticipate_renovation,
+                            region = NULL,
+                            objectives_endogenous = objectives_endogenous)
+              sub <- temp$sub
+              sub_report <- bind_rows(sub_report, temp$sub_report)
             }
           } else {
-            print("Objectives for renovation are set for all EU")
-            temp <- fun_subsidies_renovation(i,
-                          yrs,
-                          stp,
-                          param$objective_renovation,
-                          param$budget_constraint_insulation,
-                          carbon_revenue,
-                          param$subsidies_renovation_type,
-                          d$subsidies_renovation_target,
-                          d,
-                          cat,
-                          param,
-                          bld_det_i,
-                          en_hh_tot,
-                          parameters_renovation,
-                          emission_factors,
-                          param$anticipate_renovation,
-                          region = NULL)
-            sub <- temp$sub
-            sub_report <- bind_rows(sub_report, temp$sub_report)
+            print(paste("No objectives for renovation in year", yrs[i]))
           }
         } else {
           print("Using exogenous subsidies renovation")

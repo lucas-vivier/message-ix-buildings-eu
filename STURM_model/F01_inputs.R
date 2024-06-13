@@ -156,6 +156,27 @@ read_parameters <- function(scen_param, param) {
     param$objective_renovation <- objective_renovation
   }
 
+  if ("_success_renovation" %in% scen_param$name_parameter) {
+    success_renovation <- scen_param %>%
+      filter(name_parameter == "_success_renovation") %>%
+      pull(scenario)
+    param$success_renovation <- success_renovation
+  }
+
+  if ("_repartition_renovation" %in% scen_param$name_parameter) {
+    repartition_renovation <- scen_param %>%
+      filter(name_parameter == "_repartition_renovation") %>%
+      pull(scenario)
+    param$repartition_renovation <- repartition_renovation
+  }
+
+  if ("_renovation_intensity" %in% scen_param$name_parameter) {
+    renovation_intensity <- scen_param %>%
+      filter(name_parameter == "_renovation_intensity") %>%
+      pull(scenario)
+    param$renovation_intensity <- renovation_intensity
+  }
+
   if ("_objective_heat_pump" %in% scen_param$name_parameter) {
     objective_heat_pump <- scen_param %>%
       filter(name_parameter == "_objective_heat_pump") %>%

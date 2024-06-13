@@ -96,6 +96,8 @@ fun_utility_ren_shell <- function(yrs,
   social_discount_factor <-
     (1 - (1 + social_discount_rate)^-30) / social_discount_rate
 
+  # write.csv(filter(utility_ren_hh, region_bld == "C-WEU-FRA"), "test.csv")
+
   utility_ren_hh <- bld_cases_fuel %>%
       left_join(ct_ren_eneff %>%
           rename(eneff = eneff_i),
@@ -268,6 +270,7 @@ fun_ms_ren_shell_endogenous <- function(yrs,
                 c("eneff_f", "utility_ren",
                 "cost_invest_hh", "sub_ren_hh"))) %>%
     mutate(utility_exp_sum = sum(exp(utility_ren)) + 1) %>%
+    # Max is (1 / stp) to not exceed 100% market share in a period of stp years
     mutate(ms = (1 / stp) * exp(utility_ren) / utility_exp_sum) %>%
     select(-c("utility_ren", "utility_exp_sum"))
 

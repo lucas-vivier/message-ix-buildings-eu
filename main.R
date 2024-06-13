@@ -42,6 +42,7 @@ if (!is.null(args$cores)) {
 }
 
 file_scenarios <- "all_scenarios.csv"
+file_scenarios <- "scenarios_EU.csv"
 if (!is.null(args$scenarios_file)) {
   file_scenarios <- args$scenarios_file
 }
@@ -51,7 +52,7 @@ rnd <- 5 # rounding (number of decimals)
 u_EJ_GWa <- 31.71
 min_shr_fuel <- 0.01
 
-param <- list(subsidies_renovation_type = "per_kWh",
+param <- list(subsidies_renovation_type = "ad_valorem",
             objective_renovation = NULL,
             objective_heat_pump = NULL,
             budget_constraint_insulation = NULL,
@@ -66,10 +67,13 @@ param <- list(subsidies_renovation_type = "per_kWh",
             social_discount_rate = 0.03,
             heat_pump_floor_cost = TRUE,
             short_term_price_elasticity = -0.2,
-            credit_constraint = 0.05,
+            credit_constraint = 0.2,
             duration_remboursment = 10,
             nzeb = FALSE,
             realization_rate_renovation = 1,
+            renovation_intensity = NULL,
+            success_renovation = 1,
+            repartition_renovation = NULL,
             elasticity_renovation = -1,
             elasticity_heat_pump = -1,
             remove_barriers_renovation = FALSE,
@@ -116,7 +120,7 @@ run <- "policies"
 
 # runs <- c("EU", "EU_carbon_tax", "EU_carbon_tax_social")
 
-runs <- c("EU")
+runs <- c("EU", "EU_reno_endo", "EU_reno", "EU_deep")
 
 if (args$all_scenarios) {
     runs <- "all"

@@ -288,6 +288,8 @@ fun_en_sim <- function(sector,
         price_en_wt)) %>%
       left_join(bld_cases_fuel)
   }
+  # print(head(filter(en_hh, region_bld == "C-WEU-FRA")))
+  # print(filter(price_en, region_bld == "C-WEU-FRA"))
 
   # Calculating household energy cost (residential only)
   if (!is.null(path_out)) {

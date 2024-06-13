@@ -98,15 +98,11 @@ fun_subsidies_renovation <- function(i,
       }
     }
   } else if (grepl("renovation", objective_renovation)) {
-    if (grepl("endogenous", objective_renovation)) {
-      objective <- filter(objectives_endogenous, region_bld == region)
-    } else {
       if (!is.null(region)) {
-        objective <- filter(d$objectives_renovation, region_bld == region)
+        objective <- filter(objectives_endogenous, region_bld == region)
       } else {
-        objective <- d$objectives_renovation
+        objective <- objectives_endogenous
       }
-    }
     objective <- filter(objective,
       year == yrs[i]) %>% pull(objectives_renovation)
     
