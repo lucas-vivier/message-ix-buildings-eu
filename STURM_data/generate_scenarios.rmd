@@ -19,10 +19,11 @@ variables <- list(
   "carbon_tax" = as.character(c("", "EUETS", "social")), # "EUETSII", 
   "_objective_renovation" = as.character(c("", "renovation", "deep_renovation")),
   "_sub_heat" = as.character(c("", "carbon")),
+  "_success_objective_renovation" = as.character(c(0.5, 1)),
   "learning_rate_heat" = as.character(c("constant", "")),
-  "_realization_rate_renovation" = as.character(c(0.5, 1)),
-  "_remove_barriers_renovation" = as.character(c(FALSE, TRUE)),
-  "_remove_barriers_heater" = as.character(c(FALSE, TRUE))
+  "_realization_rate_renovation" = as.character(c(0.75, 1))
+  #"_remove_barriers_renovation" = as.character(c(FALSE, TRUE)),
+  #"_remove_barriers_heater" = as.character(c(FALSE, TRUE))
 )
 
 ```
@@ -46,6 +47,11 @@ combinations <- combinations %>%
     all(across(everything(), ~ . == all_policies_values[cur_column()])) ~ "All policies",
     TRUE ~ paste0("S", scenario_id)
   ))
+
+
+# Remove impossible combination
+combinations <- combinations %>%
+  filter(!(`_success_objective_renovation` == "0.5" & `_objective_renovation` == ""))
 
 # Reorder columns to have scenario_id and scenario_name first
 combinations <- combinations %>%

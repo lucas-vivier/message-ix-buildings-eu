@@ -1174,76 +1174,6 @@ output_table <- function(data,
   return(format_temp)
 }
 
-
-calculate_cost_hh <- function(df, discount = 0.05, lifetime_loan = 10,
-  lifetime_renovation = 30, lifetime_heater = 20, stp = 5) {
-
-  var <- c("to_pay_renovation", "to_pay_heater", "cost_energy", "stock_building")
-
-  temp <- df %>%
-    filter(variable %in% var)
-
-  wide_data <- pivot_wider(
-    temp,
-    id_cols = c("region_bld", "year", "scenario", "resolution"),
-    names_from = variable,
-    values_from = value
-    )
-
-  wide_data <- wide_data %>%
-    mutate(
-      to_pay_renovation = ifelse(is.na(to_pay_renovation), 0, to_pay_renovation),
-      to_pay_heater = ifelse(is.na(to_pay_heater), 0, to_pay_heater),
-      cost_energy = ifelse(is.na(cost_energy), 0, cost_energy),
-      to_pay_renovation = to_pay_renovation *
-        discount / (1 - (1 + discount)^(-lifetime_loan)),
-      to_pay_heater = to_pay_heater *
-        discount / (1 - (1 + discount)^(-lifetime_loan))
-          )
-
-  wide_data <- wide_data %>%
-    rowwise() %>%
-    mutate(to_pay_renovation_cumsum =
-      sum(wide_data$to_pay_renovation[wide_data$region_bld == region_bld &
-          wide_data$scenario == scenario &
-          wide_data$resolution == resolution &
-          wide_data$year <= year &
-          wide_data$year >= (year - lifetime_loan)], na.rm = TRUE)) %>%
-    mutate(to_pay_heater_cumsum =
-      sum(wide_data$to_pay_heater[wide_data$region_bld == region_bld &
-          wide_data$scenario == scenario &
-          wide_data$resolution == resolution &
-          wide_data$year <= year &
-          wide_data$year > (year - lifetime_loan)], na.rm = TRUE)) %>%
-    ungroup() %>%
-    filter(!is.na(stock_building)) %>%
-    mutate(total_cost_hh =
-      to_pay_renovation_cumsum + to_pay_heater_cumsum +
-      cost_energy,
-      to_pay_renovation_cumsum = to_pay_renovation_cumsum / stock_building,
-      to_pay_heater_cumsum = to_pay_heater_cumsum / stock_building,
-      cost_energy = cost_energy / stock_building,
-      total_cost_hh = total_cost_hh / stock_building)
-
-  long_data <- wide_data %>%
-    select(c("region_bld", "year", "scenario", "resolution",
-      "to_pay_renovation_cumsum", "to_pay_heater_cumsum", "cost_energy", "total_cost_hh")) %>%
-    pivot_longer(
-      cols = c("to_pay_renovation_cumsum", "to_pay_heater_cumsum",
-        "cost_energy", "total_cost_hh"),
-      names_to = "variable",
-      values_to = "value"
-    )
-
-  long_data  <- long_data %>%
-    group_by(region_bld, scenario, resolution, variable) %>%
-    summarize(value = mean(value, na.rm = TRUE)) %>%
-    ungroup()
-
-  return(long_data)
-}
-
-
 make_cost_hh_figures <- function(data, ref, save_path, x_column = "scenario",
   subplot_column = "resolution", angle_x_label = NULL) {
 
@@ -1463,4 +1393,332 @@ sobol_figures <- function(df, list_features, y, rename_feature, save_path) {
           height = plot_settings[["height"]],
           dpi = plot_settings[["dpi"]])
 
+}
+
+
+calculate_cost_hh <- function(df, discount = 0.05, lifetime_loan = 10,
+  lifetime_renovation = 30, lifetime_heater = 20, stp = 5) {
+
+  var <- c("to_pay_renovation", "to_pay_heater", "cost_energy", "stock_building")
+
+  temp <- df %>%
+    filter(variable %in% var)
+
+  wide_data <- pivot_wider(
+    temp,
+    id_cols = c("region_bld", "year", "scenario", "resolution"),
+    names_from = variable,
+    values_from = value
+    )
+
+  wide_data <- wide_data %>%
+    mutate(
+      to_pay_renovation = ifelse(is.na(to_pay_renovation), 0, to_pay_renovation),
+      to_pay_heater = ifelse(is.na(to_pay_heater), 0, to_pay_heater),
+      cost_energy = ifelse(is.na(cost_energy), 0, cost_energy),
+      to_pay_renovation = to_pay_renovation *
+        discount / (1 - (1 + discount)^(-lifetime_loan)),
+      to_pay_heater = to_pay_heater *
+        discount / (1 - (1 + discount)^(-lifetime_loan))
+          )
+
+  wide_data <- wide_data %>%
+    rowwise() %>%
+    mutate(to_pay_renovation_cumsum =
+      sum(wide_data$to_pay_renovation[wide_data$region_bld == region_bld &
+          wide_data$scenario == scenario &
+          wide_data$resolution == resolution &
+          wide_data$year <= year &
+          wide_data$year >= (year - lifetime_loan)], na.rm = TRUE)) %>%
+    mutate(to_pay_heater_cumsum =
+      sum(wide_data$to_pay_heater[wide_data$region_bld == region_bld &
+          wide_data$scenario == scenario &
+          wide_data$resolution == resolution &
+          wide_data$year <= year &
+          wide_data$year > (year - lifetime_loan)], na.rm = TRUE)) %>%
+    ungroup() %>%
+    filter(!is.na(stock_building)) %>%
+    mutate(total_cost_hh =
+      to_pay_renovation_cumsum + to_pay_heater_cumsum +
+      cost_energy,
+      to_pay_renovation_cumsum = to_pay_renovation_cumsum / stock_building,
+      to_pay_heater_cumsum = to_pay_heater_cumsum / stock_building,
+      cost_energy = cost_energy / stock_building,
+      total_cost_hh = total_cost_hh / stock_building)
+
+  long_data <- wide_data %>%
+    select(c("region_bld", "year", "scenario", "resolution",
+      "to_pay_renovation_cumsum", "to_pay_heater_cumsum", "cost_energy", "total_cost_hh")) %>%
+    pivot_longer(
+      cols = c("to_pay_renovation_cumsum", "to_pay_heater_cumsum",
+        "cost_energy", "total_cost_hh"),
+      names_to = "variable",
+      values_to = "value"
+    )
+
+  long_data  <- long_data %>%
+    group_by(region_bld, scenario, resolution, variable) %>%
+    summarize(value = mean(value, na.rm = TRUE)) %>%
+    ungroup()
+
+  return(long_data)
+}
+
+make_cost_benefits <- function(data, ref, save_dir, nb_years = 30, figures = TRUE) {
+
+  data_raw <- data
+
+
+  data <- filter(data,
+      resolution == "all",
+      variable %in% c("cost_renovation_EUR", "cost_heater_EUR",
+        "cost_heat_EUR", "heat_tCO2", "thermal_comfort_EUR")) %>%
+      filter(year > 2015) %>%
+      select(-resolution)
+
+  wide_data <- pivot_wider(data,
+                          id_cols = c("region_bld", "year", "scenario"),
+                          names_from = variable,
+                          values_from = value)
+
+  wide_data <- wide_data %>%
+    left_join(social_cost_carbon, by = "year") %>%
+    mutate(
+      cost_renovation_EUR =
+        ifelse(is.na(cost_renovation_EUR), 0, cost_renovation_EUR),
+      cost_heater_EUR =
+        ifelse(is.na(cost_heater_EUR), 0, cost_heater_EUR),
+      annuities_renovation =
+        social_discount / (1 - (1 + social_discount)^(-lifetime_renovation)),
+      annuities_heater =
+        social_discount / (1 - (1 + social_discount)^(-lifetime_heater)),
+      cost_renovation_EUR_year = cost_renovation_EUR * annuities_renovation * stp,
+      cost_heater_EUR_year = cost_heater_EUR * annuities_heater * stp,
+      cost_emission_EUR = heat_tCO2 * social_cost_carbon * stp,
+      cost_heat_EUR = cost_heat_EUR * stp,
+      thermal_comfort_EUR = - thermal_comfort_EUR * stp
+      )
+
+  wide_data <- wide_data %>%
+    rowwise() %>%
+    mutate(cost_renovation_EUR_cumsum =
+      sum(wide_data$cost_renovation_EUR_year[wide_data$region_bld == region_bld &
+          wide_data$scenario == scenario &
+          wide_data$year <= year &
+          wide_data$year >= (year - lifetime_renovation)], na.rm = TRUE)) %>%
+    mutate(cost_heater_EUR_cumsum =
+      sum(wide_data$cost_heater_EUR_year[wide_data$region_bld == region_bld &
+          wide_data$scenario == scenario &
+          wide_data$year <= year &
+          wide_data$year > (year - lifetime_heater)], na.rm = TRUE)) %>%
+    ungroup()
+
+  wide_data <- wide_data %>%
+    mutate(running_cost = cost_renovation_EUR_cumsum + cost_heater_EUR_cumsum +
+      cost_heat_EUR + cost_emission_EUR + thermal_comfort_EUR) %>%
+    mutate(running_cost_private = running_cost - cost_emission_EUR)
+
+  # write.csv(filter(wide_data, region_bld == "EU"), paste0(save_dir, "/cba_calculation_eu.csv"))
+
+  long_data <- wide_data %>%
+    select("region_bld", "year", "scenario", "cost_renovation_EUR_cumsum",
+      "cost_heater_EUR_cumsum", "cost_heater_EUR_cumsum",
+      "cost_heat_EUR", "cost_emission_EUR", "thermal_comfort_EUR", "running_cost",
+      "running_cost_private") %>%
+    pivot_longer(cols = c("cost_renovation_EUR_cumsum",
+      "cost_heater_EUR_cumsum", "cost_heater_EUR_cumsum",
+      "cost_heat_EUR", "cost_emission_EUR", "thermal_comfort_EUR", "running_cost",
+      "running_cost_private"),
+                names_to = "variable",
+                values_to = "value")
+
+  data_ref <- long_data %>%
+    filter(scenario == ref) %>%
+    rename(value_ref = value) %>%
+    select(-scenario)
+
+  diff <- long_data %>%
+    filter(scenario != ref) %>%
+    left_join(data_ref,
+      by = c("region_bld", "year", "variable")) %>%
+    mutate(diff = (value - value_ref)) %>%
+    select(-c(value, value_ref)) %>%
+    rename(value = diff)
+
+  wide_data_diff <- pivot_wider(diff,
+                          id_cols = c("region_bld", "year", "scenario"),
+                          names_from = variable,
+                          values_from = value) %>%
+                    mutate(discount_factor = 1 / ((1 + social_discount)^(year - 2015)))
+
+  # households
+  pop <- data_raw %>%
+    filter(variable == "stock_building", resolution == "all") %>%
+    pivot_wider(id_cols = c("region_bld", "year", "scenario"),
+                names_from = variable,
+                values_from = value) %>%
+    mutate(discount_factor = 1 / ((1 + social_discount)^(year - 2015))) %>%
+    filter(year >= 2020) %>%
+    group_by(scenario, region_bld) %>%
+    summarize(
+      stock_building_avg = sum(stock_building * discount_factor) / sum(discount_factor)
+    ) %>%
+    ungroup()
+
+  
+
+  # summary
+  summary <- wide_data_diff %>%
+    group_by(scenario, region_bld) %>%
+    summarize(
+      cost_renovation_sum = sum(cost_renovation_EUR_cumsum * discount_factor),
+      cost_heater_sum = sum(cost_heater_EUR_cumsum * discount_factor),
+      cost_heat_sum = sum(cost_heat_EUR * discount_factor),
+      cost_emission_sum = sum(cost_emission_EUR * discount_factor),
+      thermal_comfort_sum = sum(thermal_comfort_EUR * discount_factor),
+      running_cost = sum(running_cost * discount_factor),
+      running_cost_private = sum(running_cost_private * discount_factor)
+    ) %>%
+    ungroup() %>%
+    left_join(pop) %>%
+    mutate(
+      cost_renovation_sum = cost_renovation_sum / (stock_building_avg * nb_years),
+      cost_heater_sum = cost_heater_sum/ (stock_building_avg * nb_years),
+      cost_heat_sum = cost_heat_sum / (stock_building_avg * nb_years),
+      cost_emission_sum = cost_emission_sum / (stock_building_avg * nb_years),
+      thermal_comfort_sum = thermal_comfort_sum / (stock_building_avg * nb_years),
+      running_cost = running_cost / (stock_building_avg * nb_years),
+      running_cost_private = running_cost_private / (stock_building_avg * nb_years)
+    ) %>%
+    select(-stock_building_avg)
+
+
+  # Make table recap
+  list_variables <- c(
+    "Space heating consumption (TWh)",
+    "Space heating consumption electricity (TWh)",
+    "Emission (MtCO2)",
+    "Emission cumulated (GtCO2)",
+    "Total cost (Billion EUR)",
+    "Government expenditures (Billion EUR)",
+    "Emission saving (%)",
+    "Consumption saving (%)",
+    "Consumption electricity variation (%)"
+    )
+
+  file <- paste0(save_dir, "/", run, "_2050_summary_eu.csv")
+  if (file.exists(file)) {
+    # read file column as character
+
+    summary_2050 <- read.csv(file, check.names = FALSE) %>%
+      select(all_of(c("scenario_name", list_variables))) %>%
+      pivot_longer(cols = list_variables, names_to = "variable", values_to = "value") %>%
+      pivot_wider(names_from = scenario_name, values_from = value) %>%
+      # select only rows who variables are in list_variables
+      # remove column "Initial"
+      select(-Initial) %>%
+      mutate(across(-c(variable, all_of(ref)), ~ . - .data[[ref]])) %>%
+      select(variable, all_of(ref), everything())
+
+
+    # Calculate difference of each column with the column "Current policies"
+
+    rename_list <- c(
+      cost_renovation_sum = "Delta cost renovation (euro/hh/year)",
+      cost_heater_sum = "Delta cost heating system (euro/hh/year)",
+      cost_heat_sum = "Delta cost fuel (euro/hh/year)",
+      thermal_comfort_sum = "Delta cost thermal comfort (euro/hh/year)",
+      running_cost_private = "Delta total cost private (euro/hh/year)",
+      cost_emission_sum = "Delta cost emission (euro/hh/year)",
+      running_cost = "Delta total cost (euro/hh/year)"
+    )
+
+
+    temp <- summary %>%
+      filter(region_bld == "EU") %>%
+      select(-region_bld) %>%
+      gather(variable, value, cost_renovation_sum, cost_heater_sum, cost_heat_sum,
+      , thermal_comfort_sum, running_cost_private, cost_emission_sum, running_cost) %>%
+      mutate(variable = rename_list[.data[["variable"]]]) %>%
+      # put scneario in column
+      pivot_wider(names_from = scenario, values_from = value)
+
+    
+    results <- bind_rows(summary_2050, temp) %>%
+        select(variable, all_of(ref), everything()) %>%
+        # if na put nothing
+        mutate(across(-variable, ~ ifelse(is.na(.), "", formatC(., format = "f", digits = 2)))) 
+
+    if (!is.null(names_scenarios)) {
+
+      results <- results %>%
+        pivot_longer(-variable, names_to = "scenario_name", values_to = "value") %>%
+        pivot_wider(names_from = variable, values_from = value) %>%
+        left_join(names_scenarios, by = "scenario_name") %>%
+        # put names_scenarios columns first
+        select(colnames(names_scenarios), everything())
+    }
+
+    write.csv(results, paste0(save_dir, "/results.csv"), row.names = FALSE)
+  }
+  rename_list <- c(
+    cost_renovation_sum = "Cost renovation",
+    cost_heater_sum = "Cost heating system",
+    cost_heat_sum = "Cost fuel",
+    thermal_comfort_sum = "Cost thermal comfort",
+    running_cost_private = "Total cost private",
+    cost_emission_sum = "Cost emission",
+    running_cost = "Total cost"
+  )
+
+  color_list <- c(
+    "Cost renovation" = "#ee6a6b",
+    "Cost heating system" = "#62c5c0",
+    "Cost fuel" = "#00589d",
+    "Cost emission" = "#fdbb40",
+    "Cost thermal comfort" = "lightblue"
+  )
+
+  df <- summary %>%
+    gather(variable, value, cost_renovation_sum, cost_heater_sum, cost_heat_sum,
+      cost_emission_sum, thermal_comfort_sum, running_cost, running_cost_private) %>%
+    mutate(variable = rename_list[.data[["variable"]]]) %>%
+    filter(scenario != ref)
+    # mutate(scenario = scenarios[.data[["scenario"]]]) %>%
+
+  total <- df %>%
+    filter(variable == "Total cost") %>%
+    rename(total_value = value) %>%
+    select(-variable)
+
+  total_private <- df %>%
+    filter(variable == "Total cost private") %>%
+    rename(total_value_private = value) %>%
+    select(-variable)
+
+  df <- df %>%
+    filter(variable != "Total cost", variable != "Total cost private")
+
+  df <- df %>%
+    left_join(total, by = c("scenario", "region_bld")) %>%
+    left_join(total_private, by = c("scenario", "region_bld"))
+
+  presentation <- FALSE
+  legend <- TRUE
+
+  if (figures) {
+    stacked_plots(df, subplot_column = "region_bld",
+      save_path = paste0(save_dir, "/cba_countries.png"),
+      color_list = color_list)
+
+    stacked_plots(filter(df, region_bld == "EU"),
+      save_path = paste0(save_dir, "/cba_eu.png"),
+      color_list = color_list, y_label_suffix = "EUR/(year.hh)",
+      presentation = presentation, legend = legend)
+
+    stacked_plots(filter(df, region_bld == "EU"),
+      save_path = paste0(save_dir, "/cba_eu_horizontal.png"),
+      color_list = color_list, y_label_suffix = "EUR/(year.hh)",
+      presentation = presentation, legend = legend, horizontal = TRUE)
+  }
 }
