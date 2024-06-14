@@ -46,6 +46,7 @@ file_scenarios <- "scenarios_EU.csv"
 if (!is.null(args$scenarios_file)) {
   file_scenarios <- args$scenarios_file
 }
+print(paste("Scenarios file:", file_scenarios))
 
 # Parameters
 rnd <- 5 # rounding (number of decimals)
