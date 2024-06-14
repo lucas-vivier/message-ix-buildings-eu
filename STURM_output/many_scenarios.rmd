@@ -16,22 +16,23 @@ print(paste("Working directory is:", getwd()))
 # Loding figures setttings and functions
 source("STURM_output/C00_plots.R")
 
-dir <- "simulation"
+dir <- "simulation_14062024"
+ref <- "S19"
 save_dir <- paste("STURM_output", "figures", dir, sep = "/")
 file <- paste(save_dir, "results.csv", sep = "/")
 data <- read.csv(file,  check.names = FALSE, stringsAsFactors = FALSE, header = TRUE, row.names = NULL)
 data <- data[, -1]
 
-emission_saving_counterfactual <- filter(data, scenario_name == "S1")$`Emission saving (%)`[1]
-energy_saving_counterfactual <- filter(data, scenario_name == "S1")$`Consumption saving (%)`[1]
-electricity_variation_counterfactual <- filter(data, scenario_name == "S1")$`Consumption electricity variation (%)`[1]
+emission_saving_counterfactual <- filter(data, scenario_name == ref)$`Emission saving (%)`[1]
+energy_saving_counterfactual <- filter(data, scenario_name == ref)$`Consumption saving (%)`[1]
+electricity_variation_counterfactual <- filter(data, scenario_name == ref)$`Consumption electricity variation (%)`[1]
 
 data <- data %>%
     mutate(color = "darkgrey") %>%
     mutate(size = 1) %>%
-    mutate(`Emission saving (%)` = ifelse(scenario_name != "S1", `Emission saving (%)` + emission_saving_counterfactual, `Emission saving (%)`)) %>%
-    mutate(`Consumption saving (%)` = ifelse(scenario_name != "S1", `Consumption saving (%)` + energy_saving_counterfactual, `Consumption saving (%)`)) %>%
-    mutate(`Consumption electricity variation (%)` = ifelse(scenario_name != "S1", `Consumption electricity variation (%)` + electricity_variation_counterfactual, `Consumption electricity variation (%)`))
+    mutate(`Emission saving (%)` = ifelse(scenario_name != ref, `Emission saving (%)` + emission_saving_counterfactual, `Emission saving (%)`)) %>%
+    mutate(`Consumption saving (%)` = ifelse(scenario_name != ref, `Consumption saving (%)` + energy_saving_counterfactual, `Consumption saving (%)`)) %>%
+    mutate(`Consumption electricity variation (%)` = ifelse(scenario_name != ref, `Consumption electricity variation (%)` + electricity_variation_counterfactual, `Consumption electricity variation (%)`))
 
 target_emission_saving <- 0.85
 target_electricity_heating <- 1

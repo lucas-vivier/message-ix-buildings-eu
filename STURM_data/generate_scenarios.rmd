@@ -19,7 +19,7 @@ variables <- list(
   "carbon_tax" = as.character(c("", "EUETS", "social")), # "EUETSII", 
   "_objective_renovation" = as.character(c("", "renovation", "deep_renovation")),
   "_sub_heat" = as.character(c("", "carbon")),
-  "_success_objective_renovation" = as.character(c(0.5, 1)),
+  "_success_objective_renovation" = as.character(c("", 0.5)),
   "learning_rate_heat" = as.character(c("constant", "")),
   "_realization_rate_renovation" = as.character(c(0.75, 1))
   #"_remove_barriers_renovation" = as.character(c(FALSE, TRUE)),

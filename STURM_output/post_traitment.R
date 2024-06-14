@@ -77,6 +77,11 @@ if (!is.null(args$path)) {
 
   if (!is.null(args$c)) {
     ref <- args$c
+    if (!ref %in% names(scenarios)) {
+      print("Check the name of the counterfactual scenario!")
+      print("Automatically set to the first scenario!")
+      ref <- names(scenarios)[1]
+    }
   } else {
     # first scenario is the reference
     ref <- names(scenarios)[1]
@@ -154,10 +159,7 @@ write.csv(final_df_eu, save_file, row.names = FALSE)
 # ----------------------------------------------------------------------
 # Cost-benefits analysis
 
-source("STURM_output/C00_plots.R")
-
-ref <- "EU"
-make_cost_benefits(data, ref, save_dir, nb_years = 30, figures = args$figures)
+make_cost_benefits(data, ref, save_dir, nb_years = 30, figures = args$figures, make_summary = TRUE)
 
 # ----------------------------------------------------------------------
 
