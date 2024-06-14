@@ -79,15 +79,17 @@ source("STURM_output/C00_plots.R")
 rename_policies <- c("carbon_tax" = "Carbon tax",
     "sub_heat" = "Heat pump subsidies",
     "learning_rate_heat" = "Heat pump learning-by-doing",
-    "_remove_barriers_heater" = "Market-failures heating system",
+    #"_remove_barriers_heater" = "Market-failures heating system",
     "_objective_renovation" = "Energy renovation",
-    "_realization_rate_renovation" = "Renovation realization rate",
-    "_remove_barriers_renovation" = "Market-failures energy renovation")
+    "_realization_rate_renovation" = "Renovation realization rate"
+    #"_remove_barriers_renovation" = "Market-failures energy renovation"
+    )
 list_policies <- c("carbon_tax", "_objective_renovation",
-    "sub_heat", "learning_rate_heat", "_realization_rate_renovation",
-    "_remove_barriers_renovation", "_remove_barriers_heater")
+    "sub_heat", "learning_rate_heat", "_realization_rate_renovation"
+    #"_remove_barriers_renovation", "_remove_barriers_heater"
+    )
 scenarios <- data %>%
-    filter(!grepl("S1", scenario_name))
+    filter(!grepl(ref, scenario_name))
 
 
 y <- "Emission cumulated (GtCO2)"
