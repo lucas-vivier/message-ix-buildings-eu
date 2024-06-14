@@ -77,12 +77,14 @@ if (!is.null(args$path)) {
 
   if (!is.null(args$c)) {
     ref <- args$c
+    print(paste("Trying to set:", ref, "as the counterfactual scenario"))
     if (!ref %in% names(scenarios)) {
       print("Check the name of the counterfactual scenario!")
       print("Automatically set to the first scenario!")
       ref <- names(scenarios)[1]
     }
   } else {
+    print("Automatically set to the first scenario!")
     # first scenario is the reference
     ref <- names(scenarios)[1]
   }

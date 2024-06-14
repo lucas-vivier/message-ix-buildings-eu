@@ -1700,11 +1700,10 @@ make_cost_benefits <- function(data, ref, save_dir, nb_years = 30, figures = TRU
     filter(scenario != ref)
     # mutate(scenario = scenarios[.data[["scenario"]]]) %>%
 
-  pop <- pop %>%
-    mutate(variable = "Stock building") %>%
-    rename(value = stock_building_avg)
-
-  temp <- bind_rows(pop, df)
+  # pop <- pop %>%
+  #   mutate(variable = "Stock building") %>%
+  #   rename(value = stock_building_avg)
+  # temp <- bind_rows(pop, df)
 
   write.csv(temp, paste0(save_dir, "/data_cba_country.csv"), row.names = FALSE)
 
