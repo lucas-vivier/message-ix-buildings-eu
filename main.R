@@ -124,7 +124,6 @@ run <- "policies"
 runs <- c("EU", "EU_deep", "EU_reno", "EU_deep_reno", "EU_deep_and_reno")
 runs <- c("EU_reno_halfsuccess")
 #runs <- c("EU_deep_and_reno")
-parallel <- FALSE
 
 if (args$all_scenarios) {
     runs <- "all"
