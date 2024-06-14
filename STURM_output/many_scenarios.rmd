@@ -106,7 +106,7 @@ sobol_figures(scenarios, list_policies, y, rename_policies, save_path)
 
 ##### Scatter plot - Relationship between two key outcomes
 ```{r}
-source("STURM_output/C00_plots.R")
+
 x_column <- "Delta total cost private (euro/hh/year)"
 y_column <- "Emission saving (%)"
 color_column <- "targets"
@@ -116,14 +116,19 @@ colors_scenarios <- c("Constraint-Violating" =  "darkgrey", "Constraint-Satisfyi
 save_path <- paste(save_dir, "tradeoff_cost_emission.png", sep = "/")
 
 temp <- data %>%
-    mutate(`Emission saving (%)` = 100 * `Emission saving (%)`)
+    mutate(`Emission saving (%)` = 100 * `Emission saving (%)`) %>%
+    mutate(shape = 16) %>%
+    mutate(shape = ifelse((sub_heat == "" & learning_rate_heat == "constant"), 17, shape)) %>%
+    mutate(shape = ifelse((`_objective_renovation` == "" & `_realization_rate_renovation` == "0.5"), 18, shape))
 
+source("STURM_output/C00_plots.R")
 scatter_plots(temp,
             x_column,
             y_column,
             color_column,
             colors_scenarios = colors_scenarios,
             size_column,
+            shape_column = "shape",
             save_path = save_path,
             x_label_suffix = "",
             y_label_suffix = "%",

@@ -468,6 +468,7 @@ scatter_plots <- function(df,
                           color_column = "Scenario",
                           colors_scenarios,
                           size_column = NULL,
+                          shape_column = NULL,
                           save_path = NULL,
                           x_label_suffix = "",
                           y_label_suffix = "",
@@ -477,10 +478,20 @@ scatter_plots <- function(df,
                           legend = FALSE,
                           presentation = FALSE) {
   
+  if (is.null(shape_column)) {
+    df <- df %>%
+      mutate("shape" = 16)
+
+    shape_column <- "shape"
+  }
+  df[[shape_column]] <- as.factor(df[[shape_column]])
+
   p <- ggplot(df, aes(x = .data[[x_column]], y = .data[[y_column]],
-    color = .data[[color_column]], size = .data[[size_column]])) +
+    color = .data[[color_column]], size = .data[[size_column]], shape = .data[[shape_column]]),
+    ) +
     geom_point(alpha = 1) +
     # expand_limits(y = 0, x = 0) +
+    scale_shape_manual(values = c(16, 17, 18)) +  # Map groups to shapes 16, 17, 18
     scale_color_manual(values = colors_scenarios) +
     scale_size(range = c(5, 10),
                 breaks = c(
@@ -1395,7 +1406,6 @@ sobol_figures <- function(df, list_features, y, rename_feature, save_path) {
 
 }
 
-
 calculate_cost_hh <- function(df, discount = 0.05, lifetime_loan = 10,
   lifetime_renovation = 30, lifetime_heater = 20, stp = 5) {
 
@@ -1464,10 +1474,15 @@ calculate_cost_hh <- function(df, discount = 0.05, lifetime_loan = 10,
   return(long_data)
 }
 
-make_cost_benefits <- function(data, ref, save_dir, nb_years = 30, figures = TRUE) {
+make_cost_benefits <- function(data, ref, save_dir, nb_years = 30, figures = TRUE, 
+  social_discount = 0.03, lifetime_renovation = 30, lifetime_heater = 20, stp = 5,
+  make_summary = FALSE) {
+
+  path <- "STURM_data/input_csv/input_resid/macro/social_cost_carbon_20.csv"
+  social_cost_carbon <- read.csv(path) %>%
+    rename(social_cost_carbon = value)
 
   data_raw <- data
-
 
   data <- filter(data,
       resolution == "all",
@@ -1565,8 +1580,6 @@ make_cost_benefits <- function(data, ref, save_dir, nb_years = 30, figures = TRU
     ) %>%
     ungroup()
 
-  
-
   # summary
   summary <- wide_data_diff %>%
     group_by(scenario, region_bld) %>%
@@ -1591,24 +1604,24 @@ make_cost_benefits <- function(data, ref, save_dir, nb_years = 30, figures = TRU
       running_cost_private = running_cost_private / (stock_building_avg * nb_years)
     ) %>%
     select(-stock_building_avg)
-
-
-  # Make table recap
-  list_variables <- c(
-    "Space heating consumption (TWh)",
-    "Space heating consumption electricity (TWh)",
-    "Emission (MtCO2)",
-    "Emission cumulated (GtCO2)",
-    "Total cost (Billion EUR)",
-    "Government expenditures (Billion EUR)",
-    "Emission saving (%)",
-    "Consumption saving (%)",
-    "Consumption electricity variation (%)"
-    )
-
+  #-------------------------------------
   file <- paste0(save_dir, "/", run, "_2050_summary_eu.csv")
-  if (file.exists(file)) {
+  if (file.exists(file) & make_summary) {
+    print("Generate summary table")
     # read file column as character
+
+    list_variables <- c(
+      "Space heating consumption (TWh)",
+      "Space heating consumption electricity (TWh)",
+      "Emission (MtCO2)",
+      "Emission cumulated (GtCO2)",
+      "Total cost (Billion EUR)",
+      "Government expenditures (Billion EUR)",
+      "Emission saving (%)",
+      "Consumption saving (%)",
+      "Consumption electricity variation (%)"
+      )
+
 
     summary_2050 <- read.csv(file, check.names = FALSE) %>%
       select(all_of(c("scenario_name", list_variables))) %>%
@@ -1661,6 +1674,7 @@ make_cost_benefits <- function(data, ref, save_dir, nb_years = 30, figures = TRU
 
     write.csv(results, paste0(save_dir, "/results.csv"), row.names = FALSE)
   }
+  #-------------------------------------
   rename_list <- c(
     cost_renovation_sum = "Cost renovation",
     cost_heater_sum = "Cost heating system",
@@ -1685,6 +1699,14 @@ make_cost_benefits <- function(data, ref, save_dir, nb_years = 30, figures = TRU
     mutate(variable = rename_list[.data[["variable"]]]) %>%
     filter(scenario != ref)
     # mutate(scenario = scenarios[.data[["scenario"]]]) %>%
+
+  pop <- pop %>%
+    mutate(variable = "Stock building") %>%
+    rename(value = stock_building_avg)
+
+  temp <- bind_rows(pop, df)
+
+  write.csv(temp, paste0(save_dir, "/data_cba_country.csv"), row.names = FALSE)
 
   total <- df %>%
     filter(variable == "Total cost") %>%
@@ -1721,4 +1743,5 @@ make_cost_benefits <- function(data, ref, save_dir, nb_years = 30, figures = TRU
       color_list = color_list, y_label_suffix = "EUR/(year.hh)",
       presentation = presentation, legend = legend, horizontal = TRUE)
   }
+  return(temp)
 }

@@ -181,7 +181,67 @@ scatter_plots(temp,
               y_label = "Share of population in energy poverty",
               x_label = "Space heating emission saving (%)"
               )
+#--------------------------------------------------------------
+### Cost-benefits analysis
+source("STURM_output/C00_plots.R")
+xx
+df <- make_cost_benefits(data, ref, save_dir, nb_years = 30, figures = TRUE, make_summary = FALSE)
 
+var <- "Total cost"
+temp <- df %>%
+  filter(variable == var)
+
+min_maps <- min(filter(df, variable == var)$value, na.rm = TRUE)
+max_maps <- max(filter(df, variable == var)$value, na.rm = TRUE)
+limits <- c(min_maps, max_maps)
+figure_title <- "Cost"
+legend_title <- "euro/hh.year"
+title <- "cost"
+
+plot_map(temp,
+  limits,
+  figure_title = figure_title,
+  legend_title = legend_title,
+  subplot_column = "scenario",
+  ncol = 3,
+  save_path = paste(save_dir,
+    paste0("map_", title, "_2050.png"), sep = "/"))
+
+#--------------------------------------------------------------
+### Maps by scenarios
+var <- "heat_kWh"
+ref <- "floor_m2"
+years <- c(2050)
+limits <- c(0, 200)
+figure_title <- "Energy consumption for space heating"
+legend_title <- "kWh/m2.year"
+title <- "kwh_m2"
+
+df <- data %>%
+    filter(variable %in% c(var, ref)) %>%
+    filter(resolution == "all") %>%
+    pivot_wider(id_cols = c(region_bld, year, resolution, scenario),
+      names_from = variable,
+      values_from = value) %>%
+    filter(!is.na(.data[[var]])) %>%
+    filter(!is.na(.data[[ref]])) %>%
+    mutate(value = .data[[var]] / .data[[ref]]) %>%
+    filter(year %in% years) %>%
+    select(-c(all_of(var), all_of(ref), "resolution"))
+
+if (!is.null(scenarios)) {
+  df <- filter(df, scenario %in% scenarios)
+}
+
+plot_map(df,
+  limits,
+  figure_title = figure_title,
+  legend_title = legend_title,
+  subplot_column = "scenario",
+  ncol = 3,
+  save_path = paste(save_dir,
+    paste0("map_", title, "_2050.png"), sep = "/"))
+#--------------------------------------------------------------
 ### Maps by scenarios
 var <- "heat_kWh"
 ref <- "floor_m2"
