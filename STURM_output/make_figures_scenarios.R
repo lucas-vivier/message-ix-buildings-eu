@@ -14,16 +14,16 @@ run <- "renovation_bis"
 
 scenarios <- c(
     "EU" = "Counterfactual",
-    "EU_reno" = "EU_reno_country",
-    "EU_reno_endo" = "EU_reno_endo",
-    "EU_deep" = "EU_deep")
-
+    "EU_reno" = "EU_reno",
+    "EU_deep" = "EU_deep",
+    "EU_reno_new" = "EU_reno_new"
+    )
 
 # Generate distinct colors using RColorBrewer
 num_scenarios <- length(scenarios)
-colors <- brewer.pal(min(12, num_scenarios), "Set3") # Use Set3 palette with a maximum of 12 colors
+colors <- brewer.pal(min(12, num_scenarios), "Set1") # Use Set3 palette with a maximum of 12 colors
 if (num_scenarios > 12) {
-  colors <- colorRampPalette(brewer.pal(12, "Set3"))(num_scenarios) # Generate more colors if needed
+  colors <- colorRampPalette(brewer.pal(12, "Set1"))(num_scenarios) # Generate more colors if needed
 }
 # Assign colors to scenarios
 colors_scenarios <- setNames(colors, scenarios)
@@ -91,6 +91,7 @@ data <- data %>%
          / stp, value))
 data <- distinct(data)
 
+#--------------------------------------------------------------
 ## Processing output
 ### Table summary
 
@@ -211,7 +212,7 @@ plot_map(df,
   save_path = paste(save_dir,
     paste0("map_", title, "_2050.png"), sep = "/"))
 
-
+#--------------------------------------------------------------
 ### Clustered stack bar plot by countries
 #### Fuel types
 
@@ -1125,11 +1126,35 @@ plot_multiple_lines(temp,
       paste0(run, "_energy_poverty_income.png"), sep = "/"),
     y_label_suffix = "M")
 
+#--------------------------------------------------------------
 ### Distributional consequences
+
+source("STURM_output/C00_plots.R")
+
 years <- c(2030, 2050)
+ref <- "Counterfactual"
 
-ref <- "Current policies"
 rename_income <- c("q1" = "Tertile 1", "q2" = "Tertile 2", "q3" = "Tertile 3")
-# df <- mutate(data, resolution = ifelse(resolution %in% names(rename_income), rename_income[.data[["resolution"]]], resolution))
 
-# budget_share_energy_plots(data, years, scenarios, ref, save_dir, angle_x_label = 20, rename_income = rename_income)
+temp <- data %>%
+    filter(resolution %in% c("q1", "q2", "q3"))
+
+temp <- calculate_cost_hh(temp)
+
+if (!is.null(rename_income)) {
+  temp <- temp %>%
+    mutate(resolution = ifelse(resolution %in% names(rename_income), rename_income[.data[["resolution"]]], resolution))
+}
+
+# at EU-level
+parse_data <- temp %>%
+  filter(region_bld == "EU") %>%
+  mutate(value = value)
+
+# Order of scenarios
+parse_data <- parse_data %>%
+  mutate(scenario = factor(scenario, levels = unname(scenarios)))
+
+save_path <- paste(save_dir, paste0(run, "_cost_average_hh_eu.png"), sep = "/")
+make_cost_hh_figures(temp, ref, save_path, x_column = "scenario",
+  subplot_column = "resolution", angle_x_label = 20)

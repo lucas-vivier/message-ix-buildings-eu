@@ -115,9 +115,8 @@ fun_subsidies_renovation <- function(i,
     target <- c("adv")
   }
 
-
   if (subsidies_renovation_type == "ad_valorem") {
-    interval <- c(0, 0.9)
+    interval <- c(0, 0.95)
   } else if (subsidies_renovation_type == "per_CO2") {
     interval <- c(0, 2000)
   } else if (subsidies_renovation_type == "per_kWh") {
@@ -254,7 +253,7 @@ fun_subsidies_heater <- function(i,
   }
 
   if (sub_heater_type == "ad_valorem") {
-    interval <- c(0, 1)
+    interval <- c(0, 0.95)
   } else if (sub_heater_type == "per_CO2") {
     interval <- c(0, 2000)
   } else if (sub_heater_type == "per_kWh") {

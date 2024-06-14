@@ -199,6 +199,12 @@ run_scenario <- function(run,
   d$en_sav_ren <- d$en_sav_ren %>%
     mutate(en_sav_ren = en_sav_ren * param$realization_rate_renovation)
 
+  # Success objective renovation
+  if (!is.null(d$objectives_renovation)) {
+    d$objectives_renovation  <- d$objectives_renovation %>%
+      mutate(objectives_renovation = objectives_renovation * param$success_objective_renovation)
+  }
+
   # Adding year column to start subsidies after calibration
   if (!"year" %in% names(d$subsidies_renovation)) {
     d$subsidies_renovation <- crossing(d$subsidies_renovation, yrs) %>%
@@ -715,7 +721,7 @@ run_scenario <- function(run,
       # Calculating renovation decisions
       if (energy_efficiency == "endogenous") {
         print("2.1 Calculation of renovation rate")
-        if (isTRUE(param$renovation_intensity == "deep_renovation") && i == 3) {
+        if ((isTRUE(param$renovation_intensity == "deep_renovation") | isTRUE(grepl("deep", param$objective_renovation))) && i == 3) {
           print("Removing barriers for deep renovation")
           # Assigning constant value of "std" to "adv" parameters
           parameters_std <- filter(parameters_renovation,
@@ -785,6 +791,7 @@ run_scenario <- function(run,
             if ("region_bld" %in% names(objectives_endogenous)) {
               print("Objectives for renovation are set per country")
               for (region in unique(objectives_endogenous$region_bld)) {
+              #for (region in c("C-WEU-PRT")) {
                 print(region)
                 bld_det_i_region <- filter(bld_det_i, region_bld == region)
 

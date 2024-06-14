@@ -265,6 +265,18 @@ fun_stock_renovation_dyn <- function(bld_det_i,
                                      anticipate = NULL,
                                      verbose = TRUE) {
 
+
+  # If renovation rate is empty
+  if (nrow(rate_ren_i) == 0) {
+
+    ren_det_i <- bld_det_i %>%
+      mutate(sub_ren_hh = 0, cost_invest_hh = 0, n_units_fuel = 0)
+    return(list(
+      bld_det_i = bld_det_i,
+      ren_det_i = ren_det_i
+    ))
+  }
+  
   temp <- sum(bld_det_i$n_units_fuel_exst)
 
   # Create dummy variable for premature replacement if NULL

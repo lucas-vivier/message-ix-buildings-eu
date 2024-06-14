@@ -72,9 +72,9 @@ param <- list(subsidies_renovation_type = "ad_valorem",
             nzeb = FALSE,
             realization_rate_renovation = 1,
             renovation_intensity = NULL,
-            success_renovation = 1,
+            success_objective_renovation = 1,
             repartition_renovation = NULL,
-            elasticity_renovation = -1,
+            elasticity_renovation = -1.5,
             elasticity_heat_pump = -1,
             remove_barriers_renovation = FALSE,
             remove_barriers_heater = FALSE,
@@ -120,7 +120,10 @@ run <- "policies"
 
 # runs <- c("EU", "EU_carbon_tax", "EU_carbon_tax_social")
 
-runs <- c("EU_reno_endo")#, "EU", "EU_reno", "EU_deep")
+runs <- c("EU", "EU_deep", "EU_reno", "EU_deep_reno", "EU_deep_and_reno")
+runs <- c("EU_reno_halfsuccess")
+#runs <- c("EU_deep_and_reno")
+parallel <- FALSE
 
 if (args$all_scenarios) {
     runs <- "all"

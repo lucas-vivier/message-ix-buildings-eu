@@ -491,12 +491,9 @@ data_stock_historic <- read.csv(
 
 data_stock_historic <- data_stock_historic %>%
   filter(region_bld %in% unique(data$region_bld)) %>%
-  filter(fuel_heat %in% names(rename_fuels))
+  filter(fuel_heat %in% names(rename_fuels)) %>%
+  rename(resolution = fuel_heat)
 
-# Rename the variable resolution to fuel_heat
-t <- data_stock_historic %>%
-  rename(resolution = fuel_heat) %>%
-  filter(year < 2015)
 
 # Add a row for the EU
 t_eu <- t %>%
@@ -504,16 +501,19 @@ t_eu <- t %>%
   summarise(value = sum(value)) %>%
   ungroup() %>%
   mutate(region_bld = "EU")
-t <- bind_rows(t, t_eu)
+data_stock_historic <- bind_rows(data_stock_historic, t_eu)
+
+t <- data_stock_historic %>%
+  filter(year < 2015)
 
 # Select the stock of housing units
-temp <- data %>%
+simulation <- data %>%
   filter(variable == "stock_building") %>%
   filter(resolution %in% names(rename_fuels)) %>%
   select(-c("variable"))
 
 # Add the historic stock data to the data
-temp <- bind_rows(t, temp)
+temp <- bind_rows(t, simulation)
 
 # Plot the share of fuels for the countries
 legend <- TRUE
@@ -533,8 +533,52 @@ plot_stacked_areas(temp, "year", "value", "resolution", "region_bld",
                     save_path = paste(save_dir, paste0(scenario, "_share_fuels_stock_countries.png"),
                     sep = "/"), vertical = 2015, percent = FALSE, , legend = legend,
                     y_label_suffix = "M")
+#--------------------------------------------------------------------------
+# Plot validation
 
-xx
+# Check years that are in simulation and historic data  
+years <- unique(data_stock_historic$year)
+years <- years[years %in% unique(simulation$year)]
+
+# Combine in one data frame
+temp <- data_stock_historic %>%
+  mutate(type = "historic") %>%
+  bind_rows(simulation %>% mutate(type = "simulation")) %>%
+  filter(year == 2020)
+
+# Make one file per group of 5 regions
+regions <- unique(temp$region_bld)
+regions <- regions[regions != "EU"]
+regions <- split(regions, ceiling(seq_along(regions) / 14))
+
+
+for (region in regions) {
+
+  temp_region <- temp %>%
+    filter(region_bld %in% region) %>%
+    mutate(region_bld = ifelse(region_bld %in% names(rename_countries_code), rename_countries_code[region_bld], region_bld))
+  
+  if (TRUE) {
+    temp_region <- temp_region %>%
+        group_by_at(c("region_bld", "year", "type")) %>%
+        mutate(value = value / sum(value, na.rm = FALSE) * 100) %>%
+        ungroup()
+  }
+
+  name_file <- paste0("_share_fuels_stock_", paste(region, collapse = "_"), ".png")
+
+  plot_clustered_barplot(temp_region,
+    "type",
+    "resolution",
+    subplot_column = "region_bld",
+    y_label = "Dwelling units by fuel type",
+    y_label_suffix = "%",
+    display_total = FALSE,
+    x_order = c("historic", "simulation"),
+    angle_x_label = 90,
+    save_path = paste(save_dir, paste0(scenario, name_file), sep = "/"))
+}
+
 #--------------------------------------------------------------------------
 # Plot the share of fuels for the EU
 temp <- temp %>%

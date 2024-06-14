@@ -156,11 +156,11 @@ read_parameters <- function(scen_param, param) {
     param$objective_renovation <- objective_renovation
   }
 
-  if ("_success_renovation" %in% scen_param$name_parameter) {
-    success_renovation <- scen_param %>%
-      filter(name_parameter == "_success_renovation") %>%
+  if ("_success_objective_renovation" %in% scen_param$name_parameter) {
+    success_objective_renovation <- scen_param %>%
+      filter(name_parameter == "_success_objective_renovation") %>%
       pull(scenario)
-    param$success_renovation <- success_renovation
+    param$success_objective_renovation <- as.numeric(success_objective_renovation)
   }
 
   if ("_repartition_renovation" %in% scen_param$name_parameter) {

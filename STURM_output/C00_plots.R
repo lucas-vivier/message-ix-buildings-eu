@@ -1175,29 +1175,17 @@ output_table <- function(data,
 }
 
 
-budget_share_energy_plots <- function(data, years, sub_scenarios, ref, save_dir, angle_x_label = NULL, rename_income = NULL) {
+calculate_cost_hh <- function(df, discount = 0.05, lifetime_loan = 10,
+  lifetime_renovation = 30, lifetime_heater = 20, stp = 5) {
 
-    # STEP 1
   var <- c("to_pay_renovation", "to_pay_heater", "cost_energy", "stock_building")
-  discount <- 0.05
-  lifetime_loan <- 10
-  lifetime_renovation <- 35 # years
-  lifetime_heater <- 20 # years
-  stp <- 5
 
-  temp <- data %>%
-    filter(variable %in% var) %>%
-    filter(resolution %in% c("q1", "q2", "q3")) %>%
-    rename(income = resolution)
-
-  if (!is.null(rename_income)) {
-    temp <- temp %>%
-      mutate(income = rename_income[.data[["income"]]])
-  }
+  temp <- df %>%
+    filter(variable %in% var)
 
   wide_data <- pivot_wider(
     temp,
-    id_cols = c("region_bld", "year", "scenario", "income"),
+    id_cols = c("region_bld", "year", "scenario", "resolution"),
     names_from = variable,
     values_from = value
     )
@@ -1218,13 +1206,13 @@ budget_share_energy_plots <- function(data, years, sub_scenarios, ref, save_dir,
     mutate(to_pay_renovation_cumsum =
       sum(wide_data$to_pay_renovation[wide_data$region_bld == region_bld &
           wide_data$scenario == scenario &
-          wide_data$income == income &
+          wide_data$resolution == resolution &
           wide_data$year <= year &
           wide_data$year >= (year - lifetime_loan)], na.rm = TRUE)) %>%
     mutate(to_pay_heater_cumsum =
       sum(wide_data$to_pay_heater[wide_data$region_bld == region_bld &
           wide_data$scenario == scenario &
-          wide_data$income == income &
+          wide_data$resolution == resolution &
           wide_data$year <= year &
           wide_data$year > (year - lifetime_loan)], na.rm = TRUE)) %>%
     ungroup() %>%
@@ -1238,7 +1226,7 @@ budget_share_energy_plots <- function(data, years, sub_scenarios, ref, save_dir,
       total_cost_hh = total_cost_hh / stock_building)
 
   long_data <- wide_data %>%
-    select(c("region_bld", "year", "scenario", "income",
+    select(c("region_bld", "year", "scenario", "resolution",
       "to_pay_renovation_cumsum", "to_pay_heater_cumsum", "cost_energy", "total_cost_hh")) %>%
     pivot_longer(
       cols = c("to_pay_renovation_cumsum", "to_pay_heater_cumsum",
@@ -1247,12 +1235,17 @@ budget_share_energy_plots <- function(data, years, sub_scenarios, ref, save_dir,
       values_to = "value"
     )
 
-  ## STEP 2
+  long_data  <- long_data %>%
+    group_by(region_bld, scenario, resolution, variable) %>%
+    summarize(value = mean(value, na.rm = TRUE)) %>%
+    ungroup()
 
-  parse_data <- long_data %>%
-    filter(region_bld == "EU") %>%
-    filter(year %in% years) %>%
-    mutate(value = value)
+  return(long_data)
+}
+
+
+make_cost_hh_figures <- function(data, ref, save_path, x_column = "scenario",
+  subplot_column = "resolution", angle_x_label = NULL) {
 
   data_ref <- parse_data %>%
     filter(scenario == ref) %>%
@@ -1262,38 +1255,25 @@ budget_share_energy_plots <- function(data, years, sub_scenarios, ref, save_dir,
   diff <- parse_data %>%
     filter(variable != "total_cost_hh") %>%
     filter(scenario != ref) %>%
-    left_join(data_ref, by = c("region_bld", "year", "variable", "income")) %>%
+    left_join(data_ref, by = c("region_bld", "variable", "resolution")) %>%
     mutate(diff = (value - value_ref)) %>%
     select(-c(value, value_ref)) %>%
     rename(value = diff)
 
-  diff <- diff %>%
-    rename(yr = year, year = income)
-
   plot_clustered_barplot(
-    filter(diff, yr == 2030),
-    "scenario",
-    "variable",
+    df = diff,
+    x_column = x_column,
+    fill_column = "variable",
+    subplot_column = subplot_column,
     y_label = "Difference energy cost per household compared to current policies",
     y_label_suffix = "EUR",
     year_start = NULL,
-    save_path = paste(save_dir, paste0(run, "_cost_energy_2030.png"), sep = "/"),
+    save_path = save_path,
     display_total = TRUE,
-    x_order = scenarios,
+    x_order = NULL,
     angle_x_label = angle_x_label)
 
-  plot_clustered_barplot(
-    filter(diff, yr == 2050),
-    "scenario",
-    "variable",
-    y_label = "Difference energy cost per household compared to current policies",
-    y_label_suffix = "EUR",
-    year_start = NULL,
-    save_path = paste(save_dir, paste0(run, "_cost_energy_2050.png"), sep = "/"),
-    display_total = TRUE,
-    x_order = scenarios,
-    angle_x_label = angle_x_label)
-  }
+}
 
 
 plot_map <- function(data,

@@ -57,9 +57,14 @@ fun_utility_ren_shell <- function(yrs,
                           subsidies_renovation_type = "ad_valorem",
                           full = FALSE,
                           emission_factors = NULL) {
+  
+  # Calculate operational energy costs
+  en_hh_tot <- en_hh_tot %>%
+    # Based on cost of energy standard not real
+    mutate(cost_op = cost_op / heating_intensity) %>%
+    select(-c("budget_share", "heating_intensity", "en_hh_std",
+      "cost_op_wt", "u_building", "en_pe_hh_std"))
 
-  en_hh_tot <- select(en_hh_tot, -c("budget_share",
-    "heating_intensity", "en_hh_std", "cost_op_wt", "u_building", "en_pe_hh_std"))
   # Operational energy costs before/after renovation
   en_hh_tot_ren_fin <- en_hh_tot %>%
     rename(eneff_f = eneff)
@@ -314,17 +319,21 @@ fun_ms_ren_shell_endogenous <- function(yrs,
 
   anticipate <- NULL
   if (!is.null(anticipate_renovation)) {
-    anticipate <- payback %>%
-      # Select the cheaper renovation
-      group_by_at(setdiff(names(payback), c("payback", "eneff_f"))) %>%
-      filter(payback == min(payback)) %>%
-      filter(if(n() > 1) eneff_f == "adv" else TRUE) %>%
-      slice(1) %>%
-      ungroup() %>%
-      mutate(anticipate = ifelse(payback < anticipate_renovation, 1, 0)) %>%
-      filter(anticipate == 1) %>%
-      rename(eneff = eneff_i)
-
+    if (!all(is.na(payback$payback))) {
+      anticipate <- payback %>%
+        filter(!is.na(payback)) %>%  # Remove NA values first
+        # Select the cheaper renovation
+        group_by_at(setdiff(names(payback), c("payback", "eneff_f"))) %>%
+        filter(payback == min(payback, na.rm = TRUE)) %>%
+        filter(if(n() > 1) eneff_f == "adv" else TRUE) %>%
+        slice(1) %>%
+        ungroup() %>%
+        mutate(anticipate = ifelse(payback < anticipate_renovation, 1, 0)) %>%
+        filter(anticipate == 1) %>%
+        rename(eneff = eneff_i)
+      
+      # print(paste0("Number of anticipations: ", round(sum(anticipate$n_units_fuel_exst) / 1e6, 2)))
+    }
   }
 
   output <- list(
