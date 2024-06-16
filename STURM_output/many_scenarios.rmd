@@ -16,8 +16,8 @@ print(paste("Working directory is:", getwd()))
 # Loding figures setttings and functions
 source("STURM_output/C00_plots.R")
 
-dir <- "simulation_14062024"
-ref <- "S19"
+dir <- "simulation_192041"
+ref <- "S1"
 save_dir <- paste("STURM_output", "figures", dir, sep = "/")
 file <- paste(save_dir, "results.csv", sep = "/")
 data <- read.csv(file,  check.names = FALSE, stringsAsFactors = FALSE, header = TRUE, row.names = NULL)
@@ -29,22 +29,93 @@ electricity_variation_counterfactual <- filter(data, scenario_name == ref)$`Cons
 
 data <- data %>%
     mutate(color = "darkgrey") %>%
-    mutate(size = 1) %>%
     mutate(`Emission saving (%)` = ifelse(scenario_name != ref, `Emission saving (%)` + emission_saving_counterfactual, `Emission saving (%)`)) %>%
     mutate(`Consumption saving (%)` = ifelse(scenario_name != ref, `Consumption saving (%)` + energy_saving_counterfactual, `Consumption saving (%)`)) %>%
-    mutate(`Consumption electricity variation (%)` = ifelse(scenario_name != ref, `Consumption electricity variation (%)` + electricity_variation_counterfactual, `Consumption electricity variation (%)`))
+    mutate(`Consumption electricity variation (%)` = ifelse(scenario_name != ref, `Consumption electricity variation (%)` + electricity_variation_counterfactual, `Consumption electricity variation (%)`)) %>%
+    mutate(`Delta total cost (euro/hh/year)` = ifelse(is.na(`Delta total cost (euro/hh/year)`), 0, `Delta total cost (euro/hh/year)`)) %>%
+    mutate(`Delta total cost private (euro/hh/year)` = ifelse(is.na(`Delta total cost private (euro/hh/year)`), 0, `Delta total cost private (euro/hh/year)`))
 
-target_emission_saving <- 0.85
-target_electricity_heating <- 1
-# no social carbon price
+
+if (FALSE) {
+    target_emission_saving <- 0.85
+    target_electricity_heating <- 1
+    # no social carbon price
+
+    data <- data %>%
+        mutate(targets =
+        `Emission saving (%)` >= target_emission_saving &
+        carbon_tax != "social" &
+        `Consumption electricity variation (%)` <= target_electricity_heating) %>%
+        mutate(targets = ifelse(targets, "Constraint-Satisfying", "Constraint-Violating")) %>%
+        mutate(targets = ifelse(scenario_name == "S1", "No additional policy", targets))
+    colors_scenarios <- c("Constraint-Violating" =  "darkgrey", "Constraint-Satisfying" = "darkgreen", "Counterfactual" = "black")
+
+}
+min_cost <- min(data$`Delta total cost (euro/hh/year)`, na.rm = TRUE)
 
 data <- data %>%
-    mutate(targets =
-    `Emission saving (%)` >= target_emission_saving &
-    carbon_tax != "social" &
-    `Consumption electricity variation (%)` <= target_electricity_heating) %>%
-    mutate(targets = ifelse(targets, "Constraint-Satisfying", "Constraint-Violating")) %>%
-    mutate(targets = ifelse(scenario_name == "S1", "Counterfactual", targets))
+    mutate(`_success_objective_renovation` = ifelse(is.na(`_success_objective_renovation`), 1, `_success_objective_renovation`)) %>%
+    filter(carbon_tax != "social") %>%
+    mutate(groups = "Policy mix") %>%
+    mutate(descr = "Policy mix") %>%
+    mutate(descr = ifelse(scenario_name == ref, "No additional policy", descr)) %>%
+    mutate(descr = ifelse(`Delta total cost (euro/hh/year)` == min_cost, "Cost Minimizing", descr)) %>%
+    mutate(groups = ifelse(sub_heat == "carbon" & learning_rate_heat == "", "Heat Pump Maximizing", groups)) %>%
+    mutate(groups = ifelse(`_objective_renovation` %in% c("renovation", "deep_renovation"),
+        "Renovation Maximizing", groups)) %>%
+    mutate(groups = ifelse((groups == "Renovation Maximizing") &
+        (sub_heat == "carbon" & learning_rate_heat == ""), "Heat Pump and Renovation Maximizing", groups)) %>%
+    mutate(groups = ifelse(scenario_name == ref, "No additional policy", groups)) %>%
+    mutate(descr = ifelse(sub_heat == "carbon" & learning_rate_heat == "" & carbon_tax == "EUETS"
+        & `_objective_renovation` == "deep_renovation"
+        & `_success_objective_renovation` == 1
+        & `_realization_rate_renovation` == 1,
+        "All policies", descr)) %>%
+    mutate(descr = ifelse(sub_heat == "carbon" & learning_rate_heat == "" & carbon_tax == "EUETS"
+        & `_objective_renovation` == "deep_renovation"
+        & `_success_objective_renovation` == 0.5
+        & `_realization_rate_renovation` == 1,
+         "Renovation wave quality", descr))  %>%
+    mutate(descr = ifelse(sub_heat == "carbon" & learning_rate_heat == "" & carbon_tax == "EUETS"
+        & `_objective_renovation` == "renovation"
+        & `_success_objective_renovation` == 1
+        & `_realization_rate_renovation` == 0.75,
+         "Renovation wave quantity", descr))  %>%
+    mutate(descr = ifelse(sub_heat == "carbon" & learning_rate_heat == "" & carbon_tax == "EUETS"
+        & `_objective_renovation` == ""
+        & `_realization_rate_renovation` == 0.75,
+         "No renovation wave", descr)) 
+    
+
+# is.na(`_success_objective_renovation`) & `_realization_rate_renovation` == 1 & 
+    #"Heat Pump Maximizing policy mix", groups)) %>%
+colors_scenarios <- c(
+    "No additional policy" = "black",
+    "Policy mix" = "darkgrey",
+    "Heat Pump Maximizing" = "darkgreen",
+    "Renovation Maximizing" = "darkblue",
+    "Heat Pump and Renovation Maximizing" = "darkred"
+    )
+
+scenarios_shape <- c(
+    "No additional policy" = 8,
+    "Policy mix" = 16,
+    "Heat Pump Maximizing" = 17,
+    "Renovation Maximizing" = 18,
+    "Heat Pump and Renovation Maximizing" = 15
+)
+
+```
+
+```{r}
+# Scenario to assess 
+scenarios <- c("No additional policy", "All policies" , "Renovation wave quality", "Renovation wave quantity", "No renovation wave")
+scenario_names <- data %>%
+    filter(descr %in% scenarios) %>%
+    select(scenario_name, descr)
+scenario_names <- setNames(scenario_names$descr, scenario_names$scenario_name)
+
+print(scenario_names)
 ```
 
 ##### Histogram - Distribution of key outcomes across scenarios
@@ -70,7 +141,7 @@ plot_histogram(data, column, save_path)
 
 # TODO: histogram cost-efficient strategies
 ```
-
+#------------------------------------------------------------------------------
 ##### Sobol - Identification of key policies
 ```{r}
 # Sobol analysis
@@ -106,56 +177,19 @@ sobol_figures(scenarios, list_policies, y, rename_policies, save_path)
 
 ```
 
-
+#------------------------------------------------------------------------------
 ##### Scatter plot - Relationship between two key outcomes
 ```{r}
-
-x_column <- "Delta total cost private (euro/hh/year)"
+source("STURM_output/C00_plots.R")
+x_column <- "Delta total cost (euro/hh/year)"
 y_column <- "Emission saving (%)"
-color_column <- "targets"
-size_column <- "size"
+#color_column <- "descr"
+color_column <- "groups"
+shape_column <- "groups"
 
-colors_scenarios <- c("Constraint-Violating" =  "darkgrey", "Constraint-Satisfying" = "darkgreen", "Counterfactual" = "black")
 save_path <- paste(save_dir, "tradeoff_cost_emission.png", sep = "/")
 
 temp <- data %>%
-    mutate(`Emission saving (%)` = 100 * `Emission saving (%)`) %>%
-    mutate(shape = 16) %>%
-    mutate(shape = ifelse((sub_heat == "" & learning_rate_heat == "constant"), 17, shape)) %>%
-    mutate(shape = ifelse((`_objective_renovation` == "" & `_realization_rate_renovation` == "0.5"), 18, shape))
-
-source("STURM_output/C00_plots.R")
-scatter_plots(temp,
-            x_column,
-            y_column,
-            color_column,
-            colors_scenarios = colors_scenarios,
-            size_column,
-            shape_column = "shape",
-            save_path = save_path,
-            x_label_suffix = "",
-            y_label_suffix = "%",
-            legend_suffix = "",
-            y_label = "Emission saving (%)",
-            x_label = "Cost (€/hh/year)",
-            legend = TRUE,
-            presentation = FALSE)
-
-```
-
-```{r}
-source("STURM_output/C00_plots.R")
-
-x_column <- "Consumption electricity variation (%)"
-y_column <- "Emission saving (%)"
-color_column <- "targets"
-size_column <- "size"
-
-colors_scenarios <- c("Constraint-Violating" =  "darkgrey", "Constraint-Satisfying" = "darkgreen", "Counterfactual" = "black")
-save_path <- paste(save_dir, "tradeoff_eletricity_emission.png", sep = "/")
-
-temp <- data %>%
-    mutate(`Consumption electricity variation (%)` = 100 * `Consumption electricity variation (%)`) %>%
     mutate(`Emission saving (%)` = 100 * `Emission saving (%)`)
 
 scatter_plots(temp,
@@ -163,19 +197,111 @@ scatter_plots(temp,
             y_column,
             color_column,
             colors_scenarios = colors_scenarios,
-            size_column,
+            size_column = NULL,
+            shape_column = shape_column,
+            scenarios_shape = scenarios_shape,
+            hline = 95,
+            save_path = save_path,
+            x_label_suffix = "€",
+            y_label_suffix = "%",
+            legend_suffix = "",
+            y_label = "Emission saving (%)",
+            x_label = "Social cost-benefits (€/hh/year)",
+            legend = TRUE,
+            presentation = FALSE)
+
+```
+
+
+```{r}
+x_column <- "Delta total cost private (euro/hh/year)"
+y_column <- "Emission saving (%)"
+
+save_path <- paste(save_dir, "tradeoff_cost_private_emission.png", sep = "/")
+
+temp <- data %>%
+    mutate(`Emission saving (%)` = 100 * `Emission saving (%)`)
+
+source("STURM_output/C00_plots.R")
+scatter_plots(temp,
+            x_column,
+            y_column,
+            color_column,
+            colors_scenarios = colors_scenarios,
+            size_column = NULL,
+            shape_column = shape_column,
+            scenarios_shape = scenarios_shape,
+            save_path = save_path,
+            x_label_suffix = "",
+            y_label_suffix = "%",
+            legend_suffix = "",
+            y_label = "Emission saving (%)",
+            x_label = "Private cost-benefits (€/hh/year)",
+            legend = TRUE,
+            presentation = FALSE)
+```
+
+```{r}
+
+x_column <- "Consumption electricity variation (%)"
+y_column <- "Emission saving (%)"
+
+save_path <- paste(save_dir, "tradeoff_electricity_emission.png", sep = "/")
+
+temp <- data %>%
+    mutate(`Emission saving (%)` = 100 * `Emission saving (%)`) %>%
+    mutate(`Consumption electricity variation (%)` = 100 * `Consumption electricity variation (%)`)
+
+scatter_plots(temp,
+            x_column,
+            y_column,
+            color_column,
+            colors_scenarios = colors_scenarios,
+            size_column = NULL,
+            shape_column = shape_column,
+            scenarios_shape = scenarios_shape,
             save_path = save_path,
             x_label_suffix = "%",
             y_label_suffix = "%",
             legend_suffix = "",
             y_label = "Emission saving (%)",
-            x_label = "Consumption electricity variation (%)",
+            x_label = "Electrictity variation (%)",
+            legend = TRUE,
+            presentation = FALSE)
+```
+
+
+```{r}
+x_column <- "Consumption saving (%)"
+y_column <- "Emission saving (%)"
+
+save_path <- paste(save_dir, "tradeoff_consumption_emission.png", sep = "/")
+
+temp <- data %>%
+    mutate(`Consumption saving (%)` = 100 * `Consumption saving (%)`) %>%
+    mutate(`Emission saving (%)` = 100 * `Emission saving (%)`)
+
+scatter_plots(temp,
+            x_column,
+            y_column,
+            color_column,
+            colors_scenarios = colors_scenarios,
+            size_column = NULL,
+            shape_column = shape_column,
+            scenarios_shape = scenarios_shape,
+            save_path = save_path,
+            x_label_suffix = "%",
+            y_label_suffix = "%",
+            legend_suffix = "",
+            y_label = "Emission saving (%)",
+            x_label = "Consumption saving (%)",
             legend = TRUE,
             presentation = FALSE)
 
-
 ```
 
+
+#------------------------------------------------------------------------------
 #### Identification of policies that are in the target
 ```{r}
 # Identify the policies that are in the target
@@ -192,9 +318,11 @@ rename_policies <- c("carbon_tax" = "Carbon tax",
 list_policies <- c("carbon_tax", "_objective_renovation",
     "sub_heat", "learning_rate_heat", "_realization_rate_renovation",
     "_remove_barriers_renovation", "_remove_barriers_heater")
+list_policies <- intersect(list_policies, colnames(data))
 
 temp <- data %>%
-    filter(targets == "Constraint-Satisfying") %>%
+    filter(`Emission saving (%)` > 0.95) %>%
+    # Select only the policies that are in data colnames
     select(all_of(list_policies)) %>%
     mutate(across(all_of(list_policies), as.character)) %>%
     pivot_longer(cols = all_of(list_policies),
@@ -208,7 +336,6 @@ n_scenario <- nrow(temp)
 temp <- temp %>%
   group_by(policy, value) %>%
   summarise(count = n()) #/ n_scenario)
-
 
 
 # Make stacked bar plot of the policies in the target scenarios
@@ -234,6 +361,7 @@ ggsave(save_path, plot = p, width = plot_settings[["width"]],
 ``` 
 
 #------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 #### Analysis by countries
 
 ```{r}
@@ -245,7 +373,7 @@ cost_factor <- read.csv(file,  check.names = FALSE, stringsAsFactors = FALSE, he
     rename(name = region_bld, cost_factor = value)
 
 
-file <- "2024-06-10_131316_2050_summary_countries.csv"
+file <- "2024-06-14_192041_2050_summary_countries.csv"
 file <- paste(save_dir, file, sep = "/")
 data_eu <- read.csv(file,  check.names = FALSE, stringsAsFactors = FALSE, header = TRUE, row.names = NULL) %>%
     mutate(name = `Member states`) %>%
@@ -268,38 +396,34 @@ data_eu <- read.csv(file,  check.names = FALSE, stringsAsFactors = FALSE, header
     ) %>%
     mutate(name = ifelse(name == "Czech Republic", "Czechia", name))
 
+```
 
-
-scenarios_target <- filter(data, targets == "Constraint-Satisfying")$scenario_name
-best_scenario <- data %>%
-    filter(targets == "Constraint-Satisfying") %>%
-    # Get the scenario that minimize the cost
-    filter(`Delta total cost (euro/hh/year)` == min(`Delta total cost (euro/hh/year)`))
-best_scenario <- best_scenario$scenario_name
+```{r}
+data_eu <- data_eu %>%
+    mutate(scenario_name = ifelse(scenario_name %in% names(scenario_names), scenario_names[scenario_name], scenario_name))
 
 ```
 
 ```{r}
-# Calculate the cost
+# Calculate the average cost accoss scenarios
+
+# temp <- data_eu %>%
+#     filter(scenario_name %in% scenarios_target) %>%
+#     group_by_at("Member states") %>%
+#     summarize(`Emission saving (%)` = mean(`Emission saving (%)`),
+#         `Consumption saving (%)` = mean(`Consumption saving (%)`),
+#         `Consumption electricity variation (%)` = mean(`Consumption electricity variation (%)`),
+#         `Renovated buildings (#/capita)` = mean(`Renovated buildings (Million)` / `Population (Million)`),
+#         `Heat-pumps (#/capita)` = mean(`Heat-pumps (Million)` / `Population (Million)`),
+#         `Space heating consumption (MWh/capita)` = mean(`Space heating consumption (TWh)` / `Population (Million)`),
+#         `Emission (tCO2/capita)` = mean(`Emission (MtCO2)` / `Population (Million)`),
+#         `Government expenditures (EUR/capita)`= mean(`Government expenditures (Billion EUR)` / `Population (Million)`),
+#         `Cost renovation (EUR/capita)` = mean(`Cost renovation (Billion EUR)` / `Population (Million)`),
+#         `Cost heater (EUR/capita)` = mean(`Cost heater (Billion EUR)` / `Population (Million)`),
+#         `Total cost (EUR/capita)`= mean(`Total cost (Billion EUR)` / `Population (Million)`))
 
 
-temp <- data_eu %>%
-    filter(scenario_name %in% scenarios_target) %>%
-    group_by_at("Member states") %>%
-    summarize(`Emission saving (%)` = mean(`Emission saving (%)`),
-        `Consumption saving (%)` = mean(`Consumption saving (%)`),
-        `Consumption electricity variation (%)` = mean(`Consumption electricity variation (%)`),
-        `Renovated buildings (#/capita)` = mean(`Renovated buildings (Million)` / `Population (Million)`),
-        `Heat-pumps (#/capita)` = mean(`Heat-pumps (Million)` / `Population (Million)`),
-        `Space heating consumption (MWh/capita)` = mean(`Space heating consumption (TWh)` / `Population (Million)`),
-        `Emission (tCO2/capita)` = mean(`Emission (MtCO2)` / `Population (Million)`),
-        `Government expenditures (EUR/capita)`= mean(`Government expenditures (Billion EUR)` / `Population (Million)`),
-        `Cost renovation (EUR/capita)` = mean(`Cost renovation (Billion EUR)` / `Population (Million)`),
-        `Cost heater (EUR/capita)` = mean(`Cost heater (Billion EUR)` / `Population (Million)`),
-        `Total cost (EUR/capita)`= mean(`Total cost (Billion EUR)` / `Population (Million)`))
-
-
-write.csv(temp, paste(save_dir, "scenario_target_countries.csv", sep = "/"), row.names = FALSE)
+# write.csv(temp, paste(save_dir, "scenario_target_countries.csv", sep = "/"), row.names = FALSE)
 
 ```
 
@@ -309,12 +433,9 @@ write.csv(temp, paste(save_dir, "scenario_target_countries.csv", sep = "/"), row
 # Check energy consumption per capita in Initial, Counterfactual and Ambitious scenario
 
 df <- data_eu %>%
-    filter(scenario_name %in% c("Initial", "S1", best_scenario)) %>%
     mutate(`Space heating consumption (MWh/capita)` = `Space heating consumption (TWh)` / `Population (Million)`) %>%
     mutate(`Emission (tCO2/capita)` = `Emission (MtCO2)` / `Population (Million)`) %>%
-    mutate(name = `Member states`) %>%
-    mutate(scenario_name = ifelse(scenario_name == "S1", "Counterfactual", scenario_name)) %>%
-    mutate(scenario_name = ifelse(scenario_name == best_scenario, "Ambitious", scenario_name))
+    mutate(name = `Member states`)
 ```
 
 ```{r}
@@ -322,10 +443,10 @@ source("STURM_output/C00_plots.R")
 
 temp <- df %>%
     select(c("scenario_name", "name", "Space heating consumption (MWh/capita)")) %>%
-    rename(value = `Space heating consumption (MWh/capita)`)
+    rename(value = `Space heating consumption (MWh/capita)`) %>%
+    filter(scenario_name %in% scenarios)
 
-scenario_order <- c("Initial", "Counterfactual", "Ambitious")
-temp$scenario_name <- factor(temp$scenario_name, levels = scenario_order)
+temp$scenario_name <- factor(temp$scenario_name, levels = scenarios)
 
 limits <- c(0, 7)
 save_path <- paste(save_dir, "space_heating_consumption_countries.png", sep = "/")
@@ -346,10 +467,10 @@ source("STURM_output/C00_plots.R")
 temp <- df %>%
     select(c("scenario_name", "name", "Share fossil-fuels (Percent)")) %>%
     rename(value = `Share fossil-fuels (Percent)`) %>%
-    mutate(value = ifelse(is.na(value), 0, value))
+    mutate(value = ifelse(is.na(value), 0, value)) %>%
+    filter(scenario_name %in% scenarios)
 
-scenario_order <- c("Initial", "Counterfactual", "Ambitious")
-temp$scenario_name <- factor(temp$scenario_name, levels = scenario_order)
+temp$scenario_name <- factor(temp$scenario_name, levels = scenarios)
 
 limits <- c(0, 0.8)
 save_path <- paste(save_dir, "share_fossil_fuels_countries.png", sep = "/")

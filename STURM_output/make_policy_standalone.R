@@ -8,7 +8,7 @@ library(stringr)
 
 source("STURM_output/C00_plots.R")
 # Load data
-dir <- "simulation"
+dir <- "simulation_192041"
 save_dir <- paste("STURM_output", "figures", dir, sep = "/")
 file <- paste(save_dir, "results.csv", sep = "/")
 data <- read.csv(file,  check.names = FALSE, stringsAsFactors = FALSE, header = TRUE, row.names = NULL)
@@ -20,11 +20,13 @@ if (!dir.exists(out_dir)) {
 }
 
 scenarios <- c(
-    "Counterfactual", "EU-ETS", "EU-ETS 2", "Social value of carbon",
+    "No additionnal policy", "EU-ETS", "EU-ETS 2", "Social value of carbon",
     "Subsidies heat pumps", "Market-failures heater",
     "Learning-by-doing heat pumps",
-    "Renovation wave", "Deep renovation wave",
-    "Quality renovation", "Market-failures renovation")
+    "Renovation wave", "Renovation wave half success",
+    "Deep renovation wave", "Deep renovation wave half success",
+    "Quality renovation",
+    "Market-failures renovation")
 
 # Select scenario by rows
 subset <- data %>%
@@ -72,8 +74,8 @@ temp$scenario <- factor(temp$scenario, levels = rev(scenarios))
 p <- temp %>%
   ggplot(aes(x = variable, y = scenario)) +
   #geom_tile(aes(fill = norm_value), color = "white") +
-  geom_tile(aes(fill = ifelse(scenario == "Counterfactual", NA, norm_value)), color = "white") +
-  geom_tile(data = subset(temp, scenario == "Counterfactual"), aes(x = variable, y = scenario), fill = "grey", color = "white") +
+  geom_tile(aes(fill = ifelse(scenario == "No additionnal policy", NA, norm_value)), color = "white") +
+  geom_tile(data = subset(temp, scenario == "No additionnal policy"), aes(x = variable, y = scenario), fill = "grey", color = "white") +
   geom_text(aes(label = round(value, 1)), size=6) +
   scale_fill_gradient2(low = "blue", mid = "grey", high = "red", midpoint = 0, na.value = "grey") +
   theme_minimal() +
@@ -123,7 +125,7 @@ df <- subset %>%
          `Delta cost thermal comfort (euro/hh/year)`, `Delta total cost (euro/hh/year)`, 
          `Delta total cost private (euro/hh/year)`, `Delta cost emission (euro/hh/year)`) %>%
   mutate(variable = rename_list[.data[["variable"]]]) %>%
-  filter(scenario != "Counterfactual") %>%
+  filter(scenario != "No additionnal policy") %>%
   # mutate(scenario = scenarios[.data[["scenario"]]]) %>%
   mutate(value = value)
 

@@ -10,19 +10,16 @@ print(paste("Working directory is:", getwd()))
 # Loading figures setttings and functions
 source("STURM_output/C00_plots.R")
 
-run <- "2024-06-14_094322"
+run <- "2024-06-14_192041"
 
 scenarios <- c(
-    "EU" = "Counterfactual",
-    "EU_reno" = "EU_reno",
-    "EU_reno_quality" = "EU_reno_quality",
-    "EU_reno_quality_halfsuccess" = "EU_reno_quality_halfsuccess",
-    "EU_realization_rate" = "EU_realization_rate",
-    "EU_deep" = "EU_deep",
-    "EU_deep_reno" = "EU_deep_reno",
-    "EU_deep_and_reno" = "EU_deep_and_reno"
-    )
-
+    "S1" = "No additional policy",
+    "S107" = "All policies",
+    "S119" = "Renovation wave quality",
+    "S41" = "No renovation wave",
+    "S44" = "Renovation wave quantity"
+)
+ref <- "No additional policy"
 # Generate distinct colors using RColorBrewer
 num_scenarios <- length(scenarios)
 colors <- brewer.pal(min(12, num_scenarios), "Set1") # Use Set3 palette with a maximum of 12 colors
@@ -99,7 +96,7 @@ data <- distinct(data)
 ## Processing output
 ### Table summary
 
-ref <- "Counterfactual"
+
 base_year <- 2015
 
 output_table(data, save_dir = save_dir, end_year = 2030, base_year = 2015)
@@ -184,7 +181,6 @@ scatter_plots(temp,
 #--------------------------------------------------------------
 ### Cost-benefits analysis
 source("STURM_output/C00_plots.R")
-xx
 df <- make_cost_benefits(data, ref, save_dir, nb_years = 30, figures = TRUE, make_summary = FALSE)
 
 var <- "Total cost"
@@ -192,6 +188,7 @@ temp <- df %>%
   filter(variable == var)
 
 min_maps <- min(filter(df, variable == var)$value, na.rm = TRUE)
+min_maps <- - 200
 max_maps <- max(filter(df, variable == var)$value, na.rm = TRUE)
 limits <- c(min_maps, max_maps)
 figure_title <- "Cost"
@@ -203,10 +200,11 @@ plot_map(temp,
   figure_title = figure_title,
   legend_title = legend_title,
   subplot_column = "scenario",
-  ncol = 3,
+  ncol = 2,
   save_path = paste(save_dir,
     paste0("map_", title, "_2050.png"), sep = "/"))
 
+xx
 #--------------------------------------------------------------
 ### Maps by scenarios
 var <- "heat_kWh"
@@ -1196,7 +1194,6 @@ plot_multiple_lines(temp,
 source("STURM_output/C00_plots.R")
 
 years <- c(2030, 2050)
-ref <- "Counterfactual"
 
 rename_income <- c("q1" = "Tertile 1", "q2" = "Tertile 2", "q3" = "Tertile 3")
 

@@ -60,10 +60,10 @@ message_building_theme_presentation <- theme_minimal() +
 message_building_theme <- theme_minimal() +
     theme(text = element_text(size = plot_settings[["size_text"]],
                               family = plot_settings[["font_family"]]),
-          axis.title.x = element_text(margin = margin(t = 10)),
+          axis.title.x = element_blank(),
           axis.text.x = element_text(size = plot_settings[["size_text"]]),
           axis.text.y = element_text(size = plot_settings[["size_text"]]),
-          axis.title.y = element_text(margin = margin(r = 10), vjust = 0.5),
+          axis.title.y = element_blank(),
           axis.title = element_text(hjust = 0,
                                     size = plot_settings[["size_title"]]),
           panel.grid.major.x = element_blank(),
@@ -470,6 +470,8 @@ scatter_plots <- function(df,
                           size_column = NULL,
                           shape_column = NULL,
                           save_path = NULL,
+                          hline = NULL,
+                          scenarios_shape = NULL,
                           x_label_suffix = "",
                           y_label_suffix = "",
                           legend_suffix = "",
@@ -478,11 +480,22 @@ scatter_plots <- function(df,
                           legend = FALSE,
                           presentation = FALSE) {
   
+  legend_shape <- TRUE
   if (is.null(shape_column)) {
+    legend_shape <- FALSE
     df <- df %>%
       mutate("shape" = 16)
 
     shape_column <- "shape"
+  }
+
+  legend_size <- TRUE
+  if (is.null(size_column)) {
+    legend_size <- FALSE
+    df <- df %>%
+      mutate("size" = 1)
+
+    size_column <- "size"
   }
   df[[shape_column]] <- as.factor(df[[shape_column]])
 
@@ -491,16 +504,21 @@ scatter_plots <- function(df,
     ) +
     geom_point(alpha = 1) +
     # expand_limits(y = 0, x = 0) +
-    scale_shape_manual(values = c(16, 17, 18)) +  # Map groups to shapes 16, 17, 18
     scale_color_manual(values = colors_scenarios) +
     scale_size(range = c(5, 10),
                 breaks = c(
                 min(df[[size_column]]),
                 (min(df[[size_column]]) + max(df[[size_column]])) / 2,
                 max(df[[size_column]])),
-              labels = function(x) paste0(round(x, 0), legend_suffix)) +
-    guides(color = guide_legend(override.aes = list(size = 5)), size = "none")
+              labels = function(x) paste0(round(x, 0), legend_suffix))
 
+  if (!is.null(hline)) {
+    p <- p + geom_hline(yintercept = hline, linetype = "dashed", color = "red")
+  }
+
+  if (!is.null(scenarios_shape)) {
+    p <- p + scale_shape_manual(values = scenarios_shape)
+  }
 
   if (!presentation) {
       p <- p +
@@ -544,6 +562,20 @@ scatter_plots <- function(df,
 
   if (!legend) {
     p <- p + theme(legend.position = "none")
+  } else {
+    guide_list <- guides(color = guide_legend(override.aes = list(size = 5)), shape = "none", size = "none")
+
+    if (legend_size) {
+      guide_list$size <- guide_legend(override.aes = list(size = 5))
+    }
+    
+    if (legend_shape) {
+      guide_list$shape <- guide_legend(override.aes = list(size = 5))
+    }
+
+    p <- p + guides(!!!guide_list)
+
+
   }
   if (!is.null(save_path)) {
     ggsave(save_path, plot = p, width = plot_settings[["width"]],
@@ -561,7 +593,8 @@ stacked_plots <- function(data,
                           y_label_suffix = "",
                           presentation = FALSE,
                           legend = TRUE,
-                          horizontal = FALSE) {
+                          horizontal = FALSE,
+                          scales = "free_y") {
 
   if (!is.null(subplot_column)) {
     data <- data %>%
@@ -613,7 +646,7 @@ stacked_plots <- function(data,
 
   if (!is.null(subplot_column)) {
     p <- p +
-      facet_wrap(subplot_column, ncol = 4, scales = "free_y") +
+      facet_wrap(subplot_column, ncol = 4, scales = scales) +
       message_building_subplot_theme +
       theme(axis.text.x = element_text(angle = 20, hjust = 1))
 
@@ -1704,8 +1737,8 @@ make_cost_benefits <- function(data, ref, save_dir, nb_years = 30, figures = TRU
   #   mutate(variable = "Stock building") %>%
   #   rename(value = stock_building_avg)
   # temp <- bind_rows(pop, df)
-
-  write.csv(temp, paste0(save_dir, "/data_cba_country.csv"), row.names = FALSE)
+  df_return <- df
+  write.csv(df, paste0(save_dir, "/data_cba_country.csv"), row.names = FALSE)
 
   total <- df %>%
     filter(variable == "Total cost") %>%
@@ -1730,17 +1763,17 @@ make_cost_benefits <- function(data, ref, save_dir, nb_years = 30, figures = TRU
   if (figures) {
     stacked_plots(df, subplot_column = "region_bld",
       save_path = paste0(save_dir, "/cba_countries.png"),
-      color_list = color_list)
+      color_list = color_list, scales = "fixed")
 
     stacked_plots(filter(df, region_bld == "EU"),
       save_path = paste0(save_dir, "/cba_eu.png"),
-      color_list = color_list, y_label_suffix = "EUR/(year.hh)",
+      color_list = color_list, y_label_suffix = "€",
       presentation = presentation, legend = legend)
 
     stacked_plots(filter(df, region_bld == "EU"),
       save_path = paste0(save_dir, "/cba_eu_horizontal.png"),
-      color_list = color_list, y_label_suffix = "EUR/(year.hh)",
+      color_list = color_list, y_label_suffix = "€",
       presentation = presentation, legend = legend, horizontal = TRUE)
   }
-  return(temp)
+  return(df_return)
 }

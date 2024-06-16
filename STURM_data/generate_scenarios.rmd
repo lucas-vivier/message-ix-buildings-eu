@@ -18,11 +18,11 @@ print(paste("Working directory is:", getwd()))
 variables <- list(
   "carbon_tax" = as.character(c("", "EUETS", "social")), # "EUETSII", 
   "_objective_renovation" = as.character(c("", "renovation", "deep_renovation")),
-  "sub_heat" = as.character(c("", "carbon")),
-  "_success_objective_renovation" = as.character(c("", 0.5)),
+  "sub_heat" = as.character(c("", "half_carbon", "carbon")),
   "learning_rate_heat" = as.character(c("constant", "")),
-  "_realization_rate_renovation" = as.character(c(0.75, 1))
-  #"_remove_barriers_renovation" = as.character(c(FALSE, TRUE)),
+  "_success_objective_renovation" = as.character(c(1, 0.75)),
+  "_realization_rate_renovation" = as.character(c(0.75, 1)),
+  "_remove_barriers_renovation" = as.character(c(FALSE, TRUE))
   #"_remove_barriers_heater" = as.character(c(FALSE, TRUE))
 )
 
@@ -34,7 +34,7 @@ combinations <- expand.grid(variables, stringsAsFactors = FALSE)
 
 # Remove impossible combination
 combinations <- combinations %>%
-  filter(!(`_success_objective_renovation` == "0.5" & `_objective_renovation` == ""))
+  filter(!(`_success_objective_renovation` == "0.75" & `_objective_renovation` == ""))
 
 # Add scenario_id and scenario_name columns
 combinations <- combinations %>%
