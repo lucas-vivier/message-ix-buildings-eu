@@ -1,3 +1,16 @@
+```{r reprex-options, include = FALSE}
+options(
+  keep.source = TRUE,
+  rlang_backtrace_on_error_report = "full",
+  crayon.enabled = FALSE,
+  reprex.current_venue = "gh"
+)
+```
+
+```{r, results = 'asis', echo = FALSE, include = file.exists('.Rprofile'), eval = file.exists('.Rprofile')}
+cat(sprintf("*Local `.Rprofile` detected at `%s`*", normalizePath(".Rprofile")))
+```
+
 ---
 output: reprex::reprex_document
 knit: reprex::reprex_render
@@ -75,29 +88,13 @@ data <- data %>%
         & `_objective_renovation` == "deep_renovation"
         & `_success_objective_renovation` == 1
         & `_realization_rate_renovation` == 1,
-        "All policies", descr))
-```
-
-```{r}
-data <- data %>%
+        "All policies", descr)) %>%
     mutate(descr = ifelse(sub_heat == "carbon" & learning_rate_heat == "" & carbon_tax == "EUETS"
         & `_objective_renovation` == "renovation"
-        & `_success_objective_renovation` == 0.75
+        & `_success_objective_renovation` == 0.5
         & `_realization_rate_renovation` == 0.75
         & `_remove_barriers_renovation` == FALSE,
         "Renovation", descr))  %>%
-    mutate(descr = ifelse(sub_heat == "carbon" & learning_rate_heat == "" & carbon_tax == "EUETS"
-        & `_objective_renovation` == "renovation"
-        & `_success_objective_renovation` == 0.75
-        & `_realization_rate_renovation` == 1
-        & `_remove_barriers_renovation` == FALSE,
-        "Renovation with quality", descr))  %>%
-    mutate(descr = ifelse(sub_heat == "carbon" & learning_rate_heat == "" & carbon_tax == "EUETS"
-        & `_objective_renovation` == "renovation"
-        & `_success_objective_renovation` == 0.75
-        & `_realization_rate_renovation` == 0.75
-        & `_remove_barriers_renovation` == TRUE,
-        "Renovation without barrier", descr)) %>%
     mutate(descr = ifelse(sub_heat == "carbon" & learning_rate_heat == "" & carbon_tax == "EUETS"
         & `_objective_renovation` == "renovation"
         & `_success_objective_renovation` == 1
@@ -105,48 +102,29 @@ data <- data %>%
         & `_remove_barriers_renovation` == FALSE,
         "increased quantity", descr))  %>%
     mutate(descr = ifelse(sub_heat == "carbon" & learning_rate_heat == "" & carbon_tax == "EUETS"
-        & `_objective_renovation` == "renovation"
-        & `_success_objective_renovation` == 1
-        & `_realization_rate_renovation` == 1
-        & `_remove_barriers_renovation` == FALSE,
-        "increased quantity with quality", descr))  %>%
-    mutate(descr = ifelse(sub_heat == "carbon" & learning_rate_heat == "" & carbon_tax == "EUETS"
-        & `_objective_renovation` == "renovation"
-        & `_success_objective_renovation` == 1
-        & `_realization_rate_renovation` == 0.75
-        & `_remove_barriers_renovation` == TRUE,
-        "increased quantity without barrier", descr))  %>%
-    mutate(descr = ifelse(sub_heat == "carbon" & learning_rate_heat == "" & carbon_tax == "EUETS"
         & `_objective_renovation` == "deep_renovation"
-        & `_success_objective_renovation` == 0.75
+        & `_success_objective_renovation` == 0.5
         & `_realization_rate_renovation` == 0.75
         & `_remove_barriers_renovation` == FALSE,
         "improved depth", descr))  %>%
     mutate(descr = ifelse(sub_heat == "carbon" & learning_rate_heat == "" & carbon_tax == "EUETS"
-        & `_objective_renovation` == "deep_renovation"
-        & `_success_objective_renovation` == 0.75
+        & `_objective_renovation` == "renovation"
+        & `_success_objective_renovation` == 0.5
         & `_realization_rate_renovation` == 1
         & `_remove_barriers_renovation` == FALSE,
-        "improved depth with quality", descr))  %>%
+        "improved quality", descr))  %>%
     mutate(descr = ifelse(sub_heat == "carbon" & learning_rate_heat == "" & carbon_tax == "EUETS"
-        & `_objective_renovation` == "deep_renovation"
-        & `_success_objective_renovation` == 0.75
-        & `_realization_rate_renovation` == 1
+        & `_objective_renovation` == "renovation"
+        & `_success_objective_renovation` == 0.5
+        & `_realization_rate_renovation` == 0.75
         & `_remove_barriers_renovation` == TRUE,
-        "improved depth without barrier", descr))  %>%
+        "removed barriers", descr))  %>%
     mutate(descr = ifelse(sub_heat == "carbon"
         & learning_rate_heat == ""
-        & carbon_tax == ""
+        & carbon_tax == "EUETS"
         & `_objective_renovation` == ""
-        & `_realization_rate_renovation` == 1
-        & `_remove_barriers_renovation` == FALSE, "Heat pumps max with quality", descr)) %>%
-    mutate(descr = ifelse(sub_heat == "carbon"
-        & learning_rate_heat == ""
-        & carbon_tax == ""
-        & `_objective_renovation` == ""
-        & `_realization_rate_renovation` == 1
-        & `_remove_barriers_renovation` == TRUE, "Heat pumps max without barrier", descr))
-
+        & `_realization_rate_renovation` == 0.75,
+         "No renovation", descr))
 
 data <- data %>%
     mutate(groups = ifelse(groups == "Heat Pump and Renovation Maximizing", "Heat Pump Maximizing", groups)) %>%
@@ -397,12 +375,7 @@ scenarios_heat_pumps_names <- data %>%
     select(scenario_name, descr)
 scenarios_heat_pumps_names <- setNames(scenarios_heat_pumps_names$descr, scenarios_heat_pumps_names$scenario_name)
 
-scenarios_renovation <- c(
-    "Heat pumps max", "Renovation", "increased quantity", "improved depth",
-    "Heat pumps max with quality", "Renovation with quality", "increased quantity with quality", "improved depth with quality",
-    "Heat pumps max without barrier", "Renovation without barrier", "increased quantity without barrier", "improved depth without barrier"
-    )
-
+scenarios_renovation <- c("No additional policy",  ,"Renovation wave quality", "Renovation wave quantity")
 scenario_renovation_names <- data %>%
     filter(descr %in% scenarios_renovation) %>%
     select(scenario_name, descr)
@@ -445,167 +418,12 @@ data_eu <- read.csv(file,  check.names = FALSE, stringsAsFactors = FALSE, header
     mutate(name = ifelse(name == "Czech Republic", "Czechia", name))
 
 data_eu <- data_eu %>%
-    mutate(scenario_name = ifelse(scenario_name %in% names(scenarios_heat_pumps_names), scenarios_heat_pumps_names[scenario_name], scenario_name)) %>%
-    mutate(scenario_name = ifelse(scenario_name %in% names(scenario_renovation_names), scenario_renovation_names[scenario_name], scenario_name))
+    mutate(scenario_name = ifelse(scenario_name %in% names(scenarios_heat_pumps_names), scenarios_heat_pumps_names[scenario_name], scenario_name))
 
 ```
-
-```{r}
-source("STURM_output/C00_plots.R")
-file <- "data_cba_country.csv"
-file <- paste(input_dir, file, sep = "/")
-data_cba_eu <- read.csv(file,  check.names = FALSE, stringsAsFactors = FALSE, header = TRUE, row.names = NULL)  %>%
-    rename(scenario_name = scenario) %>%
-    rename(name = region_bld) %>%
-    mutate(name = ifelse(name %in% names(rename_countries), rename_countries[name], name)) %>%
-    mutate(scenario_name = ifelse(scenario_name %in% names(scenarios_heat_pumps_names), scenarios_heat_pumps_names[scenario_name], scenario_name)) %>%
-    mutate(scenario_name = ifelse(scenario_name %in% names(scenario_renovation_names), scenario_renovation_names[scenario_name], scenario_name))
-
-```
-
-```{r}
-source("STURM_output/C00_plots.R")
-var <- "Total cost"
-ref_maps <- "Heat pumps max"
-cost_ref <- data_cba_eu %>%
-    filter(variable == var) %>%
-    filter(scenario_name == ref_maps)
-cost_ref <- setNames(cost_ref$value, cost_ref$name)
-
-ref_quality_maps <- "Heat pumps max with quality"
-cost_ref_quality <- data_cba_eu %>%
-    filter(variable == var) %>%
-    filter(scenario_name == ref_quality_maps)
-cost_ref_quality <- setNames(cost_ref_quality$value, cost_ref_quality$name)
-
-ref_barrier_maps <- "Heat pumps max without barrier"
-cost_ref_barrier <- data_cba_eu %>%
-    filter(variable == var) %>%
-    filter(scenario_name == ref_barrier_maps)
-cost_ref_barrier <- setNames(cost_ref_barrier$value, cost_ref_barrier$name)
-
-
-temp <- data_cba_eu %>%
-  filter(variable == var) %>%
-  filter(scenario_name %in% scenario_renovation_names) %>%
-  filter(!grepl("barrier", scenario_name)) %>%
-  filter(scenario_name != ref_maps) %>%
-  filter(scenario_name != ref_quality_maps) %>%
-  filter(scenario_name != ref_barrier_maps) %>%
-  mutate(value = case_when(
-    grepl("quality", scenario_name) ~ value - cost_ref_quality[name],
-    grepl("barrier", scenario_name) ~ value - cost_ref_barrier[name],
-    TRUE ~ value - cost_ref[name]
-  ))
-
-temp$scenario_name <- factor(temp$scenario_name, levels = scenario_renovation_names)
-
-min_maps <- min(filter(temp, variable == var)$value, na.rm = TRUE)
-max_maps <- max(filter(temp, variable == var)$value, na.rm = TRUE)
-limits <- c(min_maps, max_maps)
-figure_title <- "Cost"
-legend_title <- "€/hh.year"
-title <- "cost"
-save_path <- paste(save_dir, "maps_cba_countries_renovation.png", sep = "/")
-
-
-plot_map(temp,
-  limits,
-  threshold_colormap = 0,
-  figure_title = figure_title,
-  legend_title = legend_title,
-  reverse_colormap = TRUE,
-  subplot_column = "scenario_name",
-  ncol = 3,
-  save_path = save_path,
-  key = "name")
-
-```
-
 
 #-----------------------------------------------------------------------------------------
 #### Maps
-
-```{r}
-source("STURM_output/C00_plots.R")
-
-temp <- data_eu %>%
-    select(c("scenario_name", "name", "Emission saving (%)")) %>%
-    rename(value = `Emission saving (%)`) %>%
-    filter(scenario_name %in% scenarios_heat_pumps)
-
-temp$scenario_name <- factor(temp$scenario_name, levels = scenarios_heat_pumps)
-
-min <- min(temp$value, na.rm = TRUE)
-limits <- c(min, 1)
-save_path <- paste(save_dir, "maps_emission_countries_heatpump.png", sep = "/")
-
-plot_map(temp,
-        limits,
-        threshold_colormap = 0.95,
-        figure_title = "",
-        save_path = save_path,
-        legend_title = "%",
-        subplot_column = "scenario_name",
-        ncol = 4,
-        key = "name")
-```
-
-
-```{r}
-source("STURM_output/C00_plots.R")
-
-temp <- data_eu %>%
-    select(c("scenario_name", "name", "Consumption electricity variation (%)")) %>%
-    rename(value = `Consumption electricity variation (%)`) %>%
-    filter(scenario_name %in% scenario_renovation_names)
-
-temp$scenario_name <- factor(temp$scenario_name, levels = scenario_renovation_names)
-
-min <- min(temp$value, na.rm = TRUE)
-#limits <- c(min, 1)
-save_path <- paste(save_dir, "maps_electricity_countries_renovation.png", sep = "/")
-
-plot_map(temp,
-        limits = NULL,
-        threshold_colormap = NULL,
-        figure_title = "",
-        save_path = save_path,
-        legend_title = "%",
-        subplot_column = "scenario_name",
-        ncol = 3,
-        key = "name")
-```
-
-
-```{r}
-source("STURM_output/C00_plots.R")
-
-cost_heat_pump_max <- data_eu %>%
-    filter(scenario_name == "Heat pumps max") %>%
-
-
-temp <- data_eu %>%
-    select(c("scenario_name", "name", "Consumption electricity variation (%)")) %>%
-    rename(value = `Consumption electricity variation (%)`) %>%
-    filter(scenario_name %in% scenario_renovation_names)
-
-temp$scenario_name <- factor(temp$scenario_name, levels = scenario_renovation_names)
-
-min <- min(temp$value, na.rm = TRUE)
-#limits <- c(min, 1)
-save_path <- paste(save_dir, "maps_electricity_countries_renovation.png", sep = "/")
-
-plot_map(temp,
-        limits = NULL,
-        threshold_colormap = NULL,
-        figure_title = "",
-        save_path = save_path,
-        legend_title = "%",
-        subplot_column = "scenario_name",
-        ncol = 3,
-        key = "name")
-```
 
 ```{r}
 source("STURM_output/C00_plots.R")
@@ -861,3 +679,5 @@ ggsave(save_path, plot = p, width = plot_settings[["width"]],
 # write.csv(temp, paste(save_dir, "scenario_target_countries.csv", sep = "/"), row.names = FALSE)
 
 ```
+
+<sup>Created on `r Sys.Date()` with [reprex v`r utils::packageVersion("reprex")`](https://reprex.tidyverse.org)</sup>

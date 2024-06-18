@@ -1,20 +1,19 @@
----
-output: reprex::reprex_document
-knit: reprex::reprex_render
----
-
 Notebook to run STURM Ouput.
 
-```{r}
+``` r
 library(tidyverse)
 library(dplyr)
 library(ggplot2)
 library(stringr)
 
 print(paste("Working directory is:", getwd()))
+#> [1] "Working directory is: /Users/lucas/PycharmProjects/message-ix-buildings/STURM_output"
 
 # Loding figures setttings and functions
 source("STURM_output/C00_plots.R")
+#> Warning in file(filename, "r", encoding = encoding): cannot open file
+#> 'STURM_output/C00_plots.R': No such file or directory
+#> Error in file(filename, "r", encoding = encoding): cannot open the connection
 
 dir <- "simulation_2024-06-16_184750"
 ref <- "S1"
@@ -23,14 +22,25 @@ save_dir <- paste(input_dir, "multiple_scenarios", sep = "/")
 if (!dir.exists(save_dir)) {
     dir.create(save_dir)
 }
+#> Warning in dir.create(save_dir): cannot create dir
+#> 'STURM_output/figures/simulation_2024-06-16_184750/multiple_scenarios', reason
+#> 'No such file or directory'
 
 file <- paste(input_dir, "results.csv", sep = "/")
 data <- read.csv(file,  check.names = FALSE, stringsAsFactors = FALSE, header = TRUE, row.names = NULL)
+#> Warning in file(file, "rt"): cannot open file
+#> 'STURM_output/figures/simulation_2024-06-16_184750/results.csv': No such file
+#> or directory
+#> Error in file(file, "rt"): cannot open the connection
 data <- data[, -1]
+#> Error in data[, -1]: object of type 'closure' is not subsettable
 
 emission_saving_counterfactual <- filter(data, scenario_name == ref)$`Emission saving (%)`[1]
+#> Error in UseMethod("filter"): no applicable method for 'filter' applied to an object of class "function"
 energy_saving_counterfactual <- filter(data, scenario_name == ref)$`Consumption saving (%)`[1]
+#> Error in UseMethod("filter"): no applicable method for 'filter' applied to an object of class "function"
 electricity_variation_counterfactual <- filter(data, scenario_name == ref)$`Consumption electricity variation (%)`[1]
+#> Error in UseMethod("filter"): no applicable method for 'filter' applied to an object of class "function"
 
 data <- data %>%
     mutate(color = "darkgrey") %>%
@@ -39,6 +49,7 @@ data <- data %>%
     mutate(`Consumption electricity variation (%)` = ifelse(scenario_name != ref, `Consumption electricity variation (%)` + electricity_variation_counterfactual, `Consumption electricity variation (%)`)) %>%
     mutate(`Delta total cost (euro/hh/year)` = ifelse(is.na(`Delta total cost (euro/hh/year)`), 0, `Delta total cost (euro/hh/year)`)) %>%
     mutate(`Delta total cost private (euro/hh/year)` = ifelse(is.na(`Delta total cost private (euro/hh/year)`), 0, `Delta total cost private (euro/hh/year)`))
+#> Error in UseMethod("mutate"): no applicable method for 'mutate' applied to an object of class "function"
 
 
 if (FALSE) {
@@ -57,6 +68,7 @@ if (FALSE) {
 
 }
 min_cost <- min(data$`Delta total cost (euro/hh/year)`, na.rm = TRUE)
+#> Error in data$`Delta total cost (euro/hh/year)`: object of type 'closure' is not subsettable
 
 data <- data %>%
     mutate(`_success_objective_renovation` = ifelse(is.na(`_success_objective_renovation`), 1, `_success_objective_renovation`)) %>%
@@ -75,29 +87,13 @@ data <- data %>%
         & `_objective_renovation` == "deep_renovation"
         & `_success_objective_renovation` == 1
         & `_realization_rate_renovation` == 1,
-        "All policies", descr))
-```
-
-```{r}
-data <- data %>%
+        "All policies", descr)) %>%
     mutate(descr = ifelse(sub_heat == "carbon" & learning_rate_heat == "" & carbon_tax == "EUETS"
         & `_objective_renovation` == "renovation"
-        & `_success_objective_renovation` == 0.75
+        & `_success_objective_renovation` == 0.5
         & `_realization_rate_renovation` == 0.75
         & `_remove_barriers_renovation` == FALSE,
         "Renovation", descr))  %>%
-    mutate(descr = ifelse(sub_heat == "carbon" & learning_rate_heat == "" & carbon_tax == "EUETS"
-        & `_objective_renovation` == "renovation"
-        & `_success_objective_renovation` == 0.75
-        & `_realization_rate_renovation` == 1
-        & `_remove_barriers_renovation` == FALSE,
-        "Renovation with quality", descr))  %>%
-    mutate(descr = ifelse(sub_heat == "carbon" & learning_rate_heat == "" & carbon_tax == "EUETS"
-        & `_objective_renovation` == "renovation"
-        & `_success_objective_renovation` == 0.75
-        & `_realization_rate_renovation` == 0.75
-        & `_remove_barriers_renovation` == TRUE,
-        "Renovation without barrier", descr)) %>%
     mutate(descr = ifelse(sub_heat == "carbon" & learning_rate_heat == "" & carbon_tax == "EUETS"
         & `_objective_renovation` == "renovation"
         & `_success_objective_renovation` == 1
@@ -105,48 +101,30 @@ data <- data %>%
         & `_remove_barriers_renovation` == FALSE,
         "increased quantity", descr))  %>%
     mutate(descr = ifelse(sub_heat == "carbon" & learning_rate_heat == "" & carbon_tax == "EUETS"
-        & `_objective_renovation` == "renovation"
-        & `_success_objective_renovation` == 1
-        & `_realization_rate_renovation` == 1
-        & `_remove_barriers_renovation` == FALSE,
-        "increased quantity with quality", descr))  %>%
-    mutate(descr = ifelse(sub_heat == "carbon" & learning_rate_heat == "" & carbon_tax == "EUETS"
-        & `_objective_renovation` == "renovation"
-        & `_success_objective_renovation` == 1
-        & `_realization_rate_renovation` == 0.75
-        & `_remove_barriers_renovation` == TRUE,
-        "increased quantity without barrier", descr))  %>%
-    mutate(descr = ifelse(sub_heat == "carbon" & learning_rate_heat == "" & carbon_tax == "EUETS"
         & `_objective_renovation` == "deep_renovation"
-        & `_success_objective_renovation` == 0.75
+        & `_success_objective_renovation` == 0.5
         & `_realization_rate_renovation` == 0.75
         & `_remove_barriers_renovation` == FALSE,
         "improved depth", descr))  %>%
     mutate(descr = ifelse(sub_heat == "carbon" & learning_rate_heat == "" & carbon_tax == "EUETS"
-        & `_objective_renovation` == "deep_renovation"
-        & `_success_objective_renovation` == 0.75
+        & `_objective_renovation` == "renovation"
+        & `_success_objective_renovation` == 0.5
         & `_realization_rate_renovation` == 1
         & `_remove_barriers_renovation` == FALSE,
-        "improved depth with quality", descr))  %>%
+        "improved quality", descr))  %>%
     mutate(descr = ifelse(sub_heat == "carbon" & learning_rate_heat == "" & carbon_tax == "EUETS"
-        & `_objective_renovation` == "deep_renovation"
-        & `_success_objective_renovation` == 0.75
-        & `_realization_rate_renovation` == 1
+        & `_objective_renovation` == "renovation"
+        & `_success_objective_renovation` == 0.5
+        & `_realization_rate_renovation` == 0.75
         & `_remove_barriers_renovation` == TRUE,
-        "improved depth without barrier", descr))  %>%
+        "removed barriers", descr))  %>%
     mutate(descr = ifelse(sub_heat == "carbon"
         & learning_rate_heat == ""
-        & carbon_tax == ""
+        & carbon_tax == "EUETS"
         & `_objective_renovation` == ""
-        & `_realization_rate_renovation` == 1
-        & `_remove_barriers_renovation` == FALSE, "Heat pumps max with quality", descr)) %>%
-    mutate(descr = ifelse(sub_heat == "carbon"
-        & learning_rate_heat == ""
-        & carbon_tax == ""
-        & `_objective_renovation` == ""
-        & `_realization_rate_renovation` == 1
-        & `_remove_barriers_renovation` == TRUE, "Heat pumps max without barrier", descr))
-
+        & `_realization_rate_renovation` == 0.75,
+         "No renovation", descr))
+#> Error in UseMethod("mutate"): no applicable method for 'mutate' applied to an object of class "function"
 
 data <- data %>%
     mutate(groups = ifelse(groups == "Heat Pump and Renovation Maximizing", "Heat Pump Maximizing", groups)) %>%
@@ -170,6 +148,7 @@ data <- data %>%
         & `_objective_renovation` == ""
         & `_realization_rate_renovation` == 0.75
         & `_remove_barriers_renovation` == FALSE, "Heat pumps medium", descr))
+#> Error in UseMethod("mutate"): no applicable method for 'mutate' applied to an object of class "function"
 
 
 
@@ -190,39 +169,49 @@ scenarios_shape <- c(
     "Renovation Maximizing" = 18,
     "Heat Pump and Renovation Maximizing" = 15
 )
-
 ```
 
-
-
 ##### Histogram - Distribution of key outcomes across scenarios
-```{r}
+
+``` r
 source("STURM_output/C00_plots.R")
+#> Warning in file(filename, "r", encoding = encoding): cannot open file
+#> 'STURM_output/C00_plots.R': No such file or directory
+#> Error in file(filename, "r", encoding = encoding): cannot open the connection
 
 column <- "Consumption saving (%)"
 save_path <- paste(save_dir, "Consumption_saving.png", sep = "/")
 plot_histogram(data, column, save_path)
+#> Error in plot_histogram(data, column, save_path): could not find function "plot_histogram"
 
 column <- "Emission saving (%)"
 save_path <- paste(save_dir, "Emission_saving.png", sep = "/")
 plot_histogram(data, column, save_path)
+#> Error in plot_histogram(data, column, save_path): could not find function "plot_histogram"
 
 column <- "Consumption electricity variation (%)"
 save_path <- paste(save_dir, "Electricity_variation.png", sep = "/")
 plot_histogram(data, column, save_path)
+#> Error in plot_histogram(data, column, save_path): could not find function "plot_histogram"
 
 column <- "Delta total cost private (euro/hh/year)"
 save_path <- paste(save_dir, "Delta_total_cost_private_euro_hh_year.png", sep = "/")
 plot_histogram(data, column, save_path)
+#> Error in plot_histogram(data, column, save_path): could not find function "plot_histogram"
 
 
 # TODO: histogram cost-efficient strategies
 ```
-#------------------------------------------------------------------------------
-##### Sobol - Identification of key policies
-```{r}
+
+\#——————————————————————————
+\#\#\#\#\# Sobol - Identification of key policies
+
+``` r
 # Sobol analysis
 source("STURM_output/C00_plots.R")
+#> Warning in file(filename, "r", encoding = encoding): cannot open file
+#> 'STURM_output/C00_plots.R': No such file or directory
+#> Error in file(filename, "r", encoding = encoding): cannot open the connection
 
 rename_policies <- c("carbon_tax" = "Carbon tax",
     "sub_heat" = "Heat pump subsidies",
@@ -245,29 +234,34 @@ df <- data %>%
     # Replace NaN or empty value by "no" for all 
     mutate(across(all_of(list_policies), ~ifelse(is.na(.x) | .x == "", "no", .x))) %>%
     mutate(`_remove_barriers_renovation` = ifelse(`_remove_barriers_renovation`, "yes", "no"))
+#> Error in UseMethod("filter"): no applicable method for 'filter' applied to an object of class "function"
     
 
 
 y <- "Emission (MtCO2)"
 save_path <- paste(save_dir, "sobol_analysis_emission.png", sep = "/")
 sobol_figures(df, list_policies, y, rename_policies, save_path)
+#> Error in sobol_figures(df, list_policies, y, rename_policies, save_path): could not find function "sobol_figures"
 
 y <- "Space heating consumption (TWh)"
 save_path <- paste(save_dir, "sobol_analysis_energy.png", sep = "/")
 sobol_figures(df, list_policies, y, rename_policies, save_path)
+#> Error in sobol_figures(df, list_policies, y, rename_policies, save_path): could not find function "sobol_figures"
 
 y <- "Delta total cost private (euro/hh/year)"
 save_path <- paste(save_dir, "sobol_analysis_cost.png", sep = "/")
 sobol_figures(df, list_policies, y, rename_policies, save_path)
-
+#> Error in sobol_figures(df, list_policies, y, rename_policies, save_path): could not find function "sobol_figures"
 ```
 
+\#——————————————————————————
+\#\#\#\#\# Scatter plot - Relationship between two key outcomes
 
-
-#------------------------------------------------------------------------------
-##### Scatter plot - Relationship between two key outcomes
-```{r}
+``` r
 source("STURM_output/C00_plots.R")
+#> Warning in file(filename, "r", encoding = encoding): cannot open file
+#> 'STURM_output/C00_plots.R': No such file or directory
+#> Error in file(filename, "r", encoding = encoding): cannot open the connection
 x_column <- "Delta total cost (euro/hh/year)"
 y_column <- "Emission saving (%)"
 #color_column <- "descr"
@@ -278,6 +272,7 @@ save_path <- paste(save_dir, "tradeoff_cost_emission.png", sep = "/")
 
 temp <- data %>%
     mutate(`Emission saving (%)` = 100 * `Emission saving (%)`)
+#> Error in UseMethod("mutate"): no applicable method for 'mutate' applied to an object of class "function"
 
 scatter_plots(temp,
             x_column,
@@ -296,11 +291,10 @@ scatter_plots(temp,
             x_label = "Social cost-benefits (€/hh/year)",
             legend = TRUE,
             presentation = FALSE)
-
+#> Error in scatter_plots(temp, x_column, y_column, color_column, colors_scenarios = colors_scenarios, : could not find function "scatter_plots"
 ```
 
-
-```{r}
+``` r
 x_column <- "Delta total cost private (euro/hh/year)"
 y_column <- "Emission saving (%)"
 
@@ -308,8 +302,12 @@ save_path <- paste(save_dir, "tradeoff_cost_private_emission.png", sep = "/")
 
 temp <- data %>%
     mutate(`Emission saving (%)` = 100 * `Emission saving (%)`)
+#> Error in UseMethod("mutate"): no applicable method for 'mutate' applied to an object of class "function"
 
 source("STURM_output/C00_plots.R")
+#> Warning in file(filename, "r", encoding = encoding): cannot open file
+#> 'STURM_output/C00_plots.R': No such file or directory
+#> Error in file(filename, "r", encoding = encoding): cannot open the connection
 scatter_plots(temp,
             x_column,
             y_column,
@@ -327,9 +325,10 @@ scatter_plots(temp,
             x_label = "Private cost-benefits (€/hh/year)",
             legend = TRUE,
             presentation = FALSE)
+#> Error in scatter_plots(temp, x_column, y_column, color_column, colors_scenarios = colors_scenarios, : could not find function "scatter_plots"
 ```
 
-```{r}
+``` r
 x_column <- "Consumption electricity variation (%)"
 y_column <- "Emission saving (%)"
 
@@ -338,6 +337,7 @@ save_path <- paste(save_dir, "tradeoff_electricity_emission.png", sep = "/")
 temp <- data %>%
     mutate(`Emission saving (%)` = 100 * `Emission saving (%)`) %>%
     mutate(`Consumption electricity variation (%)` = 100 * `Consumption electricity variation (%)`)
+#> Error in UseMethod("mutate"): no applicable method for 'mutate' applied to an object of class "function"
 
 scatter_plots(temp,
             x_column,
@@ -356,10 +356,10 @@ scatter_plots(temp,
             x_label = "Electricitity use variation (%)",
             legend = TRUE,
             presentation = FALSE)
+#> Error in scatter_plots(temp, x_column, y_column, color_column, hline = 95, : could not find function "scatter_plots"
 ```
 
-
-```{r}
+``` r
 x_column <- "Consumption saving (%)"
 y_column <- "Emission saving (%)"
 
@@ -368,6 +368,7 @@ save_path <- paste(save_dir, "tradeoff_consumption_emission.png", sep = "/")
 temp <- data %>%
     mutate(`Consumption saving (%)` = 100 * `Consumption saving (%)`) %>%
     mutate(`Emission saving (%)` = 100 * `Emission saving (%)`)
+#> Error in UseMethod("mutate"): no applicable method for 'mutate' applied to an object of class "function"
 
 scatter_plots(temp,
             x_column,
@@ -386,39 +387,42 @@ scatter_plots(temp,
             x_label = "Consumption saving (%)",
             legend = TRUE,
             presentation = FALSE)
-
+#> Error in scatter_plots(temp, x_column, y_column, color_column, hline = 95, : could not find function "scatter_plots"
 ```
 
-```{r}
+``` r
 # Scenario to assess
 scenarios_heat_pumps <- c("No additional policy", "Heat pumps only learning", "Heat pumps medium", "Heat pumps max")
 scenarios_heat_pumps_names <- data %>%
     filter(descr %in% scenarios_heat_pumps) %>%
     select(scenario_name, descr)
+#> Error in UseMethod("filter"): no applicable method for 'filter' applied to an object of class "function"
 scenarios_heat_pumps_names <- setNames(scenarios_heat_pumps_names$descr, scenarios_heat_pumps_names$scenario_name)
+#> Error in eval(expr, envir, enclos): object 'scenarios_heat_pumps_names' not found
 
-scenarios_renovation <- c(
-    "Heat pumps max", "Renovation", "increased quantity", "improved depth",
-    "Heat pumps max with quality", "Renovation with quality", "increased quantity with quality", "improved depth with quality",
-    "Heat pumps max without barrier", "Renovation without barrier", "increased quantity without barrier", "improved depth without barrier"
-    )
-
+scenarios_renovation <- c("No additional policy",  ,"Renovation wave quality", "Renovation wave quantity")
+#> Error in c("No additional policy", , "Renovation wave quality", "Renovation wave quantity"): argument 2 is empty
 scenario_renovation_names <- data %>%
     filter(descr %in% scenarios_renovation) %>%
     select(scenario_name, descr)
+#> Error in UseMethod("filter"): no applicable method for 'filter' applied to an object of class "function"
 scenario_renovation_names <- setNames(scenario_renovation_names$descr, scenario_renovation_names$scenario_name)
-
+#> Error in eval(expr, envir, enclos): object 'scenario_renovation_names' not found
 ```
 
-#------------------------------------------------------------------------------
-#------------------------------------------------------------------------------
-#### Analysis by countries
+\#——————————————————————————
+\#——————————————————————————
+\#\#\#\# Analysis by countries
 
-```{r}
+``` r
 file <- "STURM_data/input_csv/input_resid/decision/cost_factor_countries_EU.csv"
 cost_factor <- read.csv(file,  check.names = FALSE, stringsAsFactors = FALSE, header = TRUE, row.names = NULL) %>%
     mutate(region_bld = rename_countries[region_bld]) %>%
     rename(name = region_bld, cost_factor = value)
+#> Warning in file(file, "rt"): cannot open file
+#> 'STURM_data/input_csv/input_resid/decision/cost_factor_countries_EU.csv': No
+#> such file or directory
+#> Error in file(file, "rt"): cannot open the connection
 
 
 file <- "2024-06-16_184750_2050_summary_countries.csv"
@@ -443,100 +447,36 @@ data_eu <- read.csv(file,  check.names = FALSE, stringsAsFactors = FALSE, header
         `Government expenditures (Billion EUR)` = `Government expenditures (Billion EUR)` / `Population (Million)`,
     ) %>%
     mutate(name = ifelse(name == "Czech Republic", "Czechia", name))
+#> Warning in file(file, "rt"): cannot open file
+#> 'STURM_output/figures/simulation_2024-06-16_184750/2024-06-16_184750_2050_summary_countries.csv':
+#> No such file or directory
+#> Error in file(file, "rt"): cannot open the connection
 
 data_eu <- data_eu %>%
-    mutate(scenario_name = ifelse(scenario_name %in% names(scenarios_heat_pumps_names), scenarios_heat_pumps_names[scenario_name], scenario_name)) %>%
-    mutate(scenario_name = ifelse(scenario_name %in% names(scenario_renovation_names), scenario_renovation_names[scenario_name], scenario_name))
-
+    mutate(scenario_name = ifelse(scenario_name %in% names(scenarios_heat_pumps_names), scenarios_heat_pumps_names[scenario_name], scenario_name))
+#> Error in eval(expr, envir, enclos): object 'data_eu' not found
 ```
 
-```{r}
+\#—————————————————————————————–
+\#\#\#\# Maps
+
+``` r
 source("STURM_output/C00_plots.R")
-file <- "data_cba_country.csv"
-file <- paste(input_dir, file, sep = "/")
-data_cba_eu <- read.csv(file,  check.names = FALSE, stringsAsFactors = FALSE, header = TRUE, row.names = NULL)  %>%
-    rename(scenario_name = scenario) %>%
-    rename(name = region_bld) %>%
-    mutate(name = ifelse(name %in% names(rename_countries), rename_countries[name], name)) %>%
-    mutate(scenario_name = ifelse(scenario_name %in% names(scenarios_heat_pumps_names), scenarios_heat_pumps_names[scenario_name], scenario_name)) %>%
-    mutate(scenario_name = ifelse(scenario_name %in% names(scenario_renovation_names), scenario_renovation_names[scenario_name], scenario_name))
-
-```
-
-```{r}
-source("STURM_output/C00_plots.R")
-var <- "Total cost"
-ref_maps <- "Heat pumps max"
-cost_ref <- data_cba_eu %>%
-    filter(variable == var) %>%
-    filter(scenario_name == ref_maps)
-cost_ref <- setNames(cost_ref$value, cost_ref$name)
-
-ref_quality_maps <- "Heat pumps max with quality"
-cost_ref_quality <- data_cba_eu %>%
-    filter(variable == var) %>%
-    filter(scenario_name == ref_quality_maps)
-cost_ref_quality <- setNames(cost_ref_quality$value, cost_ref_quality$name)
-
-ref_barrier_maps <- "Heat pumps max without barrier"
-cost_ref_barrier <- data_cba_eu %>%
-    filter(variable == var) %>%
-    filter(scenario_name == ref_barrier_maps)
-cost_ref_barrier <- setNames(cost_ref_barrier$value, cost_ref_barrier$name)
-
-
-temp <- data_cba_eu %>%
-  filter(variable == var) %>%
-  filter(scenario_name %in% scenario_renovation_names) %>%
-  filter(!grepl("barrier", scenario_name)) %>%
-  filter(scenario_name != ref_maps) %>%
-  filter(scenario_name != ref_quality_maps) %>%
-  filter(scenario_name != ref_barrier_maps) %>%
-  mutate(value = case_when(
-    grepl("quality", scenario_name) ~ value - cost_ref_quality[name],
-    grepl("barrier", scenario_name) ~ value - cost_ref_barrier[name],
-    TRUE ~ value - cost_ref[name]
-  ))
-
-temp$scenario_name <- factor(temp$scenario_name, levels = scenario_renovation_names)
-
-min_maps <- min(filter(temp, variable == var)$value, na.rm = TRUE)
-max_maps <- max(filter(temp, variable == var)$value, na.rm = TRUE)
-limits <- c(min_maps, max_maps)
-figure_title <- "Cost"
-legend_title <- "€/hh.year"
-title <- "cost"
-save_path <- paste(save_dir, "maps_cba_countries_renovation.png", sep = "/")
-
-
-plot_map(temp,
-  limits,
-  threshold_colormap = 0,
-  figure_title = figure_title,
-  legend_title = legend_title,
-  reverse_colormap = TRUE,
-  subplot_column = "scenario_name",
-  ncol = 3,
-  save_path = save_path,
-  key = "name")
-
-```
-
-
-#-----------------------------------------------------------------------------------------
-#### Maps
-
-```{r}
-source("STURM_output/C00_plots.R")
+#> Warning in file(filename, "r", encoding = encoding): cannot open file
+#> 'STURM_output/C00_plots.R': No such file or directory
+#> Error in file(filename, "r", encoding = encoding): cannot open the connection
 
 temp <- data_eu %>%
     select(c("scenario_name", "name", "Emission saving (%)")) %>%
     rename(value = `Emission saving (%)`) %>%
     filter(scenario_name %in% scenarios_heat_pumps)
+#> Error in eval(expr, envir, enclos): object 'data_eu' not found
 
 temp$scenario_name <- factor(temp$scenario_name, levels = scenarios_heat_pumps)
+#> Error in eval(expr, envir, enclos): object 'temp' not found
 
 min <- min(temp$value, na.rm = TRUE)
+#> Error in eval(expr, envir, enclos): object 'temp' not found
 limits <- c(min, 1)
 save_path <- paste(save_dir, "maps_emission_countries_heatpump.png", sep = "/")
 
@@ -549,99 +489,23 @@ plot_map(temp,
         subplot_column = "scenario_name",
         ncol = 4,
         key = "name")
+#> Error in plot_map(temp, limits, threshold_colormap = 0.95, figure_title = "", : could not find function "plot_map"
 ```
 
-
-```{r}
+``` r
 source("STURM_output/C00_plots.R")
-
-temp <- data_eu %>%
-    select(c("scenario_name", "name", "Consumption electricity variation (%)")) %>%
-    rename(value = `Consumption electricity variation (%)`) %>%
-    filter(scenario_name %in% scenario_renovation_names)
-
-temp$scenario_name <- factor(temp$scenario_name, levels = scenario_renovation_names)
-
-min <- min(temp$value, na.rm = TRUE)
-#limits <- c(min, 1)
-save_path <- paste(save_dir, "maps_electricity_countries_renovation.png", sep = "/")
-
-plot_map(temp,
-        limits = NULL,
-        threshold_colormap = NULL,
-        figure_title = "",
-        save_path = save_path,
-        legend_title = "%",
-        subplot_column = "scenario_name",
-        ncol = 3,
-        key = "name")
-```
-
-
-```{r}
-source("STURM_output/C00_plots.R")
-
-cost_heat_pump_max <- data_eu %>%
-    filter(scenario_name == "Heat pumps max") %>%
-
-
-temp <- data_eu %>%
-    select(c("scenario_name", "name", "Consumption electricity variation (%)")) %>%
-    rename(value = `Consumption electricity variation (%)`) %>%
-    filter(scenario_name %in% scenario_renovation_names)
-
-temp$scenario_name <- factor(temp$scenario_name, levels = scenario_renovation_names)
-
-min <- min(temp$value, na.rm = TRUE)
-#limits <- c(min, 1)
-save_path <- paste(save_dir, "maps_electricity_countries_renovation.png", sep = "/")
-
-plot_map(temp,
-        limits = NULL,
-        threshold_colormap = NULL,
-        figure_title = "",
-        save_path = save_path,
-        legend_title = "%",
-        subplot_column = "scenario_name",
-        ncol = 3,
-        key = "name")
-```
-
-```{r}
-source("STURM_output/C00_plots.R")
-
-temp <- data_eu %>%
-    select(c("scenario_name", "name", "Emission saving (%)")) %>%
-    rename(value = `Emission saving (%)`) %>%
-    filter(scenario_name %in% scenarios_heat_pumps)
-
-temp$scenario_name <- factor(temp$scenario_name, levels = scenarios_heat_pumps)
-
-min <- min(temp$value, na.rm = TRUE)
-limits <- c(min, 1)
-save_path <- paste(save_dir, "maps_emission_countries_heatpump.png", sep = "/")
-
-plot_map(temp,
-        limits,
-        threshold_colormap = 0.95,
-        figure_title = "",
-        save_path = save_path,
-        legend_title = "%",
-        subplot_column = "scenario_name",
-        ncol = 4,
-        key = "name")
-```
-
-
-```{r}
-source("STURM_output/C00_plots.R")
+#> Warning in file(filename, "r", encoding = encoding): cannot open file
+#> 'STURM_output/C00_plots.R': No such file or directory
+#> Error in file(filename, "r", encoding = encoding): cannot open the connection
 
 temp <- df %>%
     select(c("scenario_name", "name", "Space heating consumption (MWh/capita)")) %>%
     rename(value = `Space heating consumption (MWh/capita)`) %>%
     filter(scenario_name %in% scenarios)
+#> Error in UseMethod("select"): no applicable method for 'select' applied to an object of class "function"
 
 temp$scenario_name <- factor(temp$scenario_name, levels = scenarios)
+#> Error in eval(expr, envir, enclos): object 'temp' not found
 
 limits <- c(0, 7)
 save_path <- paste(save_dir, "space_heating_consumption_countries.png", sep = "/")
@@ -654,18 +518,24 @@ plot_map(temp,
         subplot_column = "scenario_name",
         ncol = 3,
         key = "name")
+#> Error in plot_map(temp, limits, figure_title = "", save_path = save_path, : could not find function "plot_map"
 ```
 
-```{r}
+``` r
 source("STURM_output/C00_plots.R")
+#> Warning in file(filename, "r", encoding = encoding): cannot open file
+#> 'STURM_output/C00_plots.R': No such file or directory
+#> Error in file(filename, "r", encoding = encoding): cannot open the connection
 
 temp <- df %>%
     select(c("scenario_name", "name", "Share fossil-fuels (Percent)")) %>%
     rename(value = `Share fossil-fuels (Percent)`) %>%
     mutate(value = ifelse(is.na(value), 0, value)) %>%
     filter(scenario_name %in% scenarios)
+#> Error in UseMethod("select"): no applicable method for 'select' applied to an object of class "function"
 
 temp$scenario_name <- factor(temp$scenario_name, levels = scenarios)
+#> Error in eval(expr, envir, enclos): object 'temp' not found
 
 limits <- c(0, 0.8)
 save_path <- paste(save_dir, "share_fossil_fuels_countries.png", sep = "/")
@@ -678,11 +548,12 @@ plot_map(temp,
         subplot_column = "scenario_name",
         ncol = 3,
         key = "name")
+#> Error in plot_map(temp, limits, figure_title = "", save_path = save_path, : could not find function "plot_map"
 ```
 
 ### Calculate difference compared to the S1 the counterfactual
-```{r}
 
+``` r
 rename_variable <- c("Space heating consumption (TWh)" = "Energy consumption",
     "Emission (MtCO2)" = "Emission",
     "Cost renovation (Billion EUR)" = "Renovation investment",
@@ -698,9 +569,10 @@ diff_counterfactual_eu <- data_eu %>%
     pivot_wider(names_from = "scenario_name", values_from = "value") %>%
     mutate(value = (.data[[best_scenario]] - .data[["S1"]]) / .data[["S1"]]) %>%
     mutate(variable = rename_variable[variable])
+#> Error in eval(expr, envir, enclos): object 'data_eu' not found
 ```
 
-```{r}
+``` r
 limits <- c(-1, 0)
 save_path <- paste(save_dir, "effort_countries.png", sep = "/")
 
@@ -712,11 +584,10 @@ plot_map(diff_counterfactual_eu,
         subplot_column = "variable",
         ncol = 4,
         key = "name")
+#> Error in plot_map(diff_counterfactual_eu, limits, figure_title = "", save_path = save_path, : could not find function "plot_map"
 ```
 
-
-
-```{r}
+``` r
 rename_variable <- c("Emission saving (%)" = "Emission saving",
     "Consumption saving (%)" = "Emission",
     "Cost renovation (Billion EUR)" = "Renovation investment",
@@ -736,14 +607,12 @@ diff_avg_eu <- data_eu %>%
     mutate(value = (.data[[best_scenario]] - .data[[best_scenario]]) / .data[[best_scenario]]) %>%
     mutate(value = (.data[[best_scenario]] - .data[["S1"]]) / .data[["S1"]]) %>%
     mutate(variable = rename_variable[variable])
-
-
+#> Error in eval(expr, envir, enclos): object 'data_eu' not found
 ```
 
-
 ### Calculate difference compared to the S1 the counterfactual
-```{r}
 
+``` r
 rename_variable <- c("Space heating consumption (MWh/capita)" = "Energy reduction effort",
     "Emission (tCO2/capita)" = "Emission reduction effort",
     "Cost renovation (EUR/capita)" = "Cost renovation effort",
@@ -764,9 +633,10 @@ diff_counterfactual_eu <- data_eu %>%
     ungroup() %>%
     mutate(value = effort / avg_effort) %>%
     mutate(variable = ifelse(variable %in% names(rename_variable), rename_variable[variable], variable))
+#> Error in eval(expr, envir, enclos): object 'data_eu' not found
 ```
 
-```{r}
+``` r
 limits <- c(-2, 2)
 save_path <- paste(save_dir, "effort_countries.png", sep = "/")
 
@@ -778,12 +648,13 @@ plot_map(diff_counterfactual_eu,
         subplot_column = "variable",
         ncol = 2,
         key = "name")
-
+#> Error in plot_map(diff_counterfactual_eu, limits, figure_title = "", save_path = save_path, : could not find function "plot_map"
 ```
 
-#------------------------------------------------------------------------------
-#### Old: Identification of policies that are in the target
-```{r}
+\#——————————————————————————
+\#\#\#\# Old: Identification of policies that are in the target
+
+``` r
 # Identify the policies that are in the target
 
 
@@ -810,12 +681,15 @@ temp <- data %>%
                 values_to = "value") %>%
     # replace "" by "No"
     mutate(value = ifelse(value == "", "No", value))
+#> Error in UseMethod("filter"): no applicable method for 'filter' applied to an object of class "function"
 
 # Add a count column for position adjustment
 n_scenario <- nrow(temp)
+#> Error in eval(expr, envir, enclos): object 'temp' not found
 temp <- temp %>%
   group_by(policy, value) %>%
   summarise(count = n()) #/ n_scenario)
+#> Error in eval(expr, envir, enclos): object 'temp' not found
 
 
 # Make stacked bar plot of the policies in the target scenarios
@@ -832,14 +706,16 @@ p <- temp %>%
     theme(axis.title.x = element_blank(),
         axis.title.y = element_blank(),
         legend.position = "none")
+#> Error in eval(expr, envir, enclos): object 'temp' not found
 
 save_path <- paste(save_dir, "policies_condition.png", sep = "/")
 ggsave(save_path, plot = p, width = plot_settings[["width"]],
         height = plot_settings[["height"]],
         dpi = plot_settings[["dpi"]])
+#> Error in eval(expr, envir, enclos): object 'plot_settings' not found
+```
 
-``` 
-```{r}
+``` r
 # Calculate the average cost accoss scenarios
 
 # temp <- data_eu %>%
@@ -859,5 +735,6 @@ ggsave(save_path, plot = p, width = plot_settings[["width"]],
 
 
 # write.csv(temp, paste(save_dir, "scenario_target_countries.csv", sep = "/"), row.names = FALSE)
-
 ```
+
+<sup>Created on 2024-06-18 with [reprex v2.0.2](https://reprex.tidyverse.org)</sup>

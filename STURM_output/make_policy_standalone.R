@@ -8,7 +8,7 @@ library(stringr)
 
 source("STURM_output/C00_plots.R")
 # Load data
-dir <- "simulation_192041"
+dir <- "simulation_2024-06-16_184750"
 save_dir <- paste("STURM_output", "figures", dir, sep = "/")
 file <- paste(save_dir, "results.csv", sep = "/")
 data <- read.csv(file,  check.names = FALSE, stringsAsFactors = FALSE, header = TRUE, row.names = NULL)
@@ -21,7 +21,7 @@ if (!dir.exists(out_dir)) {
 
 scenarios <- c(
     "No additionnal policy", "EU-ETS", "EU-ETS 2", "Social value of carbon",
-    "Subsidies heat pumps", "Market-failures heater",
+    "Subsidies heat pumps", "Subsidies heat pumps medium", "Market-failures heater",
     "Learning-by-doing heat pumps",
     "Renovation wave", "Renovation wave half success",
     "Deep renovation wave", "Deep renovation wave half success",
@@ -46,25 +46,60 @@ cols <- c(
     "Delta total cost private (euro/hh/year)",
     "Delta total cost (euro/hh/year)")
 
+# Calculate the percentage of the total cost compared to the counterfactual
+cost_counterfactual <- subset %>%
+  filter(group == "No additionnal policy") %>%
+  select(`Delta total cost (euro/hh/year)`) %>%
+  pull()
+
+emission_counterfactual <- subset %>%
+  filter(group == "No additionnal policy") %>%
+  select(`Emission saving (%)`) %>%
+  pull()
+
+energy_counterfactual <- subset %>%
+  filter(group == "No additionnal policy") %>%
+  select(`Consumption saving (%)`) %>%
+  pull()
+
+electricity_counterfactual <- subset %>%
+  filter(group == "No additionnal policy") %>%
+  select(`Consumption electricity variation (%)`) %>%
+  pull()
+
+cols <- c(
+  "Emission saving (%)" = "Emission",
+  "Consumption saving (%)" = "Energy use",
+  "Consumption electricity variation (%)" = "Electricity use"
+)
+
+
 temp <- subset %>%
-    select(all_of(c("group", cols))) %>%
+    select(all_of(c("group", names(cols)))) %>%
     pivot_longer(cols = -group, names_to = "variable", values_to = "value") %>%
     #filter(group != "Counterfactual")
     # Replace NaN with 0
     mutate(value = ifelse(is.na(value), 0, value)) %>%
-    rename(scenario = group)
+    rename(scenario = group) %>%
+    mutate(value = ifelse((scenario != "No additionnal policy") & (variable == "Emission saving (%)" ), value + emission_counterfactual, value)) %>%
+    mutate(value = ifelse((scenario != "No additionnal policy") & (variable == "Consumption saving (%)"), value + emission_counterfactual, value)) %>%
+    mutate(value = ifelse((scenario != "No additionnal policy") & (variable == "Consumption electricity variation (%)"), value + emission_counterfactual, value)) %>%
+    # Rename colnames with cols
+    mutate(value = ifelse(variable %in% c("Emission saving (%)", "Consumption saving (%)"), - value, value)) %>%
+    mutate(variable = ifelse(variable %in% names(cols), cols[variable], variable))
 
 
 # Create a function to normalize colors per column
 normalize_colors <- function(data) {
-  data$value <- rescale(data$value, to = c(0, 1))
+  data$value <- rescale(data$value, to = c(-1, 1))
   return(data)
 }
 
 # Apply normalization by variable
 temp <- temp %>%
   group_by(variable) %>%
-  mutate(norm_value = rescale(value, to = c(0, 1)))
+  mutate(norm_value = rescale(abs(value), to = c(0, 1)))
+  # mutate(norm_value = value)
 
 temp$variable <- factor(temp$variable, levels = cols)
 # Reverse order compare to scenarios
@@ -73,16 +108,17 @@ temp$scenario <- factor(temp$scenario, levels = rev(scenarios))
 # Create heatmap
 p <- temp %>%
   ggplot(aes(x = variable, y = scenario)) +
-  #geom_tile(aes(fill = norm_value), color = "white") +
-  geom_tile(aes(fill = ifelse(scenario == "No additionnal policy", NA, norm_value)), color = "white") +
-  geom_tile(data = subset(temp, scenario == "No additionnal policy"), aes(x = variable, y = scenario), fill = "grey", color = "white") +
-  geom_text(aes(label = round(value, 1)), size=6) +
+  geom_tile(aes(fill = norm_value), color = "white") +
+  # geom_tile(aes(fill = ifelse(scenario == "No additionnal policy", NA, norm_value)), color = "white") +
+  # geom_tile(data = subset(temp, scenario == "No additionnal policy"), aes(x = variable, y = scenario), fill = "grey", color = "white") +
+  # Format text in percentage
+  geom_text(aes(label = paste0(round(value * 100, 1), "%")), size = 6) +
   scale_fill_gradient2(low = "blue", mid = "grey", high = "red", midpoint = 0, na.value = "grey") +
   theme_minimal() +
     theme(axis.title.y = element_blank(),
       axis.title.x.top = element_blank(),
-      axis.text.x.top = element_text(size = 15, angle = 90, face="bold"),
-      axis.text.y = element_text(size = 15, face="bold"),
+      axis.text.x.top = element_text(size = 20, angle = 0, face="bold"),
+      axis.text.y = element_text(size = 20, face="bold"),
       legend.position = "none") +
   scale_x_discrete(position = "top")
 

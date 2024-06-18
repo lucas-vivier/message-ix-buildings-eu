@@ -523,7 +523,7 @@ scatter_plots <- function(df,
   if (!presentation) {
       p <- p +
         message_building_theme +
-        theme(axis.title.y = element_text(size = 30, vjust = 0.5, hjust = 0.5),
+        theme(axis.title.y = element_text(size = 30, vjust = 0.5, hjust = 0.5, angle = 90),
               axis.title.x = element_text(size = 30, hjust = 0.5))
 
       size_axis <- plot_settings[["size_text"]]
@@ -1256,6 +1256,8 @@ plot_map <- function(data,
                     save_path = NULL,
                     legend_title = "",
                     subplot_column = NULL,
+                    threshold_colormap = NULL,
+                    reverse_colormap = FALSE,
                     ncol = 2,
                     key = "iso_a3_eh") {
   
@@ -1281,13 +1283,32 @@ plot_map <- function(data,
   p <- ggplot(merged_data) +
     geom_sf(aes(fill = value), color = "gray20", size = 5) +
     geom_sf_text(aes(label = iso_a3_eh), size = 5, color = "grey50",
-      fontface = "bold") +  # Add country codes with geom_sf_text
-    scale_fill_viridis_c(
+      fontface = "bold")
+  
+  if (!is.null(threshold_colormap)){
+    low <- "red"
+    high <- "green"
+    if (reverse_colormap) {
+      low <- "green"
+      high <- "red"
+    }
+    p <- p + scale_fill_gradient2(
+      low = low,
+      #mid = "white",
+      high = high,
+      midpoint = threshold_colormap,
+      limits = limits,
+      oob = scales::squish,
+      na.value = "grey50"
+    )
+  } else {
+    p <- p + scale_fill_viridis_c(
       limits = limits,
       oob = scales::squish,
       na.value = "grey50",
       direction = -1
       )
+  }
 
   if (!is.null(subplot_column)) {
     p <- p +
@@ -1307,9 +1328,13 @@ plot_map <- function(data,
     guides(fill = guide_legend(title = legend_title))
 
   if (!is.null(save_path)) {
-    ggsave(save_path, plot = p, width = plot_settings[["width"]],
-           height = plot_settings[["height"]],
-           dpi = plot_settings[["dpi"]])
+    if (length(unique(temp[["scenario_name"]])) / ncol < 1) {
+      ggsave(save_path, plot = p, width = plot_settings[["width"]],
+            dpi = plot_settings[["dpi"]])
+    } else {
+      ggsave(save_path, plot = p, width = plot_settings[["width"]],
+      dpi = plot_settings[["dpi"]], height = plot_settings[["height"]])
+    }
   } else {
     print(p)
   }
@@ -1317,28 +1342,28 @@ plot_map <- function(data,
 }
 
 # Define the manual Sobol analysis function
-manual_sobol_analysis <- function(scenarios, list_features, y) {
+manual_sobol_analysis <- function(df, list_features, y) {
   # Initialize a tibble to store the results
   sobol_df <- tibble(
     Feature = list_features,
-    First_Order = numeric(length(list_features)),
-    Total_Order = numeric(length(list_features))
+    `First Order` = numeric(length(list_features)),
+    `Total Order` = numeric(length(list_features))
   )
   
   # Calculate the expectation and variance of the output variable
-  expectation <- mean(scenarios[[y]], na.rm = TRUE)
-  variance <- var(scenarios[[y]], na.rm = TRUE)
+  expectation <- mean(df[[y]], na.rm = TRUE)
+  variance <- var(df[[y]], na.rm = TRUE)
 
-  nrow_scenarios = nrow(scenarios)
+  nrow_scenarios = nrow(df)
   
   for (col in list_features) {
     # First order Sobol index
-    conditional_means <- scenarios %>%
+    conditional_means <- df %>%
       group_by_at(col) %>%
       summarize(mean_y = mean(.data[[y]], na.rm = TRUE)) %>%
       ungroup()
     
-    counts <- scenarios %>%
+    counts <- df %>%
         group_by_at(col) %>%
         summarize(n = n()) %>%
       mutate(prop = n / nrow_scenarios) %>%
@@ -1347,17 +1372,20 @@ manual_sobol_analysis <- function(scenarios, list_features, y) {
     
     sobol_first_order <- sum(counts * (conditional_means$mean_y - expectation) ^ 2) / variance
     sobol_df <- sobol_df %>%
-      mutate(First_Order = if_else(Feature == col, sobol_first_order, First_Order))
+      mutate(`First Order` = if_else(Feature == col, sobol_first_order, `First Order`))
+
+    #print(paste("First Order Sobol Index for", col, ":", sobol_first_order))
+
     
     # Total order Sobol index
     list_features_minus_i <- setdiff(list_features, col)
     
-    conditional_means <- scenarios %>%
+    conditional_means <- df %>%
       group_by_at(list_features_minus_i) %>%
       summarize(mean_y = mean(.data[[y]], na.rm = TRUE)) %>%
       ungroup()
     
-    counts <- scenarios %>%
+    counts <- df %>%
         group_by_at(list_features_minus_i) %>%
         summarize(n = n()) %>%
         mutate(prop = n / nrow_scenarios) %>%
@@ -1366,7 +1394,10 @@ manual_sobol_analysis <- function(scenarios, list_features, y) {
     
     sobol_total_order <- 1 - sum(counts * (conditional_means$mean_y - expectation) ^ 2) / variance
     sobol_df <- sobol_df %>%
-      mutate(Total_Order = if_else(Feature == col, sobol_total_order, Total_Order))
+      mutate(`Total Order` = if_else(Feature == col, sobol_total_order, `Total Order`))
+
+    #print(paste("Total Order Sobol Index for", col, ":", sobol_total_order))
+
   }
   
   return(sobol_df)
@@ -1414,17 +1445,18 @@ horizontal_bar_plot <- function(df, columns = NULL, title = NULL, order = NULL, 
 sobol_figures <- function(df, list_features, y, rename_feature, save_path) {
 
   df <- manual_sobol_analysis(df, list_features, y)
+  print(df)
 
   # order ascendng by Total_Order column
   df <- df %>%
-      arrange(Total_Order) %>%
+      arrange(`Total Order`) %>%
       mutate(Feature = rename_feature[Feature]) %>%
       mutate(Feature = factor(Feature, levels = unique(Feature)))
 
   # make horizontal bar plot of the first order and total order indices
 
   p <- df %>%
-      pivot_longer(cols = c(First_Order, Total_Order),
+      pivot_longer(cols = c(`First Order`, `Total Order`),
                   names_to = "Order_Type", 
                   values_to = "Value") %>%
       ggplot(aes(x = Value, y = Feature, fill = Order_Type)) +
@@ -1579,7 +1611,6 @@ make_cost_benefits <- function(data, ref, save_dir, nb_years = 30, figures = TRU
       "running_cost_private"),
                 names_to = "variable",
                 values_to = "value")
-
   data_ref <- long_data %>%
     filter(scenario == ref) %>%
     rename(value_ref = value) %>%
@@ -1655,6 +1686,16 @@ make_cost_benefits <- function(data, ref, save_dir, nb_years = 30, figures = TRU
       "Consumption electricity variation (%)"
       )
 
+    rename_list <- c(
+      cost_renovation_sum = "Delta cost renovation (euro/hh/year)",
+      cost_heater_sum = "Delta cost heating system (euro/hh/year)",
+      cost_heat_sum = "Delta cost fuel (euro/hh/year)",
+      thermal_comfort_sum = "Delta cost thermal comfort (euro/hh/year)",
+      running_cost_private = "Delta total cost private (euro/hh/year)",
+      cost_emission_sum = "Delta cost emission (euro/hh/year)",
+      running_cost = "Delta total cost (euro/hh/year)"
+    )
+
 
     summary_2050 <- read.csv(file, check.names = FALSE) %>%
       select(all_of(c("scenario_name", list_variables))) %>%
@@ -1665,19 +1706,6 @@ make_cost_benefits <- function(data, ref, save_dir, nb_years = 30, figures = TRU
       select(-Initial) %>%
       mutate(across(-c(variable, all_of(ref)), ~ . - .data[[ref]])) %>%
       select(variable, all_of(ref), everything())
-
-
-    # Calculate difference of each column with the column "Current policies"
-
-    rename_list <- c(
-      cost_renovation_sum = "Delta cost renovation (euro/hh/year)",
-      cost_heater_sum = "Delta cost heating system (euro/hh/year)",
-      cost_heat_sum = "Delta cost fuel (euro/hh/year)",
-      thermal_comfort_sum = "Delta cost thermal comfort (euro/hh/year)",
-      running_cost_private = "Delta total cost private (euro/hh/year)",
-      cost_emission_sum = "Delta cost emission (euro/hh/year)",
-      running_cost = "Delta total cost (euro/hh/year)"
-    )
 
 
     temp <- summary %>%
@@ -1706,6 +1734,50 @@ make_cost_benefits <- function(data, ref, save_dir, nb_years = 30, figures = TRU
     }
 
     write.csv(results, paste0(save_dir, "/results.csv"), row.names = FALSE)
+
+    # Calculate difference of each column with the column "Current policies"
+    file <- paste0(save_dir, "/", run, "_2050_summary_countries.csv")
+
+
+    summary_2050 <- read.csv(file, check.names = FALSE) %>%
+      select(all_of(c("scenario_name", "Member states", list_variables))) %>%
+      filter(scenario_name != "Initial") %>%
+      pivot_longer(list_variables, names_to = "variable", values_to = "value")
+
+    # value_ref <- summary_2050 %>%
+    #   filter(scenario_name == ref) %>%
+    #   rename(value_ref = value) %>%
+    #   select(-scenario_name)
+
+    # summary_2050 <- summary_2050 %>%
+    #   left_join(value_ref) %>%
+    #   mutate(value = value - value_ref) %>%
+    #   select(-value_ref)
+
+
+    temp <- summary %>%
+      gather(variable, value, cost_renovation_sum, cost_heater_sum, cost_heat_sum,
+      , thermal_comfort_sum, running_cost_private, cost_emission_sum, running_cost) %>%
+      mutate(variable = rename_list[.data[["variable"]]]) %>%
+      rename(`Member states` = region_bld) %>%
+      mutate(`Member states` = rename_countries[`Member states`]) %>%
+      rename(scenario_name = scenario)
+
+    results <- bind_rows(summary_2050, temp)
+
+    if (!is.null(names_scenarios)) {
+
+      results <- results %>%
+        left_join(names_scenarios, by = "scenario_name") %>%
+        # put names_scenarios columns first
+        select(colnames(names_scenarios), everything())
+    }
+
+    write.csv(results, paste0(save_dir, "/results_countries.csv"), row.names = FALSE)
+
+    
+
+
   }
   #-------------------------------------
   rename_list <- c(
