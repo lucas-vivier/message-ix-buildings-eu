@@ -629,15 +629,49 @@ df <- result_eu %>%
     select(c("scenario_name", "name", "variable", "value")) %>%
     filter(variable == var) %>%
     group_by(name) %>%
-    summarize(scenario_name = scenario_name[which.max(value)]) %>%
+    summarize(scenario_name = scenario_name[which.min(value)]) %>%
     ungroup() %>%
     mutate(name = ifelse(name == "Czechia", "Czech Republic", name)) %>%
     mutate(name = temp[name]) %>%
     rename(region_bld = name) %>%
     filter(region_bld != "EU")
 
+write.csv(df, paste(save_dir, "first_best_scenario.csv", sep = "/"), row.names = FALSE)
 
-write.csv(df, paste(save_dir, "max_scenario.csv", sep = "/"), row.names = FALSE)
+df <- result_eu %>%
+    filter(carbon_tax != "social") %>%
+    filter(`_remove_barriers_renovation` == FALSE) %>%
+    filter() %>%
+    select(c("scenario_name", "name", "variable", "value")) %>%
+    filter(variable == var) %>%
+    group_by(name) %>%
+    summarize(scenario_name = scenario_name[which.min(value)]) %>%
+    ungroup() %>%
+    mutate(name = ifelse(name == "Czechia", "Czech Republic", name)) %>%
+    mutate(name = temp[name]) %>%
+    rename(region_bld = name) %>%
+    filter(region_bld != "EU")
+
+write.csv(df, paste(save_dir, "second_best_scenario.csv", sep = "/"), row.names = FALSE)
+
+
+df <- result_eu %>%
+    filter(carbon_tax != "social") %>%
+    filter(`_remove_barriers_renovation` == FALSE) %>%
+    filter(learning_rate_heat == "constant") %>%
+    filter(`_realization_rate_renovation` == 1) %>%
+    filter() %>%
+    select(c("scenario_name", "name", "variable", "value")) %>%
+    filter(variable == var) %>%
+    group_by(name) %>%
+    summarize(scenario_name = scenario_name[which.min(value)]) %>%
+    ungroup() %>%
+    mutate(name = ifelse(name == "Czechia", "Czech Republic", name)) %>%
+    mutate(name = temp[name]) %>%
+    rename(region_bld = name) %>%
+    filter(region_bld != "EU")
+
+write.csv(df, paste(save_dir, "constraint_scenario.csv", sep = "/"), row.names = FALSE)
 
 ```
 

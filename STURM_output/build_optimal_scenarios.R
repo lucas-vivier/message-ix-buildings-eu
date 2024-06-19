@@ -20,8 +20,39 @@ parser$add_argument("-d", "--dir", default = NULL,
 
 # Parse the arguments
 args <- parser$parse_args()
-#args <- list(path = "2024-06-14_094322", names_scenarios = "STURM_data/scenarios_renovation.csv", figures = TRUE, counterfactual="EU")
+args <- list(file = "max_scenario.csv", dir = "2024-06-16_184750")
 
 
-arg$file <- "max_scenario.csv"
+file <- paste("STURM_data", args$file, sep = "/")
+scenarios <- read.csv(file, header = TRUE)
 
+
+dir <- paste("STURM_output/results", args$dir, sep = "/")
+
+data <- data.frame()
+
+for (scenario in unique(scenarios$scenario_name)) {
+
+  region <- scenarios %>%
+    filter(scenario_name == scenario) %>%
+    select(region_bld) %>%
+    unique()
+
+  print(paste("Scenario:", scenario))
+  file <- paste0("report_agg_", scenario, ".csv")
+  file <- paste(dir, file, sep = "/")
+
+  if (!file.exists(file)) {
+    print("Check file name or directory!")
+  }
+
+  # Read output files
+  temp <- read.csv(file) %>%
+    select(c("region_bld", "year", "variable", "resolution", "value")) %>%
+    filter(region_bld %in% region$region_bld) %>%
+    mutate(scenario = scenario)
+
+  data <- rbind(data, temp)
+}
+
+write.csv(data, paste(dir, args$file, sep = "/"), row.names = FALSE)
