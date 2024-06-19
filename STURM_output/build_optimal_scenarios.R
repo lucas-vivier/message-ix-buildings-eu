@@ -20,8 +20,7 @@ parser$add_argument("-d", "--dir", default = NULL,
 
 # Parse the arguments
 args <- parser$parse_args()
-args <- list(file = "max_scenario.csv", dir = "2024-06-16_184750")
-
+# args <- list(file = "max_scenario.csv", dir = "2024-06-16_184750")
 
 file <- paste("STURM_data", args$file, sep = "/")
 scenarios <- read.csv(file, header = TRUE)
