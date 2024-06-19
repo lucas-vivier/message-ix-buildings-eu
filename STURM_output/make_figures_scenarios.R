@@ -10,14 +10,13 @@ print(paste("Working directory is:", getwd()))
 # Loading figures setttings and functions
 source("STURM_output/C00_plots.R")
 
-run <- "2024-06-14_192041"
+run <- "renovation_scenario"
 
 scenarios <- c(
     "S1" = "No additional policy",
-    "S107" = "All policies",
-    "S119" = "Renovation wave quality",
-    "S41" = "No renovation wave",
-    "S44" = "Renovation wave quantity"
+    "S46" = "Heat pump max",
+    "S86" = "Renovation",
+    "S179" = "improved depth with quality"
 )
 ref <- "No additional policy"
 # Generate distinct colors using RColorBrewer
@@ -204,7 +203,6 @@ plot_map(temp,
   save_path = paste(save_dir,
     paste0("map_", title, "_2050.png"), sep = "/"))
 
-xx
 #--------------------------------------------------------------
 ### Maps by scenarios
 var <- "heat_kWh"

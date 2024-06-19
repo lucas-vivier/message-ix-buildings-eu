@@ -1328,9 +1328,10 @@ plot_map <- function(data,
     guides(fill = guide_legend(title = legend_title))
 
   if (!is.null(save_path)) {
-    if (length(unique(temp[["scenario_name"]])) / ncol < 1) {
+    if (length(unique(data[[subplot_column]])) / ncol <= 1) {
       ggsave(save_path, plot = p, width = plot_settings[["width"]],
             dpi = plot_settings[["dpi"]])
+      
     } else {
       ggsave(save_path, plot = p, width = plot_settings[["width"]],
       dpi = plot_settings[["dpi"]], height = plot_settings[["height"]])

@@ -389,6 +389,9 @@ scatter_plots(temp,
 
 ```
 
+
+
+
 ```{r}
 # Scenario to assess
 scenarios_heat_pumps <- c("No additional policy", "Heat pumps only learning", "Heat pumps medium", "Heat pumps max")
@@ -437,6 +440,7 @@ data_eu <- read.csv(file,  check.names = FALSE, stringsAsFactors = FALSE, header
     # Add per capita values
     mutate(
         `Space heating consumption (MWh/capita)` = `Space heating consumption (TWh)` / `Population (Million)`,
+        `Space heating consumption electricity (MWh/capita)` = `Space heating consumption electricity (TWh)` / `Population (Million)`,
         `Emission (tCO2/capita)` = `Emission (MtCO2)` / `Population (Million)`,
         `Cost renovation (EUR/capita)` = `Cost renovation (Billion EUR)` / `Population (Million)`,
         `Cost heater (EUR/capita)` = `Cost heater (Billion EUR)` / `Population (Million)`,
@@ -448,83 +452,42 @@ data_eu <- data_eu %>%
     mutate(scenario_name = ifelse(scenario_name %in% names(scenarios_heat_pumps_names), scenarios_heat_pumps_names[scenario_name], scenario_name)) %>%
     mutate(scenario_name = ifelse(scenario_name %in% names(scenario_renovation_names), scenario_renovation_names[scenario_name], scenario_name))
 
-```
 
-```{r}
-source("STURM_output/C00_plots.R")
-file <- "data_cba_country.csv"
+file <- "results_countries.csv"
 file <- paste(input_dir, file, sep = "/")
-data_cba_eu <- read.csv(file,  check.names = FALSE, stringsAsFactors = FALSE, header = TRUE, row.names = NULL)  %>%
-    rename(scenario_name = scenario) %>%
-    rename(name = region_bld) %>%
-    mutate(name = ifelse(name %in% names(rename_countries), rename_countries[name], name)) %>%
-    mutate(scenario_name = ifelse(scenario_name %in% names(scenarios_heat_pumps_names), scenarios_heat_pumps_names[scenario_name], scenario_name)) %>%
-    mutate(scenario_name = ifelse(scenario_name %in% names(scenario_renovation_names), scenario_renovation_names[scenario_name], scenario_name))
-
+result_eu <- read.csv(file,  check.names = FALSE, stringsAsFactors = FALSE, header = TRUE, row.names = NULL) %>%
+    rename(name = `Member states`) %>%
+    mutate(name = ifelse(name == "Czech Republic", "Czechia", name))
 ```
-
-```{r}
-source("STURM_output/C00_plots.R")
-var <- "Total cost"
-ref_maps <- "Heat pumps max"
-cost_ref <- data_cba_eu %>%
-    filter(variable == var) %>%
-    filter(scenario_name == ref_maps)
-cost_ref <- setNames(cost_ref$value, cost_ref$name)
-
-ref_quality_maps <- "Heat pumps max with quality"
-cost_ref_quality <- data_cba_eu %>%
-    filter(variable == var) %>%
-    filter(scenario_name == ref_quality_maps)
-cost_ref_quality <- setNames(cost_ref_quality$value, cost_ref_quality$name)
-
-ref_barrier_maps <- "Heat pumps max without barrier"
-cost_ref_barrier <- data_cba_eu %>%
-    filter(variable == var) %>%
-    filter(scenario_name == ref_barrier_maps)
-cost_ref_barrier <- setNames(cost_ref_barrier$value, cost_ref_barrier$name)
-
-
-temp <- data_cba_eu %>%
-  filter(variable == var) %>%
-  filter(scenario_name %in% scenario_renovation_names) %>%
-  filter(!grepl("barrier", scenario_name)) %>%
-  filter(scenario_name != ref_maps) %>%
-  filter(scenario_name != ref_quality_maps) %>%
-  filter(scenario_name != ref_barrier_maps) %>%
-  mutate(value = case_when(
-    grepl("quality", scenario_name) ~ value - cost_ref_quality[name],
-    grepl("barrier", scenario_name) ~ value - cost_ref_barrier[name],
-    TRUE ~ value - cost_ref[name]
-  ))
-
-temp$scenario_name <- factor(temp$scenario_name, levels = scenario_renovation_names)
-
-min_maps <- min(filter(temp, variable == var)$value, na.rm = TRUE)
-max_maps <- max(filter(temp, variable == var)$value, na.rm = TRUE)
-limits <- c(min_maps, max_maps)
-figure_title <- "Cost"
-legend_title <- "€/hh.year"
-title <- "cost"
-save_path <- paste(save_dir, "maps_cba_countries_renovation.png", sep = "/")
-
-
-plot_map(temp,
-  limits,
-  threshold_colormap = 0,
-  figure_title = figure_title,
-  legend_title = legend_title,
-  reverse_colormap = TRUE,
-  subplot_column = "scenario_name",
-  ncol = 3,
-  save_path = save_path,
-  key = "name")
-
-```
-
 
 #-----------------------------------------------------------------------------------------
 #### Maps
+
+## Heat pumps scenarios
+```{r}
+source("STURM_output/C00_plots.R")
+
+df <- data_eu %>%
+    select(c("scenario_name", "Share fossil-fuels (Percent)", "name")) %>%
+    rename(value = `Share fossil-fuels (Percent)`) %>%
+    mutate(value = ifelse(is.na(value), 0, value)) %>%
+    #rename(name = `Member states`) %>%
+    filter(scenario_name %in% c("Initial", "No additional policy"))
+
+min <- min(df$value, na.rm = TRUE)
+limits <- c(-0.5, 0)
+save_path <- paste(save_dir, "maps_fossil_countries.png", sep = "/")
+
+plot_map(df,
+        limits = NULL,
+        threshold_colormap = NULL,
+        figure_title = "",
+        save_path = save_path,
+        legend_title = "%",
+        subplot_column = "scenario_name",
+        ncol = 4,
+        key = "name")
+```
 
 ```{r}
 source("STURM_output/C00_plots.R")
@@ -549,6 +512,133 @@ plot_map(temp,
         subplot_column = "scenario_name",
         ncol = 4,
         key = "name")
+```
+
+#-----------------------------------------------------------------------------------------
+# Renovation
+
+# 1. Cost-benefits analysis
+```{r}
+source("STURM_output/C00_plots.R")
+var <- "Delta total cost (euro/hh/year)"
+df <- result_eu %>%
+    select(c("scenario_name", "name", "variable", "value")) %>%
+    filter(variable == var) %>%
+    filter(scenario_name %in% names(scenario_renovation_names)) %>%
+    mutate(scenario_name = scenario_renovation_names[scenario_name])
+
+ref_heat_pump <- df %>%
+    filter(variable == var) %>%
+    filter(scenario_name %in% c("Heat pumps max", "Heat pumps max with quality")) %>%
+    pivot_wider(names_from = "scenario_name", values_from = "value")
+    
+df <- df %>%
+    filter(!scenario_name %in% c("Heat pumps max", "Heat pumps max with quality")) %>%
+    left_join(ref_heat_pump) %>%
+    mutate(value = ifelse(grepl("quality", scenario_name), value - `Heat pumps max with quality`, value - `Heat pumps max`))
+
+df$scenario_name <- factor(df$scenario_name, levels = scenario_renovation_names)
+
+save_path <- paste(save_dir, "maps_cba_countries_renovation.png", sep = "/")
+
+plot_map(df,
+        limits = NULL,
+        threshold_colormap = 0,
+        figure_title = "",
+        save_path = save_path,
+        legend_title = "%",
+        subplot_column = "scenario_name",
+        reverse_colormap = TRUE,
+        ncol = 3,
+        key = "name")
+```
+
+# 2. Electricity consumption
+
+
+
+```{r}
+source("STURM_output/C00_plots.R")
+
+
+scenarios_poverty <- c("Initial", "No additional policy", "Heat pumps max", "improved depth with quality")
+temp <- data_eu %>%
+    select(c("scenario_name", "name", "Space heating consumption electricity (MWh/capita)")) %>%
+    rename(value = `Space heating consumption electricity (MWh/capita)`) %>%
+    filter(scenario_name %in% scenarios_poverty)
+
+temp$scenario_name <- factor(temp$scenario_name, levels = scenarios_poverty)
+
+#min <- min(temp$value, na.rm = TRUE)
+#
+save_path <- paste(save_dir, "maps_electricity_countries_electricity.png", sep = "/")
+
+limits <- c(0, 1)
+
+plot_map(temp,
+        limits = NULL,
+        threshold_colormap = NULL,
+        figure_title = "",
+        save_path = save_path,
+        legend_title = "MWh/capita",
+        subplot_column = "scenario_name",
+        ncol = 4,
+        key = "name")
+```
+
+# 3. Energy poverty
+
+```{r}
+source("STURM_output/C00_plots.R")
+
+
+scenarios_poverty <- c("Initial", "No additional policy", "Heat pumps max", "improved depth with quality")
+temp <- data_eu %>%
+    select(c("scenario_name", "name", "Energy poverty (Percent)")) %>%
+    rename(value = `Energy poverty (Percent)`) %>%
+    filter(scenario_name %in% scenarios_poverty)
+
+temp$scenario_name <- factor(temp$scenario_name, levels = scenarios_poverty)
+
+#min <- min(temp$value, na.rm = TRUE)
+#
+save_path <- paste(save_dir, "maps_electricity_countries_poverty.png", sep = "/")
+
+limits <- c(0, 0.2)
+
+plot_map(temp,
+        limits = limits,
+        threshold_colormap = NULL,
+        figure_title = "",
+        save_path = save_path,
+        legend_title = "%",
+        subplot_column = "scenario_name",
+        ncol = 4,
+        key = "name")
+```
+
+#----------------------------------
+# Maximum scenario by EU member states
+
+```{r}
+var <- "Delta total cost (euro/hh/year)"
+
+temp <- setNames(names(rename_countries), rename_countries)
+
+df <- result_eu %>%
+    select(c("scenario_name", "name", "variable", "value")) %>%
+    filter(variable == var) %>%
+    group_by(name) %>%
+    summarize(scenario_name = scenario_name[which.max(value)]) %>%
+    ungroup() %>%
+    mutate(name = ifelse(name == "Czechia", "Czech Republic", name)) %>%
+    mutate(name = temp[name]) %>%
+    rename(region_bld = name) %>%
+    filter(region_bld != "EU")
+
+
+write.csv(df, paste(save_dir, "max_scenario.csv", sep = "/"), row.names = FALSE)
+
 ```
 
 
@@ -607,30 +697,6 @@ plot_map(temp,
         key = "name")
 ```
 
-```{r}
-source("STURM_output/C00_plots.R")
-
-temp <- data_eu %>%
-    select(c("scenario_name", "name", "Emission saving (%)")) %>%
-    rename(value = `Emission saving (%)`) %>%
-    filter(scenario_name %in% scenarios_heat_pumps)
-
-temp$scenario_name <- factor(temp$scenario_name, levels = scenarios_heat_pumps)
-
-min <- min(temp$value, na.rm = TRUE)
-limits <- c(min, 1)
-save_path <- paste(save_dir, "maps_emission_countries_heatpump.png", sep = "/")
-
-plot_map(temp,
-        limits,
-        threshold_colormap = 0.95,
-        figure_title = "",
-        save_path = save_path,
-        legend_title = "%",
-        subplot_column = "scenario_name",
-        ncol = 4,
-        key = "name")
-```
 
 
 ```{r}
@@ -861,3 +927,76 @@ ggsave(save_path, plot = p, width = plot_settings[["width"]],
 # write.csv(temp, paste(save_dir, "scenario_target_countries.csv", sep = "/"), row.names = FALSE)
 
 ```
+
+```{r}
+source("STURM_output/C00_plots.R")
+var <- "Total cost"
+ref_maps <- "Heat pumps max"
+cost_ref <- data_cba_eu %>%
+    filter(variable == var) %>%
+    filter(scenario_name == ref_maps)
+cost_ref <- setNames(cost_ref$value, cost_ref$name)
+
+ref_quality_maps <- "Heat pumps max with quality"
+cost_ref_quality <- data_cba_eu %>%
+    filter(variable == var) %>%
+    filter(scenario_name == ref_quality_maps)
+cost_ref_quality <- setNames(cost_ref_quality$value, cost_ref_quality$name)
+
+ref_barrier_maps <- "Heat pumps max without barrier"
+cost_ref_barrier <- data_cba_eu %>%
+    filter(variable == var) %>%
+    filter(scenario_name == ref_barrier_maps)
+cost_ref_barrier <- setNames(cost_ref_barrier$value, cost_ref_barrier$name)
+
+
+temp <- data_cba_eu %>%
+  filter(variable == var) %>%
+  filter(scenario_name %in% scenario_renovation_names) %>%
+  filter(!grepl("barrier", scenario_name)) %>%
+  filter(scenario_name != ref_maps) %>%
+  filter(scenario_name != ref_quality_maps) %>%
+  filter(scenario_name != ref_barrier_maps) %>%
+  mutate(value = case_when(
+    grepl("quality", scenario_name) ~ value - cost_ref_quality[name],
+    grepl("barrier", scenario_name) ~ value - cost_ref_barrier[name],
+    TRUE ~ value - cost_ref[name]
+  ))
+
+temp$scenario_name <- factor(temp$scenario_name, levels = scenario_renovation_names)
+
+min_maps <- min(filter(temp, variable == var)$value, na.rm = TRUE)
+max_maps <- max(filter(temp, variable == var)$value, na.rm = TRUE)
+limits <- c(min_maps, max_maps)
+figure_title <- "Cost"
+legend_title <- "€/hh.year"
+title <- "cost"
+save_path <- paste(save_dir, "maps_cba_countries_renovation.png", sep = "/")
+
+
+plot_map(temp,
+  limits,
+  threshold_colormap = 0,
+  figure_title = figure_title,
+  legend_title = legend_title,
+  reverse_colormap = TRUE,
+  subplot_column = "scenario_name",
+  ncol = 3,
+  save_path = save_path,
+  key = "name")
+
+```
+
+
+```{r}
+source("STURM_output/C00_plots.R")
+file <- "data_cba_country.csv"
+file <- paste(input_dir, file, sep = "/")
+data_cba_eu <- read.csv(file,  check.names = FALSE, stringsAsFactors = FALSE, header = TRUE, row.names = NULL)  %>%
+    rename(scenario_name = scenario) %>%
+    rename(name = region_bld) %>%
+    mutate(name = ifelse(name %in% names(rename_countries), rename_countries[name], name)) %>%
+    mutate(scenario_name = ifelse(scenario_name %in% names(scenarios_heat_pumps_names), scenarios_heat_pumps_names[scenario_name], scenario_name)) %>%
+    mutate(scenario_name = ifelse(scenario_name %in% names(scenario_renovation_names), scenario_renovation_names[scenario_name], scenario_name))
+```
+
