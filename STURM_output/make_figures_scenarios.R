@@ -10,7 +10,7 @@ print(paste("Working directory is:", getwd()))
 # Loading figures setttings and functions
 source("STURM_output/C00_plots.R")
 
-run <- "renovation_scenario"
+run <- "optimal_scenarios"
 
 scenarios <- c(
     "S1" = "No additional policy",
@@ -18,6 +18,13 @@ scenarios <- c(
     "S86" = "Renovation",
     "S179" = "improved depth with quality"
 )
+scenarios <- c(
+    "S1" = "No additional policy",
+    "first_best_scenario" = "First best",
+    "second_best_scenario" = "Second best",
+    "constraint_scenario" = "Technical constraint"
+)
+
 ref <- "No additional policy"
 # Generate distinct colors using RColorBrewer
 num_scenarios <- length(scenarios)

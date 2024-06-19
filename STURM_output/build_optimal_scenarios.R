@@ -5,9 +5,6 @@ library(tidyr)
 library(argparse)
 
 
-# Loding figures setttings and functions
-source("STURM_output/C00_plots.R")
-
 # Create a parser object
 parser <- ArgumentParser(description = "Script to set number of cores")
 
@@ -48,10 +45,17 @@ for (scenario in unique(scenarios$scenario_name)) {
   # Read output files
   temp <- read.csv(file) %>%
     select(c("region_bld", "year", "variable", "resolution", "value")) %>%
-    filter(region_bld %in% region$region_bld) %>%
-    mutate(scenario = scenario)
+    filter(region_bld %in% region$region_bld) 
+    #%>% mutate(scenario = scenario)
 
   data <- rbind(data, temp)
 }
 
-write.csv(data, paste(dir, args$file, sep = "/"), row.names = FALSE)
+eu <- data %>%
+  group_by(year, variable, resolution) %>%
+  summarise(value = sum(value)) %>%
+  mutate(region_bld = "EU")
+
+data <- rbind(data, eu)
+
+write.csv(data, paste(dir, paste0("report_agg_", args$file, ".csv"), sep = "/"), row.names = FALSE)
