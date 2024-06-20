@@ -19,7 +19,7 @@ parser$add_argument("-d", "--dir", default = NULL,
 args <- parser$parse_args()
 # args <- list(file = "max_scenario.csv", dir = "2024-06-16_184750")
 
-scenarios <- read.csv(file, header = TRUE)
+scenarios <- read.csv(args$f, header = TRUE)
 
 dir <- paste("STURM_output/results", args$dir, sep = "/")
 data <- data.frame()
