@@ -57,5 +57,8 @@ eu <- data %>%
 data <- rbind(data, eu)
 
 save_dir <- paste("STURM_output/figures", paste(args$dir, "optimal_scenarios", sep = "_"), sep = "/")
+if (!dir.exists(save_dir)) {
+  dir.create(save_dir)
+}
 
 write.csv(data, paste(save_dir, paste0("report_agg_", basename(args$f)), sep = "/"), row.names = FALSE)
