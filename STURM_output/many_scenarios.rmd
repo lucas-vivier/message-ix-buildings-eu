@@ -483,7 +483,7 @@ df <- df %>%
 
 df$scenario_name <- factor(df$scenario_name, levels = scenario_renovation_names)
 
-save_path <- paste(save_dir, "maps_cba_countries_renovation.png", sep = "/")
+save_path <- paste(save_dir, "maps_cba_renovation.png", sep = "/")
 
 plot_map(df,
         limits = NULL,
@@ -515,7 +515,7 @@ temp$scenario_name <- factor(temp$scenario_name, levels = scenarios_poverty)
 
 #min <- min(temp$value, na.rm = TRUE)
 #
-save_path <- paste(save_dir, "maps_electricity_countries_poverty.png", sep = "/")
+save_path <- paste(save_dir, "maps_poverty_renovation.png", sep = "/")
 
 limits <- c(0, 20)
 

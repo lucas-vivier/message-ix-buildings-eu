@@ -19,12 +19,9 @@ parser$add_argument("-d", "--dir", default = NULL,
 args <- parser$parse_args()
 # args <- list(file = "max_scenario.csv", dir = "2024-06-16_184750")
 
-file <- paste("STURM_data", args$file, sep = "/")
 scenarios <- read.csv(file, header = TRUE)
 
-
 dir <- paste("STURM_output/results", args$dir, sep = "/")
-
 data <- data.frame()
 
 for (scenario in unique(scenarios$scenario_name)) {
@@ -58,4 +55,5 @@ eu <- data %>%
 
 data <- rbind(data, eu)
 
-write.csv(data, paste(dir, paste0("report_agg_", args$file), sep = "/"), row.names = FALSE)
+save_dir <- paste("STURM_output/figures", paste(args$dir, "optimal_scenarios", sep = "_"), sep = "/")
+write.csv(data, paste(save_dir, paste0("report_agg_", args$file), sep = "/"), row.names = FALSE)
