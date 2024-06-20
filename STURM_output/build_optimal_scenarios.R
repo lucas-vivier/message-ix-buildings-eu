@@ -58,4 +58,4 @@ eu <- data %>%
 
 data <- rbind(data, eu)
 
-write.csv(data, paste(dir, paste0("report_agg_", args$file, ".csv"), sep = "/"), row.names = FALSE)
+write.csv(data, paste(dir, paste0("report_agg_", args$file), sep = "/"), row.names = FALSE)

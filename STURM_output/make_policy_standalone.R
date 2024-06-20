@@ -5,6 +5,7 @@ library(tidyverse)
 library(dplyr)
 library(ggplot2)
 library(stringr)
+library(gridExtra)
 
 source("STURM_output/C00_plots.R")
 # Load data
@@ -28,9 +29,33 @@ scenarios <- c(
     "Quality renovation",
     "Market-failures renovation")
 
+rename_scenarios <- c(
+  "No additionnal policy" = "Baseline",
+  "EU-ETS" = "aligned with EU-ETS price",
+  "Social value of carbon" = "aligned with social value of carbon",
+  "Subsidies heat pumps" = "High heat pumps subsidies",
+  "Subsidies heat pumps medium" = "Mid heat pumps subsidies",
+  "Learning-by-doing heat pumps" = "Learning-by-doing heat pumps",
+  "Renovation wave" = "High renovation subsidies",
+  "Renovation wave half success" = "Mid renovation subsidies",
+  "Deep renovation wave" = "High Deep renovation subsidies",
+  "Deep renovation wave half success" = "Mid Deep renovation subsidies",
+  "Quality renovation" = "Improvement renovation realization",
+  "Market-failures renovation" = "Tackling market failures renovation"
+)
+scenarios <- unname(rename_scenarios)
+
+carbon_tax <- c("aligned with EU-ETS price", "aligned with social value of carbon")
+heat_pumps <- c("High heat pumps subsidies", "Mid heat pumps subsidies", "Learning-by-doing heat pumps")
+renovation <- c("High renovation subsidies", "Mid renovation subsidies", "High Deep renovation subsidies",
+  "Mid Deep renovation subsidies", "Improvement renovation realization", "Tackling market failures renovation")
+
+
 # Select scenario by rows
 subset <- data %>%
-    filter(group %in% scenarios)
+    filter(group %in% names(rename_scenarios)) %>%
+    mutate(group = ifelse(group %in% names(rename_scenarios), rename_scenarios[group], group))
+
 
 # Export as .csv
 write.csv(subset, paste(out_dir, "results_standalone.csv", sep = "/"), row.names = FALSE)
@@ -48,22 +73,22 @@ cols <- c(
 
 # Calculate the percentage of the total cost compared to the counterfactual
 cost_counterfactual <- subset %>%
-  filter(group == "No additionnal policy") %>%
+  filter(group == "Baseline") %>%
   select(`Delta total cost (euro/hh/year)`) %>%
   pull()
 
 emission_counterfactual <- subset %>%
-  filter(group == "No additionnal policy") %>%
+  filter(group == "Baseline") %>%
   select(`Emission saving (%)`) %>%
   pull()
 
 energy_counterfactual <- subset %>%
-  filter(group == "No additionnal policy") %>%
+  filter(group == "Baseline") %>%
   select(`Consumption saving (%)`) %>%
   pull()
 
 electricity_counterfactual <- subset %>%
-  filter(group == "No additionnal policy") %>%
+  filter(group == "Baseline") %>%
   select(`Consumption electricity variation (%)`) %>%
   pull()
 
@@ -81,53 +106,72 @@ temp <- subset %>%
     # Replace NaN with 0
     mutate(value = ifelse(is.na(value), 0, value)) %>%
     rename(scenario = group) %>%
-    mutate(value = ifelse((scenario != "No additionnal policy") & (variable == "Emission saving (%)" ), value + emission_counterfactual, value)) %>%
-    mutate(value = ifelse((scenario != "No additionnal policy") & (variable == "Consumption saving (%)"), value + emission_counterfactual, value)) %>%
-    mutate(value = ifelse((scenario != "No additionnal policy") & (variable == "Consumption electricity variation (%)"), value + emission_counterfactual, value)) %>%
+    mutate(value = ifelse((scenario != "Baseline") & (variable == "Emission saving (%)" ), value + emission_counterfactual, value)) %>%
+    mutate(value = ifelse((scenario != "Baseline") & (variable == "Consumption saving (%)"), value + emission_counterfactual, value)) %>%
+    mutate(value = ifelse((scenario != "Baseline") & (variable == "Consumption electricity variation (%)"), value + emission_counterfactual, value)) %>%
     # Rename colnames with cols
     mutate(value = ifelse(variable %in% c("Emission saving (%)", "Consumption saving (%)"), - value, value)) %>%
-    mutate(variable = ifelse(variable %in% names(cols), cols[variable], variable))
+    mutate(variable = ifelse(variable %in% names(cols), cols[variable], variable)
+    )
 
 
-# Create a function to normalize colors per column
-normalize_colors <- function(data) {
-  data$value <- rescale(data$value, to = c(-1, 1))
-  return(data)
-}
-
-# Apply normalization by variable
 temp <- temp %>%
-  group_by(variable) %>%
-  mutate(norm_value = rescale(abs(value), to = c(0, 1)))
-  # mutate(norm_value = value)
+    mutate(groups = case_when(
+        scenario == "Baseline" ~ "",
+        scenario %in% carbon_tax ~ "Carbon tax",
+        scenario %in% heat_pumps ~ "Promoting Heat pumps",
+        scenario %in% renovation ~ "Promoting Energy Renovation",
+        TRUE ~ "Other"
+    ))
 
 temp$variable <- factor(temp$variable, levels = cols)
 # Reverse order compare to scenarios
 temp$scenario <- factor(temp$scenario, levels = rev(scenarios))
 
+limits <- c(-0.8, 1)
+
+max_values <- temp %>%
+  group_by(variable) %>%
+  summarise(max_value = max(abs(value), na.rm = TRUE))
+
+temp <- temp %>%
+  left_join(max_values, by = "variable")
+
 # Create heatmap
 p <- temp %>%
   ggplot(aes(x = variable, y = scenario)) +
-  geom_tile(aes(fill = norm_value), color = "white") +
-  # geom_tile(aes(fill = ifelse(scenario == "No additionnal policy", NA, norm_value)), color = "white") +
-  # geom_tile(data = subset(temp, scenario == "No additionnal policy"), aes(x = variable, y = scenario), fill = "grey", color = "white") +
-  # Format text in percentage
-  geom_text(aes(label = paste0(round(value * 100, 1), "%")), size = 6) +
-  scale_fill_gradient2(low = "blue", mid = "grey", high = "red", midpoint = 0, na.value = "grey") +
+  geom_tile(aes(fill = value), color = "white", height = 1) +
+  # geom_text(aes(label = paste0(round(value * 100, 1), "%")), size = 6) +
+  geom_text(aes(label = paste0(round(value * 100, 1), "%"), 
+                fontface = ifelse(abs(value) == max_value, "bold", "plain")),
+            size = 7) +
+  scale_fill_gradient2(low = "darkgreen",
+    mid = "white",
+    high = "darkred",
+    midpoint = 0,
+    limits = limits,  # Adjust limits based on data
+    oob = scales::squish,  # Handle out-of-bounds values
+    na.value = "grey"
+    ) +
   theme_minimal() +
     theme(axis.title.y = element_blank(),
       axis.title.x.top = element_blank(),
-      axis.text.x.top = element_text(size = 20, angle = 0, face="bold"),
-      axis.text.y = element_text(size = 20, face="bold"),
+      axis.text.x.top = element_text(size = 20, angle = 0, face = "bold"),
+      axis.text.y = element_text(size = 20),
+      panel.spacing = unit(0.5, "lines"),  # Adjust spacing between panels
       legend.position = "none") +
-  scale_x_discrete(position = "top")
+  scale_x_discrete(position = "top") +
+  facet_grid(groups ~ ., scales = "free_y", space = "free_y", switch = "y") +
+  theme(strip.background = element_blank(),
+      strip.placement = "outside",
+      strip.text.y = element_text(size = 20, face = "bold", angle = 0, hjust = 0.5))
+
 
 # save plot
 ggsave(filename = paste(out_dir, "heatmap.png", sep = "/"), plot = p,
     width = plot_settings[["width"]],
     height = plot_settings[["height"]],
     dpi = plot_settings[["dpi"]])
-
 
 #-----------------------------------
 # Make cost-benefits analysis
@@ -161,7 +205,7 @@ df <- subset %>%
          `Delta cost thermal comfort (euro/hh/year)`, `Delta total cost (euro/hh/year)`, 
          `Delta total cost private (euro/hh/year)`, `Delta cost emission (euro/hh/year)`) %>%
   mutate(variable = rename_list[.data[["variable"]]]) %>%
-  filter(scenario != "No additionnal policy") %>%
+  filter(scenario != "Baseline") %>%
   # mutate(scenario = scenarios[.data[["scenario"]]]) %>%
   mutate(value = value)
 
@@ -183,20 +227,66 @@ df <- df %>%
 
 df <- df %>%
   left_join(total) %>%
-  left_join(total_private)
+  left_join(total_private) %>%
+  mutate(groups = case_when(
+    scenario == "Baseline" ~ "",
+    scenario %in% carbon_tax ~ "Carbon tax",
+    scenario %in% heat_pumps ~ "Promoting Heat pumps",
+    scenario %in% renovation ~ "Promoting Energy Renovation",
+    TRUE ~ "Other"
+  ))
 
-presentation <- FALSE
-legend <- TRUE
 
-stacked_plots(df,
-save_path = paste(out_dir, "cba_eu.png", sep = "/"),
-color_list = color_list, y_label_suffix = "", # EUR/(year.hh)
-presentation = presentation, legend = legend)
+save_path <- paste(out_dir, "cba_eu_horizontal.png", sep = "/")
+size_text <- 8
+size_point <- 5
+nudge_y <- 0.15
+round <- 0
 
-stacked_plots(df,
-save_path = paste(out_dir, "cba_eu_horizontal.png", sep = "/"),
-color_list = color_list, y_label_suffix = "", #EUR/(year.hh)
-presentation = presentation, legend = legend, horizontal = TRUE)
+p <- df %>%
+  ggplot(aes(x = scenario, y = value, fill = variable)) +
+  geom_bar(stat = "identity") +
+  geom_point(aes(x = scenario, y = total_value),
+    color = "black", size = size_point, , show.legend = FALSE) +
+  geom_text(aes(x = scenario,
+    label = paste(round(total_value, round)), y = total_value),
+    vjust = -0.5, nudge_y = nudge_y, size = size_text)+ 
+  geom_point(aes(x = scenario, y = total_value_private),
+    color = "red", size = size_point, shape = 18, show.legend = FALSE) +
+  geom_text(aes(x = scenario,
+    label = paste(round(total_value_private, round)), y = total_value_private),
+    vjust = -0.5, nudge_y = nudge_y, size = size_text, color = "red") + 
+  coord_flip() + 
+  scale_fill_manual(values = color_list) + 
+  message_building_theme +
+  theme(axis.line.y = element_blank()) +
+  facet_grid(groups ~ ., scales = "free_y", space = "free_y", switch = "y") +
+  theme(strip.background = element_blank(),
+      strip.placement = "outside",
+      strip.text.y = element_text(size = 20, face = "bold", angle = 0, hjust = 0.5))
+
+
+ggsave(save_path, plot = p, width = plot_settings[["width"]],
+        height = plot_settings[["height"]],
+        dpi = plot_settings[["dpi"]])
+
+
+# Custom label function that combines comma and suffix
+# custom_label <- function(x) {
+#   label_comma()(x) %>% paste0(" ", y_label_suffix)
+# }
+# p <- p +
+#   scale_y_continuous(labels = custom_label)
+
+# stacked_plots(df,
+# save_path = paste(out_dir, "cba_eu.png", sep = "/"),
+# color_list = color_list, y_label_suffix = "", # EUR/(year.hh)
+# presentation = presentation, legend = legend)
+
+# stacked_plots(df,
+# save_path = ,
+# color_list = color_list, y_label_suffix = "", #EUR/(year.hh)
+# presentation = presentation, legend = legend, horizontal = TRUE)
 
 
 #-----------------------------------

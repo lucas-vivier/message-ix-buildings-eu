@@ -1322,12 +1322,14 @@ plot_map <- function(data,
       legend.title = element_text(size = plot_settings[["size_text"]]),
       legend.text = element_text(size = plot_settings[["size_text"]]),
       strip.background = element_blank(),
-      strip.text = element_text(size = 20, face = "bold"),
+      strip.text = element_text(size = 15, face = "bold", margin = margin(b = 10)),
       plot.margin = unit(c(0.5, 0.5, 0.5, 0.5), "cm")) +  # Adjust the plot margins
     labs(title = figure_title) +
     guides(fill = guide_legend(title = legend_title))
 
   if (!is.null(save_path)) {
+
+    
     if (length(unique(data[[subplot_column]])) / ncol <= 1) {
       ggsave(save_path, plot = p, width = plot_settings[["width"]],
             dpi = plot_settings[["dpi"]])
@@ -1550,12 +1552,27 @@ make_cost_benefits <- function(data, ref, save_dir, nb_years = 30, figures = TRU
 
   data_raw <- data
 
+  variables_of_interest <- c("cost_renovation_EUR", "cost_heater_EUR",
+        "cost_heat_EUR", "heat_tCO2", "thermal_comfort_EUR")
+
   data <- filter(data,
       resolution == "all",
-      variable %in% c("cost_renovation_EUR", "cost_heater_EUR",
-        "cost_heat_EUR", "heat_tCO2", "thermal_comfort_EUR")) %>%
-      filter(year > 2015) %>%
+      variable %in% variables_of_interest) %>%
+      filter(year >= 2015) %>%
       select(-resolution)
+
+  # Create all combinations of region_bld, year, scenario, and variable
+  expanded_data <- expand_grid(
+    region_bld = unique(data$region_bld),
+    year = unique(data$year),
+    scenario = unique(data$scenario),
+    variable = variables_of_interest
+  )
+
+  # Merge with the original data and fill missing values with 0
+  data <- expanded_data %>%
+    left_join(data, by = c("region_bld", "year", "scenario", "variable")) %>%
+    replace_na(list(value = 0))
 
   wide_data <- pivot_wider(data,
                           id_cols = c("region_bld", "year", "scenario"),
@@ -1564,6 +1581,7 @@ make_cost_benefits <- function(data, ref, save_dir, nb_years = 30, figures = TRU
 
   wide_data <- wide_data %>%
     left_join(social_cost_carbon, by = "year") %>%
+    mutate(social_cost_carbon = ifelse(is.na(social_cost_carbon), 0, social_cost_carbon)) %>%
     mutate(
       cost_renovation_EUR =
         ifelse(is.na(cost_renovation_EUR), 0, cost_renovation_EUR),
@@ -1599,7 +1617,7 @@ make_cost_benefits <- function(data, ref, save_dir, nb_years = 30, figures = TRU
       cost_heat_EUR + cost_emission_EUR + thermal_comfort_EUR) %>%
     mutate(running_cost_private = running_cost - cost_emission_EUR)
 
-  # write.csv(filter(wide_data, region_bld == "EU"), paste0(save_dir, "/cba_calculation_eu.csv"))
+  write.csv(filter(wide_data, region_bld == "EU"), paste0(save_dir, "/cba_calculation_eu.csv"))
 
   long_data <- wide_data %>%
     select("region_bld", "year", "scenario", "cost_renovation_EUR_cumsum",
@@ -1849,4 +1867,72 @@ make_cost_benefits <- function(data, ref, save_dir, nb_years = 30, figures = TRU
       presentation = presentation, legend = legend, horizontal = TRUE)
   }
   return(df_return)
+}
+
+
+make_national_policy_mix <- function(df, scenario, save_path) {
+
+    temp <- df %>%
+        left_join(scenario) %>%
+        mutate(subsidies_hp = case_when(
+            sub_heat == "carbon" ~ "HighSubHeatPump",
+            sub_heat == "half_carbon" ~ "MidSubHeatPump",
+            TRUE ~ ""
+        )) %>%
+        mutate(subsidies_renovation  = case_when(
+            (`_objective_renovation` == "renovation") & (`_success_objective_renovation` == 0.75) ~ "MidSubRenovation",
+            (`_objective_renovation` == "renovation") & (`_success_objective_renovation` == 1) ~ "HighSubRenovation",
+            (`_objective_renovation` == "deep_renovation") & (`_success_objective_renovation` == 0.75) ~ "MidSubDeepRenovation",
+            (`_objective_renovation` == "deep_renovation") & (`_success_objective_renovation` == 1) ~ "HighSubDeepRenovation",
+            TRUE ~ ""
+        )) %>%
+        mutate(`_realization_rate_renovation` = ifelse(`_realization_rate_renovation` == 1, "ImprovedRealization", "")) %>%
+        mutate(learning_rate_heat = ifelse(learning_rate_heat == "constant", "", "HeatPumpLearning")) %>%
+        mutate(carbon_tax = case_when(
+            carbon_tax == "EUETS" ~ "Carbon tax",
+            carbon_tax == "social" ~ "Carbon tax social price",
+            TRUE ~ ""
+        )) %>%
+        mutate(`_remove_barriers_renovation` = ifelse(`_remove_barriers_renovation`, "Tackling market-failures renovation", "")) %>%
+        mutate(scenario_descriptor = paste(
+            carbon_tax, subsidies_hp, learning_rate_heat, subsidies_renovation, `_realization_rate_renovation`,
+            `_remove_barriers_renovation`, sep = " ") %>%
+            trimws %>%   # Remove leading and trailing whitespace
+            gsub(" +", " ", .))
+
+    temp <- temp %>%
+        select(c("region_bld", "scenario_descriptor")) %>%
+        rename(value = scenario_descriptor)
+
+    # make map with 
+
+    eu_countries <- ne_countries(continent = "Europe", returnclass = "sf")
+    temp <- temp %>%
+        mutate(iso_a3_eh = substr(region_bld, nchar(region_bld)-2, nchar(region_bld)))
+
+    merged_data <- merge(eu_countries, temp, by = "iso_a3_eh")
+
+    legend_title <- "National policy mix"
+    figure_title <- "National policy mix accross EU-27 Member States"
+    save_path <- paste(save_dir, save_path, sep = "/")
+    merged_data <- st_crop(merged_data, xmin = -20, xmax = 45,
+                                        ymin = 30, ymax = 73)
+
+    p <- ggplot(merged_data) +
+        geom_sf(aes(fill = value), color = "gray20", size = 5) +
+        geom_sf_text(aes(label = iso_a3_eh), size = 5, color = "grey50",
+            fontface = "bold") +
+        theme_void() +
+        theme(
+        legend.title = element_text(size = plot_settings[["size_text"]]),
+        legend.text = element_text(size = 10),
+        legend.position = "bottom",
+        legend.direction = "vertical", legend.box = "vertical",
+        strip.background = element_blank(),
+        strip.text = element_text(size = 15, face = "bold", margin = margin(b = 10)),
+        plot.margin = unit(c(0.5, 0.5, 0.5, 0.5), "cm")) +  # Adjust the plot margins
+        guides(fill = guide_legend(title = legend_title))
+
+    ggsave(save_path, plot = p, width = plot_settings[["width"]],
+        dpi = plot_settings[["dpi"]], height = plot_settings[["height"]])
 }

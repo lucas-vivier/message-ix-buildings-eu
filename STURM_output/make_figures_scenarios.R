@@ -10,7 +10,7 @@ print(paste("Working directory is:", getwd()))
 # Loading figures setttings and functions
 source("STURM_output/C00_plots.R")
 
-run <- "optimal_scenarios"
+run <- "test"
 
 scenarios <- c(
     "S1" = "No additional policy",
@@ -19,13 +19,19 @@ scenarios <- c(
     "S179" = "improved depth with quality"
 )
 scenarios <- c(
-    "S1" = "No additional policy",
+    "S1" = "Baseline",
     "first_best_scenario" = "First best",
     "second_best_scenario" = "Second best",
+    "S179" = "Second best non-tailored",
     "constraint_scenario" = "Technical constraint"
 )
+scenarios <- c(
+    "S91" = "Baseline",
+    "S109" = "Heat pump"
+)
 
-ref <- "No additional policy"
+
+ref <- "Baseline"
 # Generate distinct colors using RColorBrewer
 num_scenarios <- length(scenarios)
 colors <- brewer.pal(min(12, num_scenarios), "Set1") # Use Set3 palette with a maximum of 12 colors
@@ -93,7 +99,7 @@ data <- data %>%
 stp <- 5
 
 data <- data %>%
- mutate(year = ifelse(variable %in% flows, year - stp, year),
+ mutate(#year = ifelse(variable %in% flows, year - stp, year),
         value = ifelse(variable %in% flows, value
          / stp, value))
 data <- distinct(data)
