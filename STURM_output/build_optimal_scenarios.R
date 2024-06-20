@@ -20,6 +20,7 @@ args <- parser$parse_args()
 # args <- list(file = "max_scenario.csv", dir = "2024-06-16_184750")
 
 scenarios <- read.csv(args$f, header = TRUE)
+# get last element of args$f only the name of the file 
 
 dir <- paste("STURM_output/results", args$dir, sep = "/")
 data <- data.frame()
@@ -56,4 +57,5 @@ eu <- data %>%
 data <- rbind(data, eu)
 
 save_dir <- paste("STURM_output/figures", paste(args$dir, "optimal_scenarios", sep = "_"), sep = "/")
-write.csv(data, paste(save_dir, paste0("report_agg_", args$file), sep = "/"), row.names = FALSE)
+
+write.csv(data, paste(save_dir, paste0("report_agg_", basename(args$f)), sep = "/"), row.names = FALSE)
