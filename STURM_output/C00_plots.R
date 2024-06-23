@@ -277,7 +277,7 @@ plot_clustered_barplot <- function(df,
   if (!is.null(year_start)) {
     #print(year_start)
     df <- df %>%
-      filter(!(year == year_start & scenario != "Current policies"))
+      filter(!(year == year_start & scenario != "Baseline"))
   }
 
   df[[subplot_column]] <- factor(df[[subplot_column]], levels = unique(df[[subplot_column]]))

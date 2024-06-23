@@ -105,25 +105,9 @@ en_method <- "TABULA" # "VDD", "TABULA"
 energy_efficiency <- "endogenous"
 run <- "policies"
 
-# runs <- c("EU",
-# "EU_carbon_tax_low",
-# "EU_carbon_tax",
-# "EU_carbon_tax_social",
-# "EU_carbon_tax_rebates",
-# "EU_hp_subsidies",
-# # "EU_hp_high_elasticity",
-# "EU_hp_learning",
-# "EU_barriers_heater",
-# "EU_reno",
-# "EU_deep_reno",
-# "EU_barriers_renovation",
-# "EU_realization_rate")
 
-# runs <- c("EU", "EU_carbon_tax", "EU_carbon_tax_social")
-
-runs <- c("EU", "EU_deep", "EU_reno", "EU_deep_reno", "EU_deep_and_reno")
-runs <- c("EU_reno_halfsuccess")
-#runs <- c("EU_deep_and_reno")
+runs <- c("EU", "EU_hp_learning", "EU_hp_subsidies", "EU_hp_max")
+runs <- c("EU_hp_subsidies")
 
 if (args$all_scenarios) {
     runs <- "all"

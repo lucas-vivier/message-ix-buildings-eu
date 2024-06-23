@@ -422,12 +422,6 @@ run_scenario <- function(run,
                     d$income,
                     d$pe_conversion_factor,
                     threshold_poverty = threshold_poverty)
-
-    # Initial quantity to quantify learning
-    techno_heat_ini <- bld_det_ini %>%
-      group_by_at("fuel_heat") %>%
-      summarize(n_i = sum(n_units_fuel)) %>%
-      ungroup()
     
     # Initializing calibration parameters for energy-efficiency decisions
     parameters_renovation <- NULL
@@ -477,6 +471,7 @@ run_scenario <- function(run,
     print("End of initialization")
     # --------------------------------------------------------------
     # Loop over timesteps
+    techno_heat_number <- data.frame()
     bld_det_i <- bld_det_ini
     for (i in 2:length(yrs)) {
       print(paste("0. Starting scenario run for year", yrs[i]))
@@ -501,42 +496,57 @@ run_scenario <- function(run,
           round(sum(carbon_revenue$revenue), 0), "Billion euro"))
       }
 
-      # Learning rate and reduction of investment costs
-      learning_heat <- bld_det_i %>%
-        group_by_at("fuel_heat") %>%
-        summarize(n = sum(n_units_fuel)) %>%
-        ungroup() %>%
-        left_join(techno_heat_ini, by = "fuel_heat") %>%
-        rename(fuel_heat_f = fuel_heat) %>%
-        left_join(d$learning_rate_heat, by = "fuel_heat_f") %>%
-        mutate(alpha = log(1 - learning_rate_heat) / log(2)) %>%
-        mutate(learning_heat = (n / n_i)^(alpha)) %>%
-        mutate(learning_heat = ifelse(learning_heat > 1, 1, learning_heat)) %>%
-        select(c("fuel_heat_f", "learning_heat"))
+      # Initial quantity to quantify learning
+      temp <- bld_det_i %>%
+        group_by_at(c("fuel_heat", "year")) %>%
+        summarize(n_previous = sum(n_units_fuel)) %>%
+        ungroup()
+      techno_heat_number <- bind_rows(techno_heat_number, temp)
 
-      # Add floor cost for heat-pumps. Cannot be lower than gas boilers.
-      cost_invest_heat <- d$cost_invest_heat %>%
-        left_join(learning_heat, by = "fuel_heat_f") %>%
-        mutate(learning_heat = ifelse(is.na(learning_heat), 1, learning_heat)) %>%
-        mutate(cost_invest_heat = cost_invest_heat * learning_heat) %>%
-        select(-learning_heat)
-      
-      if (param$heat_pump_floor_cost) {
-        cost_invest_heat <- cost_invest_heat %>%
-          group_by(region_bld) %>%
-          # Get cost_invest_heat for 'gas'
-          mutate(cost_gas = ifelse(fuel_heat_f == "gas",
-            cost_invest_heat, NA_real_)) %>%
-          # Replace NA values with the cost_invest_heat of 'gas' for the region
-          mutate(cost_floor = max(cost_gas, na.rm = TRUE)) %>%
-          # Adjust cost_invest_heat for 'heat_pump'
-          mutate(cost_invest_heat = ifelse(fuel_heat_f == "heat_pump",
-              ifelse(cost_invest_heat < cost_floor,
-                cost_floor, cost_invest_heat), cost_invest_heat)) %>%
-          select(-c("cost_gas", "cost_floor")) %>%
-          ungroup()
+      techno_heat_previous <- techno_heat_number %>%
+        filter(year == yrs[i - 1] - stp) %>%
+        select(-year)
+
+      # If techno_heat_previous empty do not calculate learning
+      if (nrow(techno_heat_previous) != 0 & yrs[i] >= 2030) {
+        # Learning rate and reduction of investment costs
+        learning_heat <- bld_det_i %>%
+          group_by_at("fuel_heat") %>%
+          summarize(n = sum(n_units_fuel)) %>%
+          ungroup() %>%
+          left_join(techno_heat_previous, by = "fuel_heat") %>%
+          rename(fuel_heat_f = fuel_heat) %>%
+          left_join(d$learning_rate_heat, by = "fuel_heat_f") %>%
+          mutate(alpha = log(1 - learning_rate_heat) / log(2)) %>%
+          mutate(learning_heat = (n / n_previous)^(alpha)) %>%
+          mutate(learning_heat = ifelse(learning_heat > 1, 1, learning_heat)) %>%
+          select(c("fuel_heat_f", "learning_heat"))
+
+        # Add floor cost for heat-pumps. Cannot be lower than gas boilers.
+        cost_invest_heat <- d$cost_invest_heat %>%
+          left_join(learning_heat, by = "fuel_heat_f") %>%
+          mutate(learning_heat = ifelse(is.na(learning_heat), 1, learning_heat)) %>%
+          mutate(cost_invest_heat = cost_invest_heat * learning_heat) %>%
+          select(-learning_heat)
+        if (param$heat_pump_floor_cost) {
+          cost_invest_heat <- cost_invest_heat %>%
+            group_by(region_bld) %>%
+            # Get cost_invest_heat for 'gas'
+            mutate(cost_gas = ifelse(fuel_heat_f == "gas",
+              cost_invest_heat, NA_real_)) %>%
+            # Replace NA values with the cost_invest_heat of 'gas' for the region
+            mutate(cost_floor = max(cost_gas, na.rm = TRUE)) %>%
+            # Adjust cost_invest_heat for 'heat_pump'
+            mutate(cost_invest_heat = ifelse(fuel_heat_f == "heat_pump",
+                ifelse(cost_invest_heat < cost_floor,
+                  cost_floor, cost_invest_heat), cost_invest_heat)) %>%
+            select(-c("cost_gas", "cost_floor")) %>%
+            ungroup()
+        }
+      } else {
+        cost_invest_heat <- d$cost_invest_heat
       }
-      
+
       print("Calculating energy demand")
       if (!is.null(param$sh_recycling_rebates)) {
         # Budget rebates is the carbon revenue for 5 years
@@ -1004,6 +1014,10 @@ run_scenario <- function(run,
           }
         } else {
           sub <- filter(d$sub_heat, year == yrs[i])
+        }
+
+        if (yrs[i] == 2050) {
+          print('ok')
         }
 
         temp <- fun_ms_switch_heat_endogenous(yrs,

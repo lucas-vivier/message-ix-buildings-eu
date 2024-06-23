@@ -574,6 +574,10 @@ df <- result_eu %>%
     mutate(name = temp[name]) %>%
     rename(region_bld = name)
 
+print(filter(df, region_bld == "EU"))
+df <- df %>%
+    filter(region_bld != "EU")
+
 save_path <- "maps_countries_policy_mix_second_best.png"
 make_national_policy_mix(df, scenario, save_path)
 

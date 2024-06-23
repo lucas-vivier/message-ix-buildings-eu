@@ -1,6 +1,6 @@
 ﻿fuel_heat_f,year,value
-heat_pump,2020,171
-heat_pump,2025,189
+heat_pump,2020,0
+heat_pump,2025,0
 heat_pump,2030,207
 heat_pump,2035,225
 heat_pump,2040,243

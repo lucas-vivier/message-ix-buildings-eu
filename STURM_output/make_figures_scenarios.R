@@ -25,9 +25,12 @@ scenarios <- c(
     "S179" = "Second best non-tailored",
     "constraint_scenario" = "Technical constraint"
 )
+
 scenarios <- c(
-    "S91" = "Baseline",
-    "S109" = "Heat pump"
+    "EU" = "Baseline",
+    "EU_hp_learning" = "Learning",
+    "EU_hp_subsidies" = "Subsidies",
+    "EU_hp_max" = "Max"
 )
 
 
@@ -203,8 +206,8 @@ min_maps <- min(filter(df, variable == var)$value, na.rm = TRUE)
 min_maps <- - 200
 max_maps <- max(filter(df, variable == var)$value, na.rm = TRUE)
 limits <- c(min_maps, max_maps)
-figure_title <- "Cost"
-legend_title <- "euro/hh.year"
+figure_title <- ""
+legend_title <- "euro/(hh.year)"
 title <- "cost"
 
 plot_map(temp,
@@ -212,44 +215,10 @@ plot_map(temp,
   figure_title = figure_title,
   legend_title = legend_title,
   subplot_column = "scenario",
-  ncol = 2,
+  ncol = 4,
   save_path = paste(save_dir,
     paste0("map_", title, "_2050.png"), sep = "/"))
 
-#--------------------------------------------------------------
-### Maps by scenarios
-var <- "heat_kWh"
-ref <- "floor_m2"
-years <- c(2050)
-limits <- c(0, 200)
-figure_title <- "Energy consumption for space heating"
-legend_title <- "kWh/m2.year"
-title <- "kwh_m2"
-
-df <- data %>%
-    filter(variable %in% c(var, ref)) %>%
-    filter(resolution == "all") %>%
-    pivot_wider(id_cols = c(region_bld, year, resolution, scenario),
-      names_from = variable,
-      values_from = value) %>%
-    filter(!is.na(.data[[var]])) %>%
-    filter(!is.na(.data[[ref]])) %>%
-    mutate(value = .data[[var]] / .data[[ref]]) %>%
-    filter(year %in% years) %>%
-    select(-c(all_of(var), all_of(ref), "resolution"))
-
-if (!is.null(scenarios)) {
-  df <- filter(df, scenario %in% scenarios)
-}
-
-plot_map(df,
-  limits,
-  figure_title = figure_title,
-  legend_title = legend_title,
-  subplot_column = "scenario",
-  ncol = 3,
-  save_path = paste(save_dir,
-    paste0("map_", title, "_2050.png"), sep = "/"))
 #--------------------------------------------------------------
 ### Maps by scenarios
 var <- "heat_kWh"
