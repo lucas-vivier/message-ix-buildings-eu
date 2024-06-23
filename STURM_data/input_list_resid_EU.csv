@@ -17,7 +17,7 @@ pop,pop_clim_ssp2_hrv,basic
 hh_size,hh_size_EU,basic
 parameters_renovation,parameters_renovation,calibration
 parameters_heater,parameters_heater,calibration
-hdd,hdd_tabula,climate
+hdd,hdd_chilled,climate
 cost_invest_heat,cost_invest_heater_EU,decision
 cost_invest_ren_shell,cost_invest_renovation_EU,decision
 lifetime_new,bld_lifetime_new,decision

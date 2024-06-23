@@ -107,7 +107,7 @@ run <- "policies"
 
 
 runs <- c("EU", "EU_hp_learning", "EU_hp_subsidies", "EU_hp_max")
-runs <- c("EU_hp_subsidies")
+runs <- c("EU")
 
 if (args$all_scenarios) {
     runs <- "all"
