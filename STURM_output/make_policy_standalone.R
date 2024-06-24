@@ -9,7 +9,7 @@ library(gridExtra)
 
 source("STURM_output/C00_plots.R")
 # Load data
-dir <- "simulation_2024-06-16_184750"
+dir <- "2024-06-23_144346"
 save_dir <- paste("STURM_output", "figures", dir, sep = "/")
 file <- paste(save_dir, "results.csv", sep = "/")
 data <- read.csv(file,  check.names = FALSE, stringsAsFactors = FALSE, header = TRUE, row.names = NULL)
@@ -21,7 +21,7 @@ if (!dir.exists(out_dir)) {
 }
 
 scenarios <- c(
-    "No additionnal policy", "EU-ETS", "EU-ETS 2", "Social value of carbon",
+    "Baseline", "EU-ETS", "EU-ETS 2", "Social value of carbon",
     "Subsidies heat pumps", "Subsidies heat pumps medium", "Market-failures heater",
     "Learning-by-doing heat pumps",
     "Renovation wave", "Renovation wave half success",
@@ -30,7 +30,7 @@ scenarios <- c(
     "Market-failures renovation")
 
 rename_scenarios <- c(
-  "No additionnal policy" = "Baseline",
+  "Baseline" = "Baseline",
   "EU-ETS" = "aligned with EU-ETS price",
   "Social value of carbon" = "aligned with social value of carbon",
   "Subsidies heat pumps" = "High heat pumps subsidies",
@@ -92,6 +92,7 @@ electricity_counterfactual <- subset %>%
   select(`Consumption electricity variation (%)`) %>%
   pull()
 
+
 cols <- c(
   "Emission saving (%)" = "Emission",
   "Consumption saving (%)" = "Energy use",
@@ -123,6 +124,11 @@ temp <- temp %>%
         scenario %in% renovation ~ "Promoting Energy Renovation",
         TRUE ~ "Other"
     ))
+
+
+# Order groups c("", "Carbon tax", "Promoting Heat pumps", "Promoting Energy Renovation") for figures
+temp$groups <- factor(temp$groups, levels = c("", "Carbon tax", "Promoting Heat pumps", "Promoting Energy Renovation"))
+
 
 temp$variable <- factor(temp$variable, levels = cols)
 # Reverse order compare to scenarios
@@ -235,6 +241,9 @@ df <- df %>%
     scenario %in% renovation ~ "Promoting Energy Renovation",
     TRUE ~ "Other"
   ))
+
+df <- df %>%
+  mutate(groups = factor(groups, levels = c("", "Carbon tax", "Promoting Heat pumps", "Promoting Energy Renovation")))
 
 
 save_path <- paste(out_dir, "cba_eu_horizontal.png", sep = "/")

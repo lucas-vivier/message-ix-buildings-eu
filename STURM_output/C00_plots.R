@@ -1700,9 +1700,11 @@ make_cost_benefits <- function(data, ref, save_dir, nb_years = 30, figures = TRU
       "Emission cumulated (GtCO2)",
       "Total cost (Billion EUR)",
       "Government expenditures (Billion EUR)",
+      "Energy poverty (Million)",
       "Emission saving (%)",
       "Consumption saving (%)",
-      "Consumption electricity variation (%)"
+      "Consumption electricity variation (%)",
+      "Energy poverty (Percent)"
       )
 
     rename_list <- c(
