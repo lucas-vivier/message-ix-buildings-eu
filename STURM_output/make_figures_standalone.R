@@ -9,7 +9,7 @@ print(paste("Working directory is:", getwd()))
 # Loding figures setttings and functions
 source("STURM_output/C00_plots.R")
 
-scenario <- "EU"
+scenario <- "S1"
 file <- paste0("report_agg_", scenario, ".csv")
 file <- paste("STURM_output/results", file, sep = "/")
 
@@ -70,6 +70,7 @@ make_maps_plot <- function(df, var, ref, yr, limits,
 
   plot_map(temp,
     limits,
+    subplot_column = "year",
     figure_title = figure_title,
     legend_title = legend_title,
     save_path = paste(save_dir,
@@ -86,6 +87,7 @@ make_maps_plot <- function(df, var, ref, yr, limits,
 
   plot_map(variation,
     limits_relative,
+    subplot_column = "year",
     figure_title = figure_title,
     legend_title = legend_title,
     save_path = paste(save_dir,
@@ -172,6 +174,7 @@ limits <- c(0, 200)
 figure_title <- "Space heating consumption\nkWh/m2.year"
 legend_title <- "kWh/m2.year"
 title <- "consumption"
+
 
 make_maps_plot(data, var, ref, yr, limits,
               save_dir, figure_title = figure_title,

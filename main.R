@@ -75,7 +75,7 @@ param <- list(subsidies_renovation_type = "ad_valorem",
             renovation_intensity = NULL,
             success_objective_renovation = 1,
             repartition_renovation = NULL,
-            elasticity_renovation = -1.5,
+            elasticity_renovation = -1,
             elasticity_heat_pump = -1,
             remove_barriers_renovation = FALSE,
             remove_barriers_heater = FALSE,
@@ -107,7 +107,7 @@ run <- "policies"
 
 
 runs <- c("EU", "EU_hp_learning", "EU_hp_subsidies", "EU_hp_max")
-runs <- c("EU")
+runs <- c("EU_reno")
 
 if (args$all_scenarios) {
     runs <- "all"

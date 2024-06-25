@@ -301,9 +301,9 @@ plot_clustered_barplot <- function(df,
   if (display_total) {
     p <- p +
       geom_text(
-        aes(label = paste0(round(after_stat(y), 0), " ", y_label_suffix),
+        aes(label = paste0(round(after_stat(y), 0)),
           group = x_column),
-        stat = 'summary', fun = sum, vjust = -1, fontface = "bold", size = 7
+        stat = 'summary', fun = sum, vjust = -1, fontface = "bold", size = 6
       )
   }
   p <- p +
@@ -631,7 +631,11 @@ stacked_plots <- function(data,
       # make red diamonds for private investments
       p <- p +
         geom_point(aes(x = scenario, y = total_value_private),
-          color = "red", size = size_point, shape = 18, show.legend = FALSE)
+          color = "red", size = size_point, shape = 18, show.legend = FALSE) +
+        geom_text(aes(x = scenario,
+          label = paste(round(total_value_private, round)), y = total_value_private),
+          vjust = -0.5, nudge_y = nudge_y, size = size_text, color = "red")
+          
 
         #geom_point(aes(x = scenario, y = total_value_private), color = "red", size = size_point, , show.legend = FALSE)
     }
@@ -1294,7 +1298,7 @@ plot_map <- function(data,
     }
     p <- p + scale_fill_gradient2(
       low = low,
-      #mid = "white",
+      mid = "white",
       high = high,
       midpoint = threshold_colormap,
       limits = limits,

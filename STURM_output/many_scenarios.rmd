@@ -16,7 +16,7 @@ print(paste("Working directory is:", getwd()))
 # Loding figures setttings and functions
 source("STURM_output/C00_plots.R")
 
-dir <- "simulation_2024-06-16_184750_v1"
+dir <- "2024-06-23_144346"
 ref <- "S1"
 input_dir <- paste("STURM_output", "figures", dir, sep = "/")
 save_dir <- paste(input_dir, "multiple_scenarios", sep = "/")
@@ -31,12 +31,14 @@ data <- data[, -1]
 emission_saving_counterfactual <- filter(data, scenario_name == ref)$`Emission saving (%)`[1]
 energy_saving_counterfactual <- filter(data, scenario_name == ref)$`Consumption saving (%)`[1]
 electricity_variation_counterfactual <- filter(data, scenario_name == ref)$`Consumption electricity variation (%)`[1]
+energy_poverty_counterfactual <- filter(data, scenario_name == ref)$`Energy poverty (Percent)`[1]
 
 data <- data %>%
     mutate(color = "darkgrey") %>%
     mutate(`Emission saving (%)` = ifelse(scenario_name != ref, `Emission saving (%)` + emission_saving_counterfactual, `Emission saving (%)`)) %>%
     mutate(`Consumption saving (%)` = ifelse(scenario_name != ref, `Consumption saving (%)` + energy_saving_counterfactual, `Consumption saving (%)`)) %>%
     mutate(`Consumption electricity variation (%)` = ifelse(scenario_name != ref, `Consumption electricity variation (%)` + electricity_variation_counterfactual, `Consumption electricity variation (%)`)) %>%
+    mutate(`Energy poverty (Percent)` = ifelse(scenario_name != ref, `Energy poverty (Percent)` + energy_poverty_counterfactual, `Energy poverty (Percent)`)) %>%
     mutate(`Delta total cost (euro/hh/year)` = ifelse(is.na(`Delta total cost (euro/hh/year)`), 0, `Delta total cost (euro/hh/year)`)) %>%
     mutate(`Delta total cost private (euro/hh/year)` = ifelse(is.na(`Delta total cost private (euro/hh/year)`), 0, `Delta total cost private (euro/hh/year)`))
 
@@ -217,8 +219,12 @@ y <- "Space heating consumption (TWh)"
 save_path <- paste(save_dir, "sobol_analysis_energy.png", sep = "/")
 sobol_figures(df, list_policies, y, rename_policies, save_path)
 
-y <- "Delta total cost private (euro/hh/year)"
+y <- "Delta total cost (euro/hh/year)"
 save_path <- paste(save_dir, "sobol_analysis_cost.png", sep = "/")
+sobol_figures(df, list_policies, y, rename_policies, save_path)
+
+y <- "Energy poverty (Million)"
+save_path <- paste(save_dir, "sobol_analysis_energy_poverty.png", sep = "/")
 sobol_figures(df, list_policies, y, rename_policies, save_path)
 
 ```
@@ -319,7 +325,6 @@ scatter_plots(temp,
             presentation = FALSE)
 ```
 
-
 ```{r}
 x_column <- "Consumption saving (%)"
 y_column <- "Emission saving (%)"
@@ -350,7 +355,35 @@ scatter_plots(temp,
 
 ```
 
+```{r}
+x_column <- "Energy poverty (Percent)"
+y_column <- "Emission saving (%)"
 
+save_path <- paste(save_dir, "tradeoff_poverty_emission.png", sep = "/")
+
+temp <- data %>%
+    mutate(`Consumption saving (%)` = 100 * `Consumption saving (%)`) %>%
+    mutate(`Emission saving (%)` = 100 * `Emission saving (%)`)
+
+scatter_plots(temp,
+            x_column,
+            y_column,
+            color_column,
+            hline = 95,
+            colors_scenarios = colors_scenarios,
+            size_column = NULL,
+            shape_column = shape_column,
+            scenarios_shape = scenarios_shape,
+            save_path = save_path,
+            x_label_suffix = "%",
+            y_label_suffix = "%",
+            legend_suffix = "",
+            y_label = "Emission saving (%)",
+            x_label = "Energy poverty (%)",
+            legend = TRUE,
+            presentation = FALSE)
+
+```
 
 
 #------------------------------------------------------------------------------
@@ -363,7 +396,7 @@ cost_factor <- read.csv(file,  check.names = FALSE, stringsAsFactors = FALSE, he
     rename(name = region_bld, cost_factor = value)
 
 
-file <- "2024-06-16_184750_2050_summary_countries.csv"
+file <- "2024-06-23_144346_2050_summary_countries.csv"
 file <- paste(input_dir, file, sep = "/")
 data_eu <- read.csv(file,  check.names = FALSE, stringsAsFactors = FALSE, header = TRUE, row.names = NULL) %>%
     mutate(name = `Member states`) %>%

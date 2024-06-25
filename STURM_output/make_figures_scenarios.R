@@ -10,7 +10,7 @@ print(paste("Working directory is:", getwd()))
 # Loading figures setttings and functions
 source("STURM_output/C00_plots.R")
 
-run <- "test"
+run <- "2024-06-23_144346_optimal_scenarios"
 
 scenarios <- c(
     "S1" = "No additional policy",
@@ -19,6 +19,7 @@ scenarios <- c(
     "S179" = "improved depth with quality"
 )
 scenarios <- c(
+    #"no_supply" = "No supply-side decarbonization",
     "S1" = "Baseline",
     "first_best_scenario" = "First best",
     "second_best_scenario" = "Second best",
@@ -26,12 +27,6 @@ scenarios <- c(
     "constraint_scenario" = "Technical constraint"
 )
 
-scenarios <- c(
-    "EU" = "Baseline",
-    "EU_hp_learning" = "Learning",
-    "EU_hp_subsidies" = "Subsidies",
-    "EU_hp_max" = "Max"
-)
 
 
 ref <- "Baseline"

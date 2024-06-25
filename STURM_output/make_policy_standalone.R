@@ -69,7 +69,8 @@ cols <- c(
     "Total cost (Billion EUR)",
     "Government expenditures (Billion EUR)",
     "Delta total cost private (euro/hh/year)",
-    "Delta total cost (euro/hh/year)")
+    "Delta total cost (euro/hh/year)",
+    "Energy poverty (Percent)")
 
 # Calculate the percentage of the total cost compared to the counterfactual
 cost_counterfactual <- subset %>%
@@ -92,11 +93,17 @@ electricity_counterfactual <- subset %>%
   select(`Consumption electricity variation (%)`) %>%
   pull()
 
+energy_poverty_counterfactual <- subset %>%
+  filter(group == "Baseline") %>%
+  select(`Energy poverty (Percent)`) %>%
+  pull()
+
 
 cols <- c(
   "Emission saving (%)" = "Emission",
   "Consumption saving (%)" = "Energy use",
-  "Consumption electricity variation (%)" = "Electricity use"
+  "Consumption electricity variation (%)" = "Electricity use",
+  "Energy poverty (Percent)" = "Energy poverty"
 )
 
 
@@ -110,6 +117,7 @@ temp <- subset %>%
     mutate(value = ifelse((scenario != "Baseline") & (variable == "Emission saving (%)" ), value + emission_counterfactual, value)) %>%
     mutate(value = ifelse((scenario != "Baseline") & (variable == "Consumption saving (%)"), value + emission_counterfactual, value)) %>%
     mutate(value = ifelse((scenario != "Baseline") & (variable == "Consumption electricity variation (%)"), value + emission_counterfactual, value)) %>%
+    mutate(value = ifelse((scenario != "Baseline") & (variable == "Energy poverty (Percent)"), value + energy_poverty_counterfactual, value)) %>%
     # Rename colnames with cols
     mutate(value = ifelse(variable %in% c("Emission saving (%)", "Consumption saving (%)"), - value, value)) %>%
     mutate(variable = ifelse(variable %in% names(cols), cols[variable], variable)

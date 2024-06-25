@@ -4,7 +4,7 @@ library(rootSolve)
 
 #' @title Calculate annual energy renovation rate 
 ms_agg_ren_shell <- function(utility_obs, constant, scale,
-    barrier_rent, barrier_mfh, bld) {
+    barrier_rent, barrier_mfh, bld, stp) {
 
     # remove stp from this function
 
@@ -154,7 +154,6 @@ fun_calibration_ren_shell <- function(yrs,
         b_mfh, b_rent, bld, scale = NULL) {
         constant <- x[1:nrow(tgt)]
 
-
         # If elasticity is null no need to calibrate the scale
         calib_scale <- FALSE
         k <- 0
@@ -195,7 +194,7 @@ fun_calibration_ren_shell <- function(yrs,
             barrier_mfh = barrier_mfh)
 
         output <- ms_agg_ren_shell(utility, cst, scale,
-            barrier_rent, barrier_mfh, bld)
+            barrier_rent, barrier_mfh, bld, stp)
 
         ms_agg <- output$ms_agg %>%
             left_join(tgt, by = c("region_bld", "mat", "eneff_f"))
@@ -285,6 +284,11 @@ fun_calibration_ren_shell <- function(yrs,
     if (b_mfh != 1) {
         x <- c(x, 0)
     }
+    # objective_function(x,
+    #     utility = u, tgt = t,
+    #     b_mfh = b_mfh, b_rent = b_rent,
+    #     elasticity = param$elasticity_renovation, scale = NULL,
+    #     bld = b)
 
     root <- multiroot(objective_function, start = x,
         maxiter = 1e3, utility = u, tgt = t,
@@ -396,12 +400,12 @@ fun_calibration_ren_shell <- function(yrs,
     ms_ini <- ms_agg_ren_shell(utility_ren_hh,
         mutate(constant, constant = 0), mutate(scale, scale = 1),
         mutate(barrier_rent, barrier_rent = 0),
-        mutate(barrier_mfh, barrier_mfh = 0), bld_det_age_i)$ms_agg %>%
+        mutate(barrier_mfh, barrier_mfh = 0), bld_det_age_i, stp)$ms_agg %>%
         rename(ms_ini = ms) %>%
         select(-c("n_renovation", "n_units_fuel"))
 
     ms <- ms_agg_ren_shell(utility_ren_hh, constant, scale,
-        barrier_rent, barrier_mfh, bld_det_age_i)$ms_agg %>%
+        barrier_rent, barrier_mfh, bld_det_age_i, stp)$ms_agg %>%
         left_join(target) %>%
         left_join(constant) %>%
         left_join(barrier_rent) %>%
@@ -774,7 +778,7 @@ fun_calibration_consumption <- function(bld_det_ini,
                                         en_hh_tot,
                                         hh_size,
                                         floor_cap,
-                                        en_consumption,
+                                        en_consumption_calibration,
                                         path_out
                                         ) {
     # Calibration of energy demand
@@ -788,7 +792,7 @@ fun_calibration_consumption <- function(bld_det_ini,
 
 
     bld_energy <- bld_energy %>%
-      group_by_at(setdiff(names(en_consumption), "en_consumption")) %>%
+      group_by_at(setdiff(names(en_consumption_calibration), "en_consumption")) %>%
       summarize(en_calculation = sum(en_segment),
         en_calculation_std = sum(en_std_segment),
         n_units_fuel = sum(n_units_fuel),
@@ -796,80 +800,30 @@ fun_calibration_consumption <- function(bld_det_ini,
       ungroup() %>%
       # Conversion from kWh to ktoe
       mutate(
-        en_calculation_dw = en_calculation / n_units_fuel,
-        en_calculation_unit = en_calculation / floor_size,
-        en_calculation_std_unit = en_calculation_std / floor_size,
-        en_calculation = en_calculation / 11630 / 1e3,
-        en_calculation_std = en_calculation_std / 11630 / 1e3,
+        en_calculation_std_dw = en_calculation_std / n_units_fuel,
+        en_calculation_std_m2 = en_calculation_std / floor_size,
+        en_calculation = en_calculation / 1e9,
+        en_calculation_std = en_calculation_std / 1e9,
         n_units_fuel = n_units_fuel / 1e6,
-        floor_size = floor_size / 1e6) %>%
-      left_join(en_consumption) %>%
+        floor_size = floor_size / 1e6,
+        floor_size_dw = floor_size / n_units_fuel) %>%
+      left_join(en_consumption_calibration) %>%
+      mutate(
+        en_consumption_calibration_dw = en_consumption / n_units_fuel * 1e3,
+        en_consumption_calibration_m2 = en_consumption / floor_size * 1e3,
+        prebound_effect = (en_consumption - en_calculation_std) / en_calculation_std
+      ) %>%
       mutate(coeff_alpha = en_consumption / en_calculation)
     write.csv(bld_energy, paste0(path_out, "calibration_consumption.csv"))
 
-    alpha <- select(bld_energy, -c("en_consumption", "en_calculation",
+    alpha <- select(bld_energy, -c("en_calculation",
       "n_units_fuel", "floor_size", "en_calculation_std",
-      "en_calculation_unit",  "en_calculation_std_unit",
-      "en_calculation_dw"))
+      "en_calculation_std_dw","en_calculation_std_m2", "en_consumption",
+      "floor_size_dw", "en_consumption_calibration_dw",
+      "en_consumption_calibration_m2", "prebound_effect"))
     return(alpha)
 
     }
-# Old version of calibration of energy demand
-fun_calibration_consumption_agg <- function(bld_det_ini,
-                                        en_hh_tot,
-                                        hh_size,
-                                        floor_cap,
-                                        en_consumption,
-                                        path_out
-                                        ) {
-
-    # Calibration of energy demand
-    bld_energy <- bld_det_ini %>%
-      left_join(en_hh_tot) %>%
-      left_join(hh_size) %>%
-      left_join(floor_cap) %>%
-      mutate(floor_size = floor_cap * hh_size * n_units_fuel) %>%
-      mutate(en_segment = en_hh * n_units_fuel,
-        en_std_segment = en_hh_std * n_units_fuel)
-
-    # Calculate the weighted median budget_share for each country
-    median_budget_share <- bld_energy %>%
-      group_by(region_bld) %>%
-      summarize(median_budget_share =
-        weighted_median(budget_share, n_units_fuel))
-
-    bld_energy <- bld_energy %>%
-      left_join(median_budget_share) %>%
-      mutate(energy_poverty =
-        ifelse(budget_share >= 2 * median_budget_share, n_units_fuel, 0)) %>%
-      group_by_at(setdiff(names(en_consumption), "en_consumption")) %>%
-      summarize(en_calculation = sum(en_segment),
-        en_calculation_std = sum(en_std_segment),
-        n_units_fuel = sum(n_units_fuel),
-        floor_size = sum(floor_size),
-        en_poverty = sum(energy_poverty)) %>%
-      ungroup() %>%
-      # Conversion from kWh to ktoe
-      mutate(
-        en_calculation_dw = en_calculation / n_units_fuel,
-        en_calculation_unit = en_calculation / floor_size,
-        en_calculation_std_unit = en_calculation_std / floor_size,
-        en_calculation = en_calculation / 11630 / 1e3,
-        en_calculation_std = en_calculation_std / 11630 / 1e3,
-        n_units_fuel = n_units_fuel / 1e6,
-        en_poverty = en_poverty / 1e6,
-        sh_en_poverty = en_poverty / n_units_fuel,
-        floor_size = floor_size / 1e6) %>%
-      left_join(en_consumption) %>%
-      mutate(shr_en = en_consumption / en_calculation)
-    write.csv(bld_energy, paste0(path_out, "calibration_consumption.csv"))
-
-    shr_en <- select(bld_energy, -c("en_consumption", "en_calculation",
-      "n_units_fuel", "floor_size", "en_calculation_std",
-      "en_calculation_unit",  "en_calculation_std_unit",
-      "en_calculation_dw", "en_poverty", "sh_en_poverty"))
-    return(shr_en)
-}
 
 fun_calibration_poverty <- function(bld_det_ini,
                                     en_hh_tot,

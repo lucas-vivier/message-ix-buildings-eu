@@ -116,7 +116,7 @@ fun_subsidies_renovation <- function(i,
   }
 
   if (subsidies_renovation_type == "ad_valorem") {
-    interval <- c(0, 0.95)
+    interval <- c(0, 0.99)
   } else if (subsidies_renovation_type == "per_CO2") {
     interval <- c(0, 2000)
   } else if (subsidies_renovation_type == "per_kWh") {

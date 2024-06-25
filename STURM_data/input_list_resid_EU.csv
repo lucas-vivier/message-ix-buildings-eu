@@ -15,9 +15,9 @@ learning_rate_shell,learning_inv_ren_shell_EU,activity
 objectives_renovation,objectives_renovation,policies
 pop,pop_clim_ssp2_hrv,basic
 hh_size,hh_size_EU,basic
-parameters_renovation,parameters_renovation,calibration
+parameters_renovation,,calibration
 parameters_heater,parameters_heater,calibration
-hdd,hdd_chilled,climate
+hdd,hdd_tabula,climate
 cost_invest_heat,cost_invest_heater_EU,decision
 cost_invest_ren_shell,cost_invest_renovation_EU,decision
 lifetime_new,bld_lifetime_new,decision
@@ -29,7 +29,7 @@ ct_heat,ct_heat_EU,decision
 ct_heat_new,ct_heat_new_EU,decision
 carbon_market,carbon_market_EUETS,emission
 emission_ini,emission_ini,emission
-emission_factors,emission_factors_NPi_EUETS,emission
+emission_factors,emission_factors_Npi_EUETS,emission
 emission_factors_embodied,emission_factors_embodied,emission
 pe_conversion_factor,pe_conversion_factor_EU,macro
 eff_heat ,eff_heat_EU,energy
@@ -46,7 +46,7 @@ en_int_heat,heat_intensity_EU,energy
 en_int_cool,cool_intensity_EU,energy
 days_cool,cool_days_EU,energy
 en_int_hotwater,en_int_resid_hotwater_SSP2_rev_2022-12-15,energy
-en_consumption,en_consumption_2015_EU_eurostat,energy
+en_consumption,en_consumption_calibration_2015,energy
 energy_prices_ini,input_prices_ini_resid_EU,macro
 energy_prices_projections,input_prices_NPi,macro
 income,income,macro

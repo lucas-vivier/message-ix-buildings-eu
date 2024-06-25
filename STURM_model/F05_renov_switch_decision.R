@@ -56,12 +56,27 @@ fun_utility_ren_shell <- function(yrs,
                           subsidies_renovation = NULL,
                           subsidies_renovation_type = "ad_valorem",
                           full = FALSE,
-                          emission_factors = NULL) {
-  
-  # Calculate operational energy costs
+                          emission_factors = NULL,
+                          belief_expected_saving = FALSE) {
+  if (belief_expected_saving) {
+    # Calculate operational energy costs
+    en_hh_tot <- en_hh_tot %>%
+      # Based on cost of energy standard not real
+      mutate(cost_op = cost_op / heating_intensity)
+  } else {
+    heating_intensity <- en_hh_tot %>%
+      select(c(intersect(names(en_hh_tot), names(bld_cases_fuel))), "heating_intensity") %>%
+      filter(eneff == "avg") %>%
+      select(-c("eneff"))
+
+    en_hh_tot <- en_hh_tot %>%
+      mutate(cost_op = cost_op / heating_intensity) %>%
+      select(-c("heating_intensity")) %>%
+      left_join(heating_intensity) %>%
+      mutate(cost_op = cost_op * heating_intensity)
+  }
+
   en_hh_tot <- en_hh_tot %>%
-    # Based on cost of energy standard not real
-    mutate(cost_op = cost_op / heating_intensity) %>%
     select(-c("budget_share", "heating_intensity", "en_hh_std",
       "cost_op_wt", "u_building", "en_pe_hh_std"))
 
