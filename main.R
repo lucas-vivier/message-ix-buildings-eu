@@ -31,6 +31,7 @@ parser$add_argument("-a", "--all_scenarios", default = FALSE,
 
 # Parse the arguments
 args <- parser$parse_args()
+args <- list("scenarios_file" = "all_scenarios.csv", "all_scenarios" = TRUE)
 
 # Set num_cores based on the argument or use the default value
 parallel <- TRUE
