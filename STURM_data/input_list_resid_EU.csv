@@ -29,7 +29,7 @@ ct_heat,ct_heat_EU,decision
 ct_heat_new,ct_heat_new_EU,decision
 carbon_market,carbon_market_EUETS,emission
 emission_ini,emission_ini,emission
-emission_factors,emission_factors_Npi_EUETS,emission
+emission_factors,emission_factors_NPi_EUETS,emission
 emission_factors_embodied,emission_factors_embodied,emission
 pe_conversion_factor,pe_conversion_factor_EU,macro
 eff_heat ,eff_heat_EU,energy
