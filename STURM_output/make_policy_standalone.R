@@ -9,7 +9,7 @@ library(gridExtra)
 
 source("STURM_output/C00_plots.R")
 # Load data
-dir <- "2024-06-23_144346"
+dir <- "2024-06-25_153828"
 save_dir <- paste("STURM_output", "figures", dir, sep = "/")
 file <- paste(save_dir, "results.csv", sep = "/")
 data <- read.csv(file,  check.names = FALSE, stringsAsFactors = FALSE, header = TRUE, row.names = NULL)

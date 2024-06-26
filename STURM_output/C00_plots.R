@@ -477,6 +477,7 @@ scatter_plots <- function(df,
                           legend_suffix = "",
                           y_label = "",
                           x_label = "",
+                          discrete = FALSE,
                           legend = FALSE,
                           presentation = FALSE) {
   
@@ -553,10 +554,15 @@ scatter_plots <- function(df,
   # }
   p <- p +
     labs(y = y_label, x = x_label) +
-    scale_x_continuous(labels =
-      function(x) custom_label(x, suffix = x_label_suffix)) +
     scale_y_continuous(labels =
-      function(x) custom_label(x, suffix = y_label_suffix)) 
+      function(x) custom_label(x, suffix = y_label_suffix))
+
+  if (!discrete) {
+    p <- p +
+      scale_x_continuous(labels =
+      function(x) custom_label(x, suffix = x_label_suffix))
+  }
+
   # , limits = c(y_min, y_max)
 
 
@@ -1549,6 +1555,9 @@ calculate_cost_hh <- function(df, discount = 0.05, lifetime_loan = 10,
 make_cost_benefits <- function(data, ref, save_dir, nb_years = 30, figures = TRUE, 
   social_discount = 0.03, lifetime_renovation = 30, lifetime_heater = 20, stp = 5,
   make_summary = FALSE) {
+  # Each year represents a stp years period
+  # Cost heat in 2020 represnts the cost of heat from 2015 to 2020.
+  # Need to be corrected to account for energy saving
 
   path <- "STURM_data/input_csv/input_resid/macro/social_cost_carbon_20.csv"
   social_cost_carbon <- read.csv(path) %>%
@@ -1582,21 +1591,39 @@ make_cost_benefits <- function(data, ref, save_dir, nb_years = 30, figures = TRU
                           id_cols = c("region_bld", "year", "scenario"),
                           names_from = variable,
                           values_from = value)
+  
+  # Correct to account that cost heat over the period is not the cost of last year but the
+  # average cost over the period
+
+  if (FALSE) {
+    wide_data <- wide_data %>%
+      group_by(region_bld, scenario) %>%
+      arrange(year) %>%
+      mutate(
+        cost_heat_EUR = ifelse(year == 2015, cost_heat_EUR, cost_heat_EUR + lag(cost_heat_EUR, default = NA)) / 2 * stp,
+        heat_tCO2 = ifelse(year == 2015, heat_tCO2, heat_tCO2 + lag(heat_tCO2, default = NA)) / 2 * stp,
+        thermal_comfort_EUR = ifelse(year == 2015, thermal_comfort_EUR, thermal_comfort_EUR + lag(thermal_comfort_EUR, default = NA)) / 2 * stp
+        ) %>%
+      ungroup()
+  }
+
 
   wide_data <- wide_data %>%
     left_join(social_cost_carbon, by = "year") %>%
     mutate(social_cost_carbon = ifelse(is.na(social_cost_carbon), 0, social_cost_carbon)) %>%
     mutate(
+      # Flow have been reduced by stp in post-processing. Calculate total cost over stp years.
       cost_renovation_EUR =
-        ifelse(is.na(cost_renovation_EUR), 0, cost_renovation_EUR),
+        ifelse(is.na(cost_renovation_EUR), 0, cost_renovation_EUR) * stp,
       cost_heater_EUR =
-        ifelse(is.na(cost_heater_EUR), 0, cost_heater_EUR),
+        ifelse(is.na(cost_heater_EUR), 0, cost_heater_EUR) * stp,
+      # Running cost are over a 5 year period. 
       annuities_renovation =
-        social_discount / (1 - (1 + social_discount)^(-lifetime_renovation)),
+        stp * social_discount / (1 - (1 + social_discount)^(-lifetime_renovation)),
       annuities_heater =
-        social_discount / (1 - (1 + social_discount)^(-lifetime_heater)),
-      cost_renovation_EUR_year = cost_renovation_EUR * annuities_renovation * stp,
-      cost_heater_EUR_year = cost_heater_EUR * annuities_heater * stp,
+        stp * social_discount / (1 - (1 + social_discount)^(-lifetime_heater)),
+      cost_renovation_EUR_year = cost_renovation_EUR * annuities_renovation,
+      cost_heater_EUR_year = cost_heater_EUR * annuities_heater,
       cost_emission_EUR = heat_tCO2 * social_cost_carbon * stp,
       cost_heat_EUR = cost_heat_EUR * stp,
       thermal_comfort_EUR = - thermal_comfort_EUR * stp

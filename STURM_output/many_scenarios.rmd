@@ -493,16 +493,14 @@ plot_map(temp,
 # Renovation
 
 # 1. Cost-benefits analysis
+
 ```{r}
-source("STURM_output/C00_plots.R")
 var <- "Delta total cost (euro/hh/year)"
 df <- result_eu %>%
     select(c("scenario_name", "name", "variable", "value")) %>%
     filter(variable == var) %>%
     filter(scenario_name %in% names(scenario_renovation_names)) %>%
     mutate(scenario_name = scenario_renovation_names[scenario_name])
-
-
 
 ref_heat_pump <- df %>%
     filter(variable == var) %>%
@@ -512,9 +510,82 @@ ref_heat_pump <- df %>%
 df <- df %>%
     filter(!scenario_name %in% c("HeatPumpLearning+HighSub", "HeatPumpLearning+HighSub+ImprovedRealization")) %>%
     left_join(ref_heat_pump) %>%
-    mutate(value = ifelse(grepl("ImprovedRealization", scenario_name), value - `HeatPumpLearning+HighSub+ImprovedRealization`, value - `HeatPumpLearning+HighSub`))
+    mutate(value = ifelse(grepl("ImprovedRealization", scenario_name), value - `HeatPumpLearning+HighSub+ImprovedRealization`, value - `HeatPumpLearning+HighSub`)) %>%
+    select(c("scenario_name", "name", "variable", "value"))
 
-df$scenario_name <- factor(df$scenario_name, levels = scenario_renovation_names)
+
+```
+```{r}
+source("STURM_output/C00_plots.R")
+
+temp <- df %>%
+    mutate(color = "grey") %>%
+    mutate(color = ifelse(name == "EU", "darkorange", color)) %>%
+    mutate(shortname = case_when(
+        grepl("HighSubRenovation", scenario_name) ~ "Increase number",
+        grepl("MidSubDeepRenovation", scenario_name) ~ "Increase depth",
+        TRUE ~ "Renovation subsidies"
+    )) %>%
+    mutate(group = case_when(
+        grepl("ImprovedRealization", scenario_name) ~ "Improved realization",
+        TRUE ~ "Standard realization")
+    )
+
+# Order groups
+temp <- temp %>%
+    mutate(shortname = factor(shortname, levels = c("Increase number", "Renovation subsidies", "Increase depth")))
+
+save_path <- paste(save_dir, "scatter_cba_renovation.png", sep = "/")
+
+x_column <- "shortname"
+y_column <- "value"
+color_column <- "color"
+y_label_suffix <- "€"
+y_label <- "Social cost-benefits (€/hh/year)"
+x_label <- "Design renovation subsidies"
+colors_scenarios <- c("grey" = "grey", "darkorange" = "darkorange")
+
+#temp$scenario_name <- factor(temp$scenario_name, levels = scenario_renovation_names)
+
+
+p <- ggplot(temp, aes(x = .data[[x_column]], y = .data[[y_column]],
+        color = .data[[color_column]])) +
+    geom_jitter(alpha = 1, size = 6, width = 0.1, height = 0.1) +
+    scale_color_manual(values = colors_scenarios) +
+    facet_wrap(~group, scales = "fixed")
+
+# add 0 hline
+p <- p + geom_hline(yintercept = hline, linetype = "dashed", color = "red")
+
+p <- p +
+    message_building_theme +
+    theme(axis.title.y = element_text(size = 30, vjust = 0.5, hjust = 0.5, angle = 90),
+          axis.title.x = element_text(size = 30, hjust = 0.5),
+          axis.text.x = element_text(size = 20, angle = 20, hjust = 1)
+          ) +
+    # Remove legend
+    theme(legend.position = "none")
+
+
+custom_label <- function(x, suffix) {
+    label_comma()(x) %>% paste0(" ", suffix)
+    }
+
+p <- p +
+labs(y = y_label, x = x_label) +
+scale_y_continuous(labels =
+    function(x) custom_label(x, suffix = y_label_suffix))
+
+
+ggsave(save_path, plot = p, width = plot_settings[["width"]],
+        height = plot_settings[["height"]],
+        dpi = plot_settings[["dpi"]])
+
+```
+
+
+```{r}
+source("STURM_output/C00_plots.R")
 
 save_path <- paste(save_dir, "maps_cba_renovation.png", sep = "/")
 
@@ -562,6 +633,86 @@ plot_map(temp,
         subplot_column = "scenario_name",
         ncol = 4,
         key = "name")
+```
+
+## 3. Electricity consumption
+
+```{r}
+var <- "Space heating consumption electricity (TWh)"
+df <- result_eu %>%
+    select(c("scenario_name", "name", "variable", "value")) %>%
+    filter(variable == var) %>%
+    filter(scenario_name %in% names(scenario_renovation_names)) %>%
+    mutate(scenario_name = scenario_renovation_names[scenario_name])
+
+ref_heat_pump <- df %>%
+    filter(variable == var) %>%
+    filter(scenario_name %in% c("HeatPumpLearning+HighSub", "HeatPumpLearning+HighSub+ImprovedRealization")) %>%
+    pivot_wider(names_from = "scenario_name", values_from = "value")
+    
+df <- df %>%
+    filter(!scenario_name %in% c("HeatPumpLearning+HighSub", "HeatPumpLearning+HighSub+ImprovedRealization")) %>%
+    left_join(ref_heat_pump) %>%
+    mutate(value = ifelse(grepl("ImprovedRealization", scenario_name),
+        (value - `HeatPumpLearning+HighSub+ImprovedRealization`) / `HeatPumpLearning+HighSub+ImprovedRealization`,
+        (value - `HeatPumpLearning+HighSub`) / `HeatPumpLearning+HighSub`)) %>%
+    select(c("scenario_name", "name", "variable", "value"))
+
+df$scenario_name <- factor(df$scenario_name, levels = scenario_renovation_names)
+
+
+```
+
+```{r}
+
+temp <- df %>%
+    mutate(color = "grey") %>%
+    mutate(color = ifelse(name == "EU", "darkorange", color)) %>%
+    mutate(value = 100 * value) %>%
+    filter(!name %in% c("Malta", "Cyprus"))
+
+save_path <- paste(save_dir, "scatter_electricity_renovation.png", sep = "/")
+
+x_column <- "scenario_name"
+y_column <- "value"
+color_column <- "color"
+y_label_suffix <- "%"
+y_label <- "Electricity consumption (%)"
+x_label <- "Renovation scenarios"
+colors_scenarios <- c("grey" = "grey", "darkorange" = "darkorange")
+
+p <- ggplot(temp, aes(x = .data[[x_column]], y = .data[[y_column]],
+        color = .data[[color_column]])) +
+    geom_jitter(alpha = 1, size = 6, width = 0.1, height = 0.1) +
+    scale_color_manual(values = colors_scenarios)
+
+# add 0 hline
+p <- p + geom_hline(yintercept = hline, linetype = "dashed", color = "red")
+
+p <- p +
+    message_building_theme +
+    theme(axis.title.y = element_text(size = 30, vjust = 0.5, hjust = 0.5, angle = 90),
+          axis.title.x = element_text(size = 30, hjust = 0.5))
+
+    size_axis <- plot_settings[["size_text"]]
+
+
+custom_label <- function(x, suffix) {
+    label_comma()(x) %>% paste0(" ", suffix)
+    }
+
+p <- p +
+    labs(y = y_label, x = x_label) +
+    scale_y_continuous(labels =
+        function(x) custom_label(x, suffix = y_label_suffix))
+
+
+ggsave(save_path, plot = p, width = plot_settings[["width"]],
+        height = plot_settings[["height"]],
+        dpi = plot_settings[["dpi"]])
+
+
+
 ```
 
 #----------------------------------

@@ -108,9 +108,9 @@ Calculate the differences between scenarios and baseline:
 - Emission.
 
 ```{r}
-lifetime_renovation <- 30 #30 # years
+lifetime_renovation <- 25 #30 # years
 lifetime_heater <- 20 # years
-social_discount <- 0.02 # % per year
+social_discount <- 0.03 # % per year
 stp <- 5
 
 data_raw <- data

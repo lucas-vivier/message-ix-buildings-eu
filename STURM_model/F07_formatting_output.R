@@ -397,12 +397,11 @@ fun_format_output <- function(i,
 
         report$agg_result <- bind_rows(report$agg_result, temp_concat)
 
-
         if (!is.null(ren_det_i)) {
             det_rows <- ren_det_i %>%
                 mutate(
                     total_cost =
-                        (cost_invest_hh + sub_ren_hh) * n_units_fuel * 1e3,
+                        cost_invest_hh * n_units_fuel * 1e3,
                     total_sub = sub_ren_hh * n_units_fuel * 1e3) %>%
                 group_by_at(c("region_bld", "year", "eneff")) %>%
                 summarize(

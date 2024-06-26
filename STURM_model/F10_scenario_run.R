@@ -1016,10 +1016,6 @@ run_scenario <- function(run,
           sub <- filter(d$sub_heat, year == yrs[i])
         }
 
-        if (yrs[i] == 2050) {
-          print('ok')
-        }
-
         temp <- fun_ms_switch_heat_endogenous(yrs,
                           i,
                           bld_det_i,

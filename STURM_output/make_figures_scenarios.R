@@ -10,7 +10,7 @@ print(paste("Working directory is:", getwd()))
 # Loading figures setttings and functions
 source("STURM_output/C00_plots.R")
 
-run <- "2024-06-23_144346_optimal_scenarios"
+run <- "2024-06-25_225241"
 
 scenarios <- c(
     "S1" = "No additional policy",
@@ -26,7 +26,15 @@ scenarios <- c(
     "S179" = "Second best non-tailored",
     "constraint_scenario" = "Technical constraint"
 )
-
+scenarios <- c(
+  "EU" = "Baseline",
+  #"EU_realization_rate" = "EU_realization_rate",
+  "EU_reno" = "EU_reno",
+  "EU_reno_halfsuccess" = "EU_reno_halfsuccess",
+  "EU_reno_quality" = "EU_reno_quality",
+  "EU_deep_reno" = "EU_deep_reno"
+  #"EU_reno_quality_halfsuccess" = "EU_reno_quality_halfsuccess"
+)
 
 
 ref <- "Baseline"
@@ -191,6 +199,7 @@ scatter_plots(temp,
 #--------------------------------------------------------------
 ### Cost-benefits analysis
 source("STURM_output/C00_plots.R")
+
 df <- make_cost_benefits(data, ref, save_dir, nb_years = 30, figures = TRUE, make_summary = FALSE)
 
 var <- "Total cost"
@@ -203,16 +212,18 @@ max_maps <- max(filter(df, variable == var)$value, na.rm = TRUE)
 limits <- c(min_maps, max_maps)
 figure_title <- ""
 legend_title <- "euro/(hh.year)"
-title <- "cost"
+title <- "cba"
 
 plot_map(temp,
   limits,
+  threshold_colormap = 0,
+  reverse_colormap = TRUE,
   figure_title = figure_title,
   legend_title = legend_title,
   subplot_column = "scenario",
   ncol = 4,
   save_path = paste(save_dir,
-    paste0("map_", title, "_2050.png"), sep = "/"))
+    paste0("map_", title, ".png"), sep = "/"))
 
 #--------------------------------------------------------------
 ### Maps by scenarios
