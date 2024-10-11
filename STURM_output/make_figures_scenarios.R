@@ -18,8 +18,8 @@ scenarios <- c(
     "S86" = "Renovation",
     "S179" = "improved depth with quality"
 )
+
 scenarios <- c(
-    #"no_supply" = "No supply-side decarbonization",
     "S1" = "Baseline",
     "S143" = "All policies",
     "optimal_scenario" = "Min. cost national",

@@ -42,7 +42,7 @@ if (!is.null(args$cores)) {
     print(paste("Number of cores to be used:", num_cores))
 }
 
-file_scenarios <- "all_scenarios.csv"
+#file_scenarios <- "all_scenarios.csv"
 file_scenarios <- "scenarios_EU.csv"
 if (!is.null(args$scenarios_file)) {
   file_scenarios <- args$scenarios_file
@@ -102,12 +102,10 @@ step_year <- 5
 region <- c("WEU", "EEU")
 sector <- "resid"
 file_inputs <- "input_list_resid_EU.csv"
-en_method <- "TABULA" # "VDD", "TABULA"
+en_method <- "TABULA"
 energy_efficiency <- "endogenous"
 run <- "policies"
 
-
-runs <- c("EU", "EU_hp_learning", "EU_hp_subsidies", "EU_hp_max")
 runs <- c("EU")
 
 if (args$all_scenarios) {
