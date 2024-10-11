@@ -10,13 +10,15 @@ library(tidyverse)
 library(dplyr)
 library(ggplot2)
 library(stringr)
+library(ggrepel)
+
 
 print(paste("Working directory is:", getwd()))
 
 # Loding figures setttings and functions
 source("STURM_output/C00_plots.R")
 
-dir <- "2024-06-23_144346"
+dir <- "2024-06-26_091653"
 ref <- "S1"
 input_dir <- paste("STURM_output", "figures", dir, sep = "/")
 save_dir <- paste(input_dir, "multiple_scenarios", sep = "/")
@@ -260,7 +262,40 @@ scatter_plots(temp,
             y_label_suffix = "%",
             legend_suffix = "",
             y_label = "Emission saving (%)",
-            x_label = "Social cost-benefits (€/hh/year)",
+            x_label = "Total social cost (€/hh/year)",
+            legend = TRUE,
+            presentation = FALSE)
+
+```
+
+```{r}
+source("STURM_output/C00_plots.R")
+x_column <- "Delta total cost (euro/hh/year)"
+y_column <- "Emission saving (%)"
+#color_column <- "descr"
+color_column <- "groups"
+shape_column <- "groups"
+
+save_path <- paste(save_dir, "tradeoff_cost_emission.png", sep = "/")
+
+temp <- data %>%
+    mutate(`Emission saving (%)` = 100 * `Emission saving (%)`)
+
+scatter_plots(temp,
+            x_column,
+            y_column,
+            color_column,
+            colors_scenarios = colors_scenarios,
+            size_column = NULL,
+            shape_column = shape_column,
+            scenarios_shape = scenarios_shape,
+            hline = NULL,
+            save_path = save_path,
+            x_label_suffix = "€",
+            y_label_suffix = "%",
+            legend_suffix = "",
+            y_label = "Emission saving (%)",
+            x_label = "Total social cost (€/hh/year)",
             legend = TRUE,
             presentation = FALSE)
 
@@ -268,13 +303,14 @@ scatter_plots(temp,
 
 
 ```{r}
-x_column <- "Delta total cost private (euro/hh/year)"
-y_column <- "Emission saving (%)"
+x_column <- "Delta total cost (euro/hh/year)"
+y_column <- "Consumption electricity variation (%)"
 
-save_path <- paste(save_dir, "tradeoff_cost_private_emission.png", sep = "/")
+save_path <- paste(save_dir, "tradeoff_cost_electricity.png", sep = "/")
 
 temp <- data %>%
-    mutate(`Emission saving (%)` = 100 * `Emission saving (%)`)
+    mutate(`Emission saving (%)` = 100 * `Emission saving (%)`) %>%
+    mutate(`Consumption electricity variation (%)` = 100 * `Consumption electricity variation (%)`)
 
 source("STURM_output/C00_plots.R")
 scatter_plots(temp,
@@ -286,12 +322,12 @@ scatter_plots(temp,
             shape_column = shape_column,
             scenarios_shape = scenarios_shape,
             save_path = save_path,
-            hline = 95,
+            hline = NULL,
             x_label_suffix = "",
             y_label_suffix = "%",
             legend_suffix = "",
-            y_label = "Emission saving (%)",
-            x_label = "Private cost-benefits (€/hh/year)",
+            y_label = "Electricity use variation (%)",
+            x_label = "Total social cost (€/hh/year)",
             legend = TRUE,
             presentation = FALSE)
 ```
@@ -320,7 +356,7 @@ scatter_plots(temp,
             y_label_suffix = "%",
             legend_suffix = "",
             y_label = "Emission saving (%)",
-            x_label = "Electricitity use variation (%)",
+            x_label = "Electricity use variation (%)",
             legend = TRUE,
             presentation = FALSE)
 ```
@@ -396,7 +432,7 @@ cost_factor <- read.csv(file,  check.names = FALSE, stringsAsFactors = FALSE, he
     rename(name = region_bld, cost_factor = value)
 
 
-file <- "2024-06-23_144346_2050_summary_countries.csv"
+file <- "2024-06-26_091653_2050_summary_countries.csv"
 file <- paste(input_dir, file, sep = "/")
 data_eu <- read.csv(file,  check.names = FALSE, stringsAsFactors = FALSE, header = TRUE, row.names = NULL) %>%
     mutate(name = `Member states`) %>%
@@ -489,6 +525,34 @@ plot_map(temp,
         key = "name")
 ```
 
+```{r}
+source("STURM_output/C00_plots.R")
+
+
+temp <- data_eu %>%
+    select(c("scenario_name", "name", "Consumption electricity variation (%)")) %>%
+    rename(value = `Consumption electricity variation (%)`) %>%
+    filter(scenario_name %in% scenarios_heat_pumps) %>%
+    mutate(value = 100 * value)
+
+temp$scenario_name <- factor(temp$scenario_name, levels = scenarios_heat_pumps)
+
+min <- min(temp$value, na.rm = TRUE)
+limits <- c(100, 1000)
+save_path <- paste(save_dir, "maps_electricity_countries_heatpump.png", sep = "/")
+
+plot_map(temp,
+        limits = limits,
+        threshold_colormap = 200,
+        reverse_colormap = TRUE,
+        figure_title = "",
+        save_path = save_path,
+        legend_title = "%",
+        subplot_column = "scenario_name",
+        ncol = 4,
+        key = "name")
+```
+
 #-----------------------------------------------------------------------------------------
 # Renovation
 
@@ -515,74 +579,162 @@ df <- df %>%
 
 
 ```
+
+
+
+
 ```{r}
 source("STURM_output/C00_plots.R")
 
-temp <- df %>%
-    mutate(color = "grey") %>%
-    mutate(color = ifelse(name == "EU", "darkorange", color)) %>%
-    mutate(shortname = case_when(
-        grepl("HighSubRenovation", scenario_name) ~ "Increase number",
-        grepl("MidSubDeepRenovation", scenario_name) ~ "Increase depth",
-        TRUE ~ "Renovation subsidies"
-    )) %>%
-    mutate(group = case_when(
-        grepl("ImprovedRealization", scenario_name) ~ "Improved realization",
-        TRUE ~ "Standard realization")
+make_scatter_countries <- function(df,
+    y_label_suffix = "€",
+    y_label = "Total social cost (€/hh/year)",
+    save_path = "scatter_cba_renovation.png",
+    hline = 0,
+    highlight_negatives = TRUE) {
+
+    temp <- df %>%
+        mutate(color = "grey") %>%
+        filter(!name %in% c("Malta", "Cyprus")) %>%
+        mutate(color = ifelse(name == "EU", "darkorange", color)) %>%
+        mutate(shortname = case_when(
+            grepl("HighSubRenovation", scenario_name) ~ "Increase number",
+            grepl("MidSubDeepRenovation", scenario_name) ~ "Increase depth",
+            TRUE ~ "Renovation subsidies"
+        )) %>%
+        mutate(group = case_when(
+            grepl("ImprovedRealization", scenario_name) ~ "Improved realization",
+            TRUE ~ "Standard realization")
+        )
+
+    # Order groups
+    temp <- temp %>%
+        mutate(shortname = factor(shortname, levels = c("Increase number", "Renovation subsidies", "Increase depth"))) %>%
+        mutate(group = factor(group, levels = c("Standard realization", "Improved realization")))
+
+
+    x_column <- "shortname"
+    y_column <- "value"
+    color_column <- "point_color"
+    x_label <- "Design renovation subsidies"
+    colors_scenarios <- c("grey" = "grey", "darkorange" = "darkorange",
+        "darkred" = "darkred", "darkgreen" = "darkgreen")
+
+    max_min_labels <- temp %>%
+    group_by(group, shortname) %>%
+    summarize(
+        max_value = max(value, na.rm = TRUE),
+        min_value = min(value, na.rm = TRUE),
+        max_name = name[which.max(value)],
+        min_name = name[which.min(value)]
     )
 
-# Order groups
-temp <- temp %>%
-    mutate(shortname = factor(shortname, levels = c("Increase number", "Renovation subsidies", "Increase depth")))
-
-save_path <- paste(save_dir, "scatter_cba_renovation.png", sep = "/")
-
-x_column <- "shortname"
-y_column <- "value"
-color_column <- "color"
-y_label_suffix <- "€"
-y_label <- "Social cost-benefits (€/hh/year)"
-x_label <- "Design renovation subsidies"
-colors_scenarios <- c("grey" = "grey", "darkorange" = "darkorange")
-
-#temp$scenario_name <- factor(temp$scenario_name, levels = scenario_renovation_names)
+    temp <- temp %>%
+    left_join(max_min_labels, by = c("group", "shortname"))
 
 
-p <- ggplot(temp, aes(x = .data[[x_column]], y = .data[[y_column]],
-        color = .data[[color_column]])) +
-    geom_jitter(alpha = 1, size = 6, width = 0.1, height = 0.1) +
-    scale_color_manual(values = colors_scenarios) +
-    facet_wrap(~group, scales = "fixed")
+    temp <- temp %>%
+    mutate(point_color = case_when(
+        value == max_value ~ "darkred",
+        value == min_value ~ "darkgreen",
+        color == "darkorange" ~ "darkorange",
+        highlight_negatives & value < 0 ~ "darkgreen",
+        TRUE ~ "grey"
+    ))
 
-# add 0 hline
-p <- p + geom_hline(yintercept = hline, linetype = "dashed", color = "red")
-
-p <- p +
-    message_building_theme +
-    theme(axis.title.y = element_text(size = 30, vjust = 0.5, hjust = 0.5, angle = 90),
-          axis.title.x = element_text(size = 30, hjust = 0.5),
-          axis.text.x = element_text(size = 20, angle = 20, hjust = 1)
-          ) +
-    # Remove legend
-    theme(legend.position = "none")
+    #temp$scenario_name <- factor(temp$scenario_name, levels = scenario_renovation_names)
 
 
-custom_label <- function(x, suffix) {
-    label_comma()(x) %>% paste0(" ", suffix)
+    p <- ggplot(temp, aes(x = .data[[x_column]], y = .data[[y_column]],
+            color = .data[[color_column]])) +
+        geom_jitter(alpha = 1, size = 6, width = 0.1, height = 0.1) +
+        scale_color_manual(values = colors_scenarios) +
+        facet_wrap(~group, scales = "fixed") +
+        geom_text_repel(
+            data = filter(temp, value == max_value),
+            aes(label = max_name),
+            #vjust = -1.5,
+            size = 6,
+            color = "darkred",
+            fontface = "bold"
+
+        ) +
+        geom_text_repel(
+            data = filter(temp, value == min_value & value >= 0),
+            aes(label = min_name),
+            #vjust = 2.5,
+            size = 6,
+            color = "darkgreen",
+            fontface = "bold"
+        ) +
+        geom_text_repel(
+            data = filter(temp, name == "EU"),
+            aes(label = name),
+            #vjust = -1.5,
+            size = 6,
+            color = "darkorange",
+            fontface = "bold"
+        ) +
+        geom_errorbarh(
+            data = filter(temp, name == "EU"),
+            aes(y = value, xmin = as.numeric(shortname) - 0.15, xmax = as.numeric(shortname) + 0.15),
+            height = 0.1,
+            color = "darkorange"
+    )
+
+
+    if (highlight_negatives) {
+        p <- p + geom_text_repel(
+            data = filter(temp, value < 0),
+            aes(label = name),
+            #vjust = 1.5,
+            size = 6,
+            color = "darkgreen",
+            fontface = "bold"
+        )
     }
 
-p <- p +
-labs(y = y_label, x = x_label) +
-scale_y_continuous(labels =
-    function(x) custom_label(x, suffix = y_label_suffix))
+    # add 0 hline
+    p <- p + geom_hline(yintercept = hline, linetype = "dashed", color = "red")
+
+    p <- p +
+        message_building_theme +
+        theme(axis.title.y = element_text(size = 25, vjust = 0.5, hjust = 0.5, angle = 90),
+            axis.title.x = element_text(size = 25, hjust = 0.5),
+            axis.text.x = element_text(size = 20, angle = 20, hjust = 1),
+                legend.position = "none",
+                strip.text = element_text(size = 30, face = "bold"),  # Facet title settings
+                panel.spacing = unit(2, "lines")
+            )
 
 
-ggsave(save_path, plot = p, width = plot_settings[["width"]],
-        height = plot_settings[["height"]],
-        dpi = plot_settings[["dpi"]])
+    custom_label <- function(x, suffix) {
+        label_comma()(x) %>% paste0(" ", suffix)
+        }
 
+    p <- p +
+    labs(y = y_label, x = x_label) +
+    scale_y_continuous(labels =
+        function(x) custom_label(x, suffix = y_label_suffix))
+
+    save_path <- paste(save_dir, save_path, sep = "/")  
+    ggsave(save_path, plot = p, width = plot_settings[["width"]],
+            height = plot_settings[["height"]],
+            dpi = plot_settings[["dpi"]])
+    }
 ```
 
+```{r}
+make_scatter_countries(df,
+    y_label_suffix = "€",
+    y_label = "Total social cost (€/hh/year)",
+    save_path = "scatter_cba_renovation.png",
+    hline = 0)
+
+
+
+
+```
 
 ```{r}
 source("STURM_output/C00_plots.R")
@@ -602,7 +754,50 @@ plot_map(df,
 ```
 
 
-# 2. Energy poverty
+```{r}
+
+
+
+```
+
+
+## 2. Electricity consumption
+
+```{r}
+var <- "Space heating consumption electricity (TWh)"
+df <- result_eu %>%
+    select(c("scenario_name", "name", "variable", "value")) %>%
+    filter(variable == var) %>%
+    filter(scenario_name %in% names(scenario_renovation_names)) %>%
+    mutate(scenario_name = scenario_renovation_names[scenario_name])
+
+ref_heat_pump <- df %>%
+    filter(variable == var) %>%
+    filter(scenario_name %in% c("HeatPumpLearning+HighSub", "HeatPumpLearning+HighSub+ImprovedRealization")) %>%
+    pivot_wider(names_from = "scenario_name", values_from = "value")
+    
+df <- df %>%
+    filter(!scenario_name %in% c("HeatPumpLearning+HighSub", "HeatPumpLearning+HighSub+ImprovedRealization")) %>%
+    left_join(ref_heat_pump) %>%
+    mutate(value = ifelse(grepl("ImprovedRealization", scenario_name),
+        (value - `HeatPumpLearning+HighSub+ImprovedRealization`) / `HeatPumpLearning+HighSub+ImprovedRealization`,
+        (value - `HeatPumpLearning+HighSub`) / `HeatPumpLearning+HighSub`)) %>%
+    select(c("scenario_name", "name", "variable", "value"))
+
+df$scenario_name <- factor(df$scenario_name, levels = scenario_renovation_names)
+
+df <- df %>%
+    mutate(value = 100 * value)
+
+make_scatter_countries(df,
+    y_label_suffix = "%",
+    y_label = "Variation of electricity use (%)",
+    save_path = "scatter_electricity_renovation.png",
+    hline = 0)
+
+```
+
+# 3. Energy poverty
 
 ```{r}
 source("STURM_output/C00_plots.R")
@@ -635,86 +830,6 @@ plot_map(temp,
         key = "name")
 ```
 
-## 3. Electricity consumption
-
-```{r}
-var <- "Space heating consumption electricity (TWh)"
-df <- result_eu %>%
-    select(c("scenario_name", "name", "variable", "value")) %>%
-    filter(variable == var) %>%
-    filter(scenario_name %in% names(scenario_renovation_names)) %>%
-    mutate(scenario_name = scenario_renovation_names[scenario_name])
-
-ref_heat_pump <- df %>%
-    filter(variable == var) %>%
-    filter(scenario_name %in% c("HeatPumpLearning+HighSub", "HeatPumpLearning+HighSub+ImprovedRealization")) %>%
-    pivot_wider(names_from = "scenario_name", values_from = "value")
-    
-df <- df %>%
-    filter(!scenario_name %in% c("HeatPumpLearning+HighSub", "HeatPumpLearning+HighSub+ImprovedRealization")) %>%
-    left_join(ref_heat_pump) %>%
-    mutate(value = ifelse(grepl("ImprovedRealization", scenario_name),
-        (value - `HeatPumpLearning+HighSub+ImprovedRealization`) / `HeatPumpLearning+HighSub+ImprovedRealization`,
-        (value - `HeatPumpLearning+HighSub`) / `HeatPumpLearning+HighSub`)) %>%
-    select(c("scenario_name", "name", "variable", "value"))
-
-df$scenario_name <- factor(df$scenario_name, levels = scenario_renovation_names)
-
-
-```
-
-```{r}
-
-temp <- df %>%
-    mutate(color = "grey") %>%
-    mutate(color = ifelse(name == "EU", "darkorange", color)) %>%
-    mutate(value = 100 * value) %>%
-    filter(!name %in% c("Malta", "Cyprus"))
-
-save_path <- paste(save_dir, "scatter_electricity_renovation.png", sep = "/")
-
-x_column <- "scenario_name"
-y_column <- "value"
-color_column <- "color"
-y_label_suffix <- "%"
-y_label <- "Electricity consumption (%)"
-x_label <- "Renovation scenarios"
-colors_scenarios <- c("grey" = "grey", "darkorange" = "darkorange")
-
-p <- ggplot(temp, aes(x = .data[[x_column]], y = .data[[y_column]],
-        color = .data[[color_column]])) +
-    geom_jitter(alpha = 1, size = 6, width = 0.1, height = 0.1) +
-    scale_color_manual(values = colors_scenarios)
-
-# add 0 hline
-p <- p + geom_hline(yintercept = hline, linetype = "dashed", color = "red")
-
-p <- p +
-    message_building_theme +
-    theme(axis.title.y = element_text(size = 30, vjust = 0.5, hjust = 0.5, angle = 90),
-          axis.title.x = element_text(size = 30, hjust = 0.5))
-
-    size_axis <- plot_settings[["size_text"]]
-
-
-custom_label <- function(x, suffix) {
-    label_comma()(x) %>% paste0(" ", suffix)
-    }
-
-p <- p +
-    labs(y = y_label, x = x_label) +
-    scale_y_continuous(labels =
-        function(x) custom_label(x, suffix = y_label_suffix))
-
-
-ggsave(save_path, plot = p, width = plot_settings[["width"]],
-        height = plot_settings[["height"]],
-        dpi = plot_settings[["dpi"]])
-
-
-
-```
-
 #----------------------------------
 # Maximum scenario by EU member states
 
@@ -730,25 +845,8 @@ var <- "Delta total cost (euro/hh/year)"
 temp <- setNames(names(rename_countries), rename_countries)
 
 df <- result_eu %>%
-    select(c("scenario_name", "name", "variable", "value")) %>%
-    filter(variable == var) %>%
-    group_by(name) %>%
-    summarize(scenario_name = scenario_name[which.min(value)]) %>%
-    ungroup() %>%
-    mutate(name = ifelse(name == "Czechia", "Czech Republic", name)) %>%
-    mutate(name = temp[name]) %>%
-    rename(region_bld = name) %>%
-    filter(region_bld != "EU")
-
-save_path <- "maps_countries_policy_mix_first_best_scenario.png"
-make_national_policy_mix(df, scenario, save_path)
-
-write.csv(df, paste(save_dir, "first_best_scenario.csv", sep = "/"), row.names = FALSE)
-
-df <- result_eu %>%
-    filter(carbon_tax != "social") %>%
+    filter(carbon_tax == "EUETS") %>%
     filter(`_remove_barriers_renovation` == FALSE) %>%
-    filter() %>%
     select(c("scenario_name", "name", "variable", "value")) %>%
     filter(variable == var) %>%
     group_by(name) %>%
@@ -758,19 +856,19 @@ df <- result_eu %>%
     mutate(name = temp[name]) %>%
     rename(region_bld = name)
 
+save_path <- "maps_countries_policy_mix_optimal_scenario.png"
+make_national_policy_mix(df, scenario, save_path)
+
 print(filter(df, region_bld == "EU"))
 df <- df %>%
     filter(region_bld != "EU")
 
-save_path <- "maps_countries_policy_mix_second_best.png"
-make_national_policy_mix(df, scenario, save_path)
+write.csv(df, paste(save_dir, "optimal_scenario.csv", sep = "/"), row.names = FALSE)
+````
 
-
-write.csv(df, paste(save_dir, "second_best_scenario.csv", sep = "/"), row.names = FALSE)
-
-
+```{r}
 df <- result_eu %>%
-    filter(carbon_tax != "social") %>%
+    filter(carbon_tax == "EUETS") %>%
     filter(`_remove_barriers_renovation` == FALSE) %>%
     filter(learning_rate_heat == "constant") %>%
     filter(`_realization_rate_renovation` == 0.75) %>%
@@ -790,6 +888,8 @@ make_national_policy_mix(df, scenario, save_path)
 
 write.csv(df, paste(save_dir, "constraint_scenario.csv", sep = "/"), row.names = FALSE)
 ```
+
+
 
 
 #----------------------------------------------------------------------------------------------------

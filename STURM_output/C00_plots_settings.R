@@ -26,24 +26,25 @@ colors_efficiency <- c("Slum" = "grey30",
 # Insulation levels
 
 rename_insulation <- c(
-  "0-0.5" = "Advanced insulation",
-  "0.5-1" = "Basic insulation",
-  "1-1.5" = "Bad insulation",
-  "1.5-2" = "Poor insulation",
-  ">2" = "No insulation",
+  "0-0.5" = "0-0.5 kWh/(m2.K)",
+  "0.5-1" = "0.5-1 kWh/(m2.K)",
+  "1-1.5" = "1-1.5 kWh/(m2.K)",
+  "1.5-2" = "1.5-2 kWh/(m2.K)",
+  ">2" = "> 2 kWh/(m2.K)",
   "no_heating" = "No heating"
 )
 
-order_insulation <- c("No heating", "No insulation", "Poor insulation", "Bad insulation",
-  "Basic insulation", "Advanced insulation")
+order_insulation <- c("No heating", "> 2 kWh/(m2.K)",
+  "1.5-2 kWh/(m2.K)", "1-1.5 kWh/(m2.K)",
+ "0.5-1 kWh/(m2.K)",  "0-0.5 kWh/(m2.K)")
 
 colors_insulation <- c(
   "No heating" = "black",
-  "No insulation" = "grey30",
-  "Poor insulation" = "coral4",
-  "Bad insulation" = "coral3",
-  "Basic insulation" = "goldenrod1",
-  "Advanced insulation" = "palegreen3"
+  "> 2 kWh/(m2.K)" = "grey30",
+  "1.5-2 kWh/(m2.K)" = "coral4",
+  "1-1.5 kWh/(m2.K)" = "coral3",
+  "0.5-1 kWh/(m2.K)" = "goldenrod1",
+  "0-0.5 kWh/(m2.K)" = "darkgreen"
 )
 
 # Primary consumption level

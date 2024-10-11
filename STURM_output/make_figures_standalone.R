@@ -70,7 +70,6 @@ make_maps_plot <- function(df, var, ref, yr, limits,
 
   plot_map(temp,
     limits,
-    subplot_column = "year",
     figure_title = figure_title,
     legend_title = legend_title,
     save_path = paste(save_dir,
@@ -87,7 +86,6 @@ make_maps_plot <- function(df, var, ref, yr, limits,
 
   plot_map(variation,
     limits_relative,
-    subplot_column = "year",
     figure_title = figure_title,
     legend_title = legend_title,
     save_path = paste(save_dir,
@@ -194,15 +192,6 @@ temp <- data %>%
   mutate(variable = "fossil_building",
     resolution = "all")
 
-# if countries are missing, add them
-# missing <- setdiff(unique(data$region_bld), unique(temp$region_bld))
-# missing <- data.frame(region_bld = missing,
-#   year = 2015,
-#   value = 0,
-#   variable = "fossil_building",
-#   resolution = "all")
-# temp <- bind_rows(temp, missing)
-
 temp <- bind_rows(data, temp)
 
 var <- "fossil_building"
@@ -289,8 +278,7 @@ temp <- data %>%
   group_by(region_bld) %>%
   mutate(value = value / sum(value)) %>%
   ungroup() %>%
-  mutate(region_bld = ifelse(region_bld %in% names(rename_countries_code), rename_countries_code[region_bld], region_bld))    # this reorders samples
-
+  mutate(region_bld = ifelse(region_bld %in% names(rename_countries), rename_countries[region_bld], region_bld))    # this reorders samples
 
 
 region_grouping <- temp %>%
@@ -310,19 +298,52 @@ plot_stacked_bars(my_data_reordered,
                   fill_column = "resolution",
                   x_column = "region_bld",
                   y_column = "value",
-                  save_path = save_path)
+                  save_path = save_path,
+                  orientation = "horizontal")
+
+temp <- data %>%
+  filter(variable == "stock_building") %>%
+  filter(resolution %in% names(rename_fuels)) %>%
+  filter(year == 2050) %>%
+  group_by(region_bld) %>%
+  mutate(value = value / sum(value)) %>%
+  ungroup() %>%
+  mutate(region_bld = ifelse(region_bld %in% names(rename_countries), rename_countries[region_bld], region_bld))    # this reorders samples
+
+
+region_grouping <- temp %>%
+  filter(resolution %in% c("coal", "oil", "gas")) %>%
+  group_by_at(x_column) %>% 
+  summarise(order_by = sum(value)) %>%
+  ungroup()
+
+my_data_reordered <- temp %>%
+  left_join(region_grouping, by = "region_bld") %>% 
+  mutate(order_by = ifelse(is.na(order_by), 0, order_by)) %>%
+  mutate(region_bld = reorder(region_bld, -order_by))    # this reorders samples
+
+save_path <- paste(save_dir, paste0(scenario, "_share_fuels_stock_countries_2050.png"), sep = "/")
+
+plot_stacked_bars(my_data_reordered,
+                  fill_column = "resolution",
+                  x_column = "region_bld",
+                  y_column = "value",
+                  save_path = save_path,
+                  orientation = "horizontal")
 
 #--------------------------------------------------------------------------
-# By construction period and country
+# By U-value and country
 x_column <- "region_bld"
 temp <- data %>%
   filter(variable == "stock_building") %>%
   filter(resolution %in% names(rename_insulation)) %>%
+  filter(resolution != "no_heating") %>%
   filter(year == 2015) %>%
   group_by(region_bld) %>%
   mutate(value = value / sum(value)) %>%
   ungroup() %>%
-  mutate(region_bld = ifelse(region_bld %in% names(rename_countries_code), rename_countries_code[region_bld], region_bld))    # this reorders samples
+  mutate(region_bld = ifelse(region_bld %in% names(rename_countries), rename_countries[region_bld], region_bld))    # this reorders samples
+
 
 region_grouping <- temp %>%
   filter(resolution %in% c("1.5-2", "1-1.5", ">2")) %>%
@@ -341,17 +362,20 @@ plot_stacked_bars(my_data_reordered,
                   fill_column = "resolution",
                   x_column = "region_bld",
                   y_column = "value",
-                  save_path = save_path)
+                  save_path = save_path,
+                  orientation = "horizontal"
+                  )
 
 x_column <- "region_bld"
 temp <- data %>%
   filter(variable == "stock_building") %>%
   filter(resolution %in% names(rename_insulation)) %>%
+  filter(resolution != "no_heating") %>%
   filter(year == 2050) %>%
   group_by(region_bld) %>%
   mutate(value = value / sum(value)) %>%
   ungroup() %>%
-  mutate(region_bld = ifelse(region_bld %in% names(rename_countries_code), rename_countries_code[region_bld], region_bld))    # this reorders samples
+  mutate(region_bld = ifelse(region_bld %in% names(rename_countries), rename_countries[region_bld], region_bld))    # this reorders samples
 
 region_grouping <- temp %>%
   filter(resolution %in% c("1.5-2", "1-1.5", ">2")) %>%
@@ -370,7 +394,9 @@ plot_stacked_bars(my_data_reordered,
                   fill_column = "resolution",
                   x_column = "region_bld",
                   y_column = "value",
-                  save_path = save_path)
+                  save_path = save_path,
+                  orientation = "horizontal"
+                  )
 #--------------------------------------------------------------------------
 x_column <- "region_bld"
 temp <- data %>%
@@ -380,7 +406,7 @@ temp <- data %>%
   group_by(region_bld) %>%
   mutate(value = value / sum(value)) %>%
   ungroup() %>%
-  mutate(region_bld = ifelse(region_bld %in% names(rename_countries_code), rename_countries_code[region_bld], region_bld))    # this reorders samples
+  mutate(region_bld = ifelse(region_bld %in% names(rename_countries), rename_countries[region_bld], region_bld))    # this reorders samples
 
 region_grouping <- temp %>%
   filter(resolution %in% c(">200")) %>%
@@ -397,7 +423,8 @@ plot_stacked_bars(my_data_reordered,
                   fill_column = "resolution",
                   x_column = "region_bld",
                   y_column = "value",
-                  save_path = paste(save_dir, paste0(scenario, "_share_energy_performance_countries_ini.png"), sep = "/")
+                  save_path = paste(save_dir, paste0(scenario, "_share_energy_performance_countries_ini.png"), sep = "/"),
+                  orientation = "horizontal"
                   )
 #--------------------------------------------------------------------------
 temp <- data %>%
@@ -407,7 +434,7 @@ temp <- data %>%
   group_by(region_bld) %>%
   mutate(value = value / sum(value)) %>%
   ungroup() %>%
-  mutate(region_bld = ifelse(region_bld %in% names(rename_countries_code), rename_countries_code[region_bld], region_bld))    # this reorders samples
+  mutate(region_bld = ifelse(region_bld %in% names(rename_countries), rename_countries[region_bld], region_bld))    # this reorders samples
 
 my_data_reordered <- temp %>%
   left_join(region_grouping, by = "region_bld") %>%
@@ -418,7 +445,8 @@ plot_stacked_bars(my_data_reordered,
                   fill_column = "resolution",
                   x_column = "region_bld",
                   y_column = "value",
-                  save_path = paste(save_dir, paste0(scenario, "_share_energy_performance_countries_2050.png"), sep = "/")
+                  save_path = paste(save_dir, paste0(scenario, "_share_energy_performance_countries_2050.png"), sep = "/"),
+                  orientation = "horizontal"
                   )
 
 #--------------------------------------------------------------------------
@@ -430,7 +458,7 @@ temp <- data %>%
   group_by(region_bld) %>%
   mutate(value = value / sum(value)) %>%
   ungroup() %>%
-  mutate(region_bld = ifelse(region_bld %in% names(rename_countries_code), rename_countries_code[region_bld], region_bld))    # this reorders samples
+  mutate(region_bld = ifelse(region_bld %in% names(rename_countries), rename_countries[region_bld], region_bld))    # this reorders samples
 
 region_grouping <- temp %>%
   filter(resolution %in% c("p1")) %>%
@@ -449,7 +477,8 @@ plot_stacked_bars(my_data_reordered,
                   fill_column = "resolution",
                   x_column = "region_bld",
                   y_column = "value",
-                  save_path = save_path)
+                  save_path = save_path,
+                  orientation = "horizontal")
 
 #--------------------------------------------------------------------------
 temp <- data %>%
@@ -459,7 +488,7 @@ temp <- data %>%
   group_by(region_bld) %>%
   mutate(value = value / sum(value)) %>%
   ungroup() %>%
-  mutate(region_bld = ifelse(region_bld %in% names(rename_countries_code), rename_countries_code[region_bld], region_bld))    # this reorders samples
+  mutate(region_bld = ifelse(region_bld %in% names(rename_countries), rename_countries[region_bld], region_bld))    # this reorders samples
 
 region_grouping <- temp %>%
   filter(resolution %in% c("p1")) %>%
@@ -478,7 +507,8 @@ plot_stacked_bars(my_data_reordered,
                   fill_column = "resolution",
                   x_column = "region_bld",
                   y_column = "value",
-                  save_path = save_path)
+                  save_path = save_path,
+                  orientation = "horizontal")
 
 
 #--------------------------------------------------------------------------
@@ -497,6 +527,8 @@ data_stock_historic <- data_stock_historic %>%
   filter(fuel_heat %in% names(rename_fuels)) %>%
   rename(resolution = fuel_heat)
 
+t <- data_stock_historic %>%
+  filter(year < 2015)
 
 # Add a row for the EU
 t_eu <- t %>%
@@ -504,10 +536,10 @@ t_eu <- t %>%
   summarise(value = sum(value)) %>%
   ungroup() %>%
   mutate(region_bld = "EU")
+
 data_stock_historic <- bind_rows(data_stock_historic, t_eu)
 
-t <- data_stock_historic %>%
-  filter(year < 2015)
+
 
 # Select the stock of housing units
 simulation <- data %>%

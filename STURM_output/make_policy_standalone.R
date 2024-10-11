@@ -9,7 +9,7 @@ library(gridExtra)
 
 source("STURM_output/C00_plots.R")
 # Load data
-dir <- "2024-06-25_153828"
+dir <- "2024-06-26_091653"
 save_dir <- paste("STURM_output", "figures", dir, sep = "/")
 file <- paste(save_dir, "results.csv", sep = "/")
 data <- read.csv(file,  check.names = FALSE, stringsAsFactors = FALSE, header = TRUE, row.names = NULL)
@@ -142,19 +142,21 @@ temp$variable <- factor(temp$variable, levels = cols)
 # Reverse order compare to scenarios
 temp$scenario <- factor(temp$scenario, levels = rev(scenarios))
 
-limits <- c(-0.8, 1)
+
+limits <- c(-1, 1)
 
 max_values <- temp %>%
   group_by(variable) %>%
   summarise(max_value = max(abs(value), na.rm = TRUE))
 
 temp <- temp %>%
-  left_join(max_values, by = "variable")
+  left_join(max_values, by = "variable") %>%
+   mutate(norm_value = value / max_value)
 
 # Create heatmap
 p <- temp %>%
   ggplot(aes(x = variable, y = scenario)) +
-  geom_tile(aes(fill = value), color = "white", height = 1) +
+  geom_tile(aes(fill = norm_value), color = "white", height = 1, width = 0.95) +
   # geom_text(aes(label = paste0(round(value * 100, 1), "%")), size = 6) +
   geom_text(aes(label = paste0(round(value * 100, 1), "%"), 
                 fontface = ifelse(abs(value) == max_value, "bold", "plain")),
@@ -170,7 +172,7 @@ p <- temp %>%
   theme_minimal() +
     theme(axis.title.y = element_blank(),
       axis.title.x.top = element_blank(),
-      axis.text.x.top = element_text(size = 20, angle = 0, face = "bold"),
+      axis.text.x.top = element_text(size = 25, angle = 0, face = "bold"),
       axis.text.y = element_text(size = 20),
       panel.spacing = unit(0.5, "lines"),  # Adjust spacing between panels
       legend.position = "none") +
@@ -272,7 +274,7 @@ p <- df %>%
     color = "red", size = size_point, shape = 18, show.legend = FALSE) +
   geom_text(aes(x = scenario,
     label = paste(round(total_value_private, round)), y = total_value_private),
-    vjust = -0.5, nudge_y = nudge_y, size = size_text, color = "red") + 
+    vjust = 1.5, nudge_y = - nudge_y, size = size_text, color = "red") + 
   coord_flip() + 
   scale_fill_manual(values = color_list) + 
   message_building_theme +

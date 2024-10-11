@@ -769,7 +769,7 @@ fun_format_bld_stock_energy <- function(
                 ifelse(en_pe_hh_std < 50, "0-50",
                 ifelse(en_pe_hh_std < 100, "50-100",
                 ifelse(en_pe_hh_std < 150, "100-150",
-                ifelse(en_pe_hh_std < 2, "150-200", ">200"))))) %>%
+                ifelse(en_pe_hh_std < 200, "150-200", ">200"))))) %>%
             mutate(energy_class = ifelse(is.na(en_pe_hh_std),
                 "no_consumption", energy_class)) %>%
             left_join(median_budget_share) %>%

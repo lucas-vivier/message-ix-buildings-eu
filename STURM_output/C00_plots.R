@@ -135,7 +135,8 @@ plot_stacked_bars <- function(data,
                               fill_column,
                               x_column,
                               y_column,
-                              save_path
+                              save_path,
+                              orientation = "vertical"
                               ) {
 
   p <- data %>%
@@ -147,6 +148,12 @@ plot_stacked_bars <- function(data,
     scale_y_continuous(labels = percent_format()) +  # Formatting y-axis as percentage
     message_building_theme +
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5))
+
+  if (orientation == "horizontal") {
+    p <- p + coord_flip() +
+      theme(axis.text.x = element_text(angle = 0, vjust = 0.5))
+  }
+
 
   ggsave(save_path, plot = p, width = plot_settings[["width"]],
           height = plot_settings[["height"]],
@@ -1339,14 +1346,19 @@ plot_map <- function(data,
 
   if (!is.null(save_path)) {
 
-    
+    if (!is.null(subplot_column)) {
+
     if (length(unique(data[[subplot_column]])) / ncol <= 1) {
       ggsave(save_path, plot = p, width = plot_settings[["width"]],
             dpi = plot_settings[["dpi"]])
       
     } else {
       ggsave(save_path, plot = p, width = plot_settings[["width"]],
-      dpi = plot_settings[["dpi"]], height = plot_settings[["height"]])
+        dpi = plot_settings[["dpi"]], height = plot_settings[["height"]])
+    }
+    } else {
+      ggsave(save_path, plot = p, width = plot_settings[["width"]],
+        dpi = plot_settings[["dpi"]], height = plot_settings[["height"]])
     }
   } else {
     print(p)

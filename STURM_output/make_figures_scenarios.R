@@ -10,7 +10,7 @@ print(paste("Working directory is:", getwd()))
 # Loading figures setttings and functions
 source("STURM_output/C00_plots.R")
 
-run <- "2024-06-25_225241"
+run <- "2024-06-26_091653_optimal_scenarios"
 
 scenarios <- c(
     "S1" = "No additional policy",
@@ -21,20 +21,12 @@ scenarios <- c(
 scenarios <- c(
     #"no_supply" = "No supply-side decarbonization",
     "S1" = "Baseline",
-    "first_best_scenario" = "First best",
-    "second_best_scenario" = "Second best",
-    "S179" = "Second best non-tailored",
-    "constraint_scenario" = "Technical constraint"
+    "S143" = "All policies",
+    "optimal_scenario" = "Min. cost national",
+    "S137" = "Min. cost EU",
+    "constraint_scenario" = "Min. cost national, constraint"
 )
-scenarios <- c(
-  "EU" = "Baseline",
-  #"EU_realization_rate" = "EU_realization_rate",
-  "EU_reno" = "EU_reno",
-  "EU_reno_halfsuccess" = "EU_reno_halfsuccess",
-  "EU_reno_quality" = "EU_reno_quality",
-  "EU_deep_reno" = "EU_deep_reno"
-  #"EU_reno_quality_halfsuccess" = "EU_reno_quality_halfsuccess"
-)
+
 
 
 ref <- "Baseline"
@@ -227,6 +219,46 @@ plot_map(temp,
 
 #--------------------------------------------------------------
 ### Maps by scenarios
+
+var <- "heat_tCO2"
+ref <- "population"
+years <- c(2050)
+limits <- c(0, 0.8)
+figure_title <- "Emission for space heating"
+legend_title <- "tCO2/(capita.year)"
+title <- "tCO2_capita"
+
+df <- data %>%
+    filter(variable %in% c(var, ref)) %>%
+    filter(resolution == "all") %>%
+    pivot_wider(id_cols = c(region_bld, year, resolution, scenario),
+      names_from = variable,
+      values_from = value) %>%
+    filter(!is.na(.data[[var]])) %>%
+    filter(!is.na(.data[[ref]])) %>%
+    mutate(value = .data[[var]] / .data[[ref]]) %>%
+    filter(year %in% years) %>%
+    select(-c(all_of(var), all_of(ref), "resolution"))
+
+if (!is.null(scenarios)) {
+  df <- filter(df, scenario %in% scenarios) %>%
+    mutate(scenario = factor(scenario, levels = unname(scenarios)))
+}
+
+
+plot_map(df,
+  limits,
+  threshold_colormap = 0.1,
+  reverse_colormap = TRUE,
+  figure_title = figure_title,
+  legend_title = legend_title,
+  subplot_column = "scenario",
+  ncol = 3,
+  save_path = paste(save_dir,
+    paste0("map_", title, "_2050.png"), sep = "/"))
+
+
+#--------------------------------------------------------------
 var <- "heat_kWh"
 ref <- "floor_m2"
 years <- c(2050)
