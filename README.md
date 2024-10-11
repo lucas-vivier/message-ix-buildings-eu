@@ -1,6 +1,9 @@
 
 # Message-ix-Buildings
 
+[![DOI](https://zenodo.org/badge/812692384.svg)](https://doi.org/10.5281/zenodo.13919539)
+
+
 ## Disclaimer
 
 **This repository is a fork of the [Message-ix Buildings repository](https://github.com/iiasa/message-ix-buildings). It contains the EU Implementation of the model used in the study _Meeting climate targets with realistic demand-side policies in the residential sector_ (currently under revision). The code in this repository will eventually be merged into the main repository.**
