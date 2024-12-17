@@ -94,6 +94,13 @@ To run the script, use the following command format, specifying the appropriate 
 
 ### Example Command
 
+By default only the scenario called "EU" is run. 
+```bash
+Rscript main.R -s "scenarios_EU.csv"
+```
+
+To run all scenarios in the `scenarios_EU.csv` file, use the following command:
+
 ```bash
 Rscript main.R -c 4 -s "scenarios_EU.csv" -a TRUE
 ```
@@ -148,6 +155,13 @@ These specifications represent the environment under which the model was success
 
 
 ## Reproducing Outputs for _Meeting climate target with realistic demand-side policies in the residential sector_
+
+First start by running the counterfactual scenario:
+```bash
+Rscript main.R -s "all_scenarios.csv"
+```
+
+Then, run for all policy scenarios:
 
 ```bash
 Rscript main.R -s "all_scenarios.csv" -a TRUE

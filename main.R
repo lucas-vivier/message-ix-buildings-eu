@@ -107,7 +107,6 @@ energy_efficiency <- "endogenous"
 run <- "policies"
 
 runs <- c("EU")
-
 if (args$all_scenarios) {
     runs <- "all"
 }
@@ -116,13 +115,14 @@ if (args$all_scenarios) {
 if (is.character(runs) && length(runs) == 1) {
     if (runs == "all") {
         runs <- read.csv2(paste0(path_in, file_scenarios), sep = ',')$scenario_name
-        # Create name_dir
-        name_dir <- paste0(Sys.Date(), "_", format(Sys.time(), "%H%M%S"), "/")
-        path_out <- paste0(path_out, name_dir)
-        if (!dir.exists(path_out)) {
-            dir.create(path_out)
-        }
     }
+}
+
+# Create name_dir
+name_dir <- paste0(Sys.Date(), "_", format(Sys.time(), "%H%M%S"), "/")
+path_out <- paste0(path_out, name_dir)
+if (!dir.exists(path_out)) {
+    dir.create(path_out)
 }
 
 
