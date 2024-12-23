@@ -3,7 +3,7 @@ library(ggplot2)
 library(stringr)
 library(tidyr)
 library(argparse)
-
+library(sf)
 
 # Loding figures setttings and functions
 source("STURM_output/C00_plots.R")

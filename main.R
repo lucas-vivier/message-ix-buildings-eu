@@ -1,5 +1,3 @@
-
-#library(rstudioapi)
 library(tidyverse, quietly = TRUE)
 library(readxl)
 library(dplyr)
@@ -158,11 +156,13 @@ if (!parallel) {
             en_method = en_method
         )
 
-    end_script_time <- Sys.time()
-    print(paste("Time to run script:",
-        round(end_script_time - start_script_time, 0), "seconds."))
+    print("Scenario run completed!")
+    duration <- difftime(Sys.time(), start_time, units = "secs")
+    print(paste("Time to run scenario:", round(duration / 60, 0), "minutes."))
     }
 } else {
+
+    print(paste("Running in parallel with", num_cores, "cores"))
 
     # Function to log messages
     log_message <- function(message, log_file) {

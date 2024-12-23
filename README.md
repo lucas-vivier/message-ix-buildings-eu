@@ -55,11 +55,19 @@ git checkout eu_implementation_yssp
 
 ### Step 4: Launch the Model
 
-To launch the Message-ix Buildings model, run the following command in your R environment (normal launch of one scenario between 2015 to 2050 with a 5 year time step should take less than one minute):
+To launch the Message-ix Buildings model, go to the `message-ix-buildings` directory and run the `main.R` script.
 
+With the terminal:
+```bash
+Rscript main.R -s "all_scenarios.csv"
+```
+
+In your R environment:
 ```r
 source("message-ix-buildings/main.R", encoding = "UTF-8")
 ```
+
+Normal launch of one policy scenario between 2015 to 2050 with a 5 year time step should take less than one minute.
 
 ---
 
@@ -69,7 +77,7 @@ The model comes with a set of input data stored in the `STURM_data/input_csv/inp
 
 ### Configuration File
 
-A configuration file must be specified to run the model. This file selects the input data to be used. The file `STURM_data/input_list_resid_EU.csv` contains the necessary inputs to launch the model, including:
+A configuration file (`.csv` file) must be specified to run the model. This file contains all the input data to be used. The file `STURM_data/input_list_resid_EU.csv` contains the necessary inputs to launch the model, including:
 - `name_parameter`: Defines the name of the variation within the model.
 - `name_file`: Refers to the file to be used.
 - `category`: Specifies the sub-folder within `STURM_data/input_csv/input_resid`.

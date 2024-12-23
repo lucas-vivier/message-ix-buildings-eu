@@ -1174,8 +1174,7 @@ run_scenario <- function(run,
     paste0(path_out, "report_subsidies_", scenario_name, ".csv"))
 
   print("Scenario run completed!")
-  print(paste("Time to run scenario:",
-    round(Sys.time() - start_time, 0), "seconds."))
-  rm(start_time)
+  duration <- difftime(Sys.time(), start_time, units = "secs")
+  print(paste("Time to run scenario:", round(duration / 60, 0), "minutes."))
 
 }
