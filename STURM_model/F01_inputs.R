@@ -248,6 +248,13 @@ read_parameters <- function(scen_param, param) {
     param$premature_replacement <- premature_replacement
   }
 
+  if ("_factor_energy_behavior" %in% scen_param$name_parameter) {
+    factor_energy_behavior <- scen_param %>%
+      filter(name_parameter == "_factor_energy_behavior") %>%
+      pull(scenario)
+    param$factor_energy_behavior <- as.numeric(factor_energy_behavior)
+  }
+
   return(param)
 
 }
@@ -442,6 +449,14 @@ read_energy_prices <- function(price_base_year,
         select(-c(price_en, year)) %>%
         mutate(evolution_rate = round(evolution_rate, 3))
 
+      if (!is.null(path_out)) {
+        t <- temp %>%
+          pivot_wider(names_from = fuel, values_from = evolution_rate)
+        write.csv(t, paste0(path_out, "energy_price_rate.csv"),
+          row.names = FALSE)
+
+      }
+
       evolution_rate <- price_en %>%
         filter(year > base_year) %>%
         left_join(temp) %>%
@@ -484,8 +499,13 @@ read_energy_prices <- function(price_base_year,
     rename(price_en = value) %>%
     distinct()
 
+
+    
+
   if (!is.null(path_out)) {
-    write.csv(price_expanded, paste0(path_out, "energy_prices.csv"),
+    temp <- price_expanded %>%
+      pivot_wider(names_from = fuel, values_from = price_en)
+    write.csv(temp, paste0(path_out, "energy_prices.csv"),
       row.names = FALSE)
   }
   return(price_expanded)

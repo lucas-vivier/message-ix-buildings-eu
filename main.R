@@ -29,7 +29,7 @@ parser$add_argument("-a", "--all_scenarios", default = FALSE,
 
 # Parse the arguments
 args <- parser$parse_args()
-# args <- list("scenarios_file" = "scenarios_renovation.csv", "all_scenarios" = TRUE)
+args <- list("scenarios_file" = "scenarios_sensitivity.csv", "all_scenarios" = FALSE)
 
 # Set num_cores based on the argument or use the default value
 parallel <- TRUE
@@ -78,6 +78,7 @@ param <- list(subsidies_renovation_type = "ad_valorem",
             elasticity_heat_pump = -1,
             remove_barriers_renovation = FALSE,
             remove_barriers_heater = FALSE,
+            factor_energy_behavior = 1,
             tol = 1e-2)
 
 source("./STURM_model/F10_scenario_run.R")
@@ -104,7 +105,7 @@ en_method <- "TABULA"
 energy_efficiency <- "endogenous"
 run <- "policies"
 
-runs <- c("EU")
+runs <- c("EU_lowuse")
 if (args$all_scenarios) {
     runs <- "all"
 }

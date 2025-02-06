@@ -31,8 +31,8 @@ scenarios <- c(
 
 rename_scenarios <- c(
   "Baseline" = "Baseline",
-  "EU-ETS" = "aligned with EU-ETS price",
-  "Social value of carbon" = "aligned with social value of carbon",
+  "EU-ETS" = "ETS2-Aligned ETS Price",
+  "Social value of carbon" = "ETS2-Aligned Carbon Value",
   "Subsidies heat pumps" = "High heat pumps subsidies",
   "Subsidies heat pumps medium" = "Mid heat pumps subsidies",
   "Learning-by-doing heat pumps" = "Learning-by-doing heat pumps",
@@ -41,14 +41,14 @@ rename_scenarios <- c(
   "Deep renovation wave" = "High Deep renovation subsidies",
   "Deep renovation wave half success" = "Mid Deep renovation subsidies",
   "Quality renovation" = "Improvement renovation realization",
-  "Market-failures renovation" = "Tackling market failures renovation"
+  "Market-failures renovation" = "Tackling investment barriers"
 )
 scenarios <- unname(rename_scenarios)
 
-carbon_tax <- c("aligned with EU-ETS price", "aligned with social value of carbon")
+carbon_tax <- c("ETS2-Aligned ETS Price", "ETS2-Aligned Carbon Value")
 heat_pumps <- c("High heat pumps subsidies", "Mid heat pumps subsidies", "Learning-by-doing heat pumps")
 renovation <- c("High renovation subsidies", "Mid renovation subsidies", "High Deep renovation subsidies",
-  "Mid Deep renovation subsidies", "Improvement renovation realization", "Tackling market failures renovation")
+  "Mid Deep renovation subsidies", "Improvement renovation realization", "Tackling investment barriers")
 
 
 # Select scenario by rows
@@ -182,12 +182,17 @@ p <- temp %>%
       strip.placement = "outside",
       strip.text.y = element_text(size = 20, face = "bold", angle = 0, hjust = 0.5))
 
-
 # save plot
 ggsave(filename = paste(out_dir, "heatmap.png", sep = "/"), plot = p,
     width = plot_settings[["width"]],
     height = plot_settings[["height"]],
     dpi = plot_settings[["dpi"]])
+
+# save data
+t <- temp %>%
+  select(scenario, variable, value) %>%
+  spread(variable, value)
+write.csv(t, paste(out_dir, "heatmap.csv", sep = "/"), row.names = FALSE)
 
 #-----------------------------------
 # Make cost-benefits analysis
@@ -282,13 +287,21 @@ p <- df %>%
   facet_grid(groups ~ ., scales = "free_y", space = "free_y", switch = "y") +
   theme(strip.background = element_blank(),
       strip.placement = "outside",
-      strip.text.y = element_text(size = 20, face = "bold", angle = 0, hjust = 0.5))
+      strip.text.y = element_text(size = 20, face = "bold", angle = 0, hjust = 0.5)) 
 
 
 ggsave(save_path, plot = p, width = plot_settings[["width"]],
         height = plot_settings[["height"]],
         dpi = plot_settings[["dpi"]])
 
+# save data
+t <- df %>%
+  select(scenario, variable, value) %>%
+  spread(variable, value)
+
+write.csv(t, paste(out_dir, "cba_eu.csv", sep = "/"), row.names = FALSE)
+
+print('Done')
 
 # Custom label function that combines comma and suffix
 # custom_label <- function(x) {

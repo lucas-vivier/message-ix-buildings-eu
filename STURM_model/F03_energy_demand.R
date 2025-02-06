@@ -174,7 +174,8 @@ fun_en_sim <- function(sector,
                        en_method = "TABULA",
                        path_out = NULL,
                        alpha = NULL,
-                       short_term_price_elasticity = -0.2) {
+                       short_term_price_elasticity = -0.2,
+                       factor_energy_behavior = 1) {
   if (en_method == "TABULA") {
     # If using TABULA data, do not calibrated parameters used with CHILLED
     hours_heat <- mutate(hours_heat,
@@ -277,6 +278,7 @@ fun_en_sim <- function(sector,
       # mutate(heating_intensity = alpha * (budget_share)**p_elasticity) %>%
       left_join(alpha) %>%
       mutate(heating_intensity = coeff_alpha * cost_op_std**short_term_price_elasticity) %>%
+      mutate(heating_intensity = factor_energy_behavior * heating_intensity) %>%
       # Calculating heating intensity (household heating behavior)
       mutate(en_hh = en_hh_std * heating_intensity) %>%
       mutate(en_m2 = en_hh / m2) %>%

@@ -401,7 +401,6 @@ plot_clustered_barplot(df,
   save_path = paste(save_dir, paste0(run, file), sep = "/"))
 
 
-
 ### Dwelling units by fuel type
 
 var <- "stock_building"
@@ -425,6 +424,9 @@ plot_clustered_barplot(df,
   x_order = scenarios,
   angle_x_label = 90,
   save_path = paste(save_dir, paste0(run, "_dwelling_fuel_year_scenario_stack.png"), sep = "/"))
+
+# save data
+write.csv(df, paste(save_dir, paste0(run, "_dwelling_fuel_year_scenario_stack.csv"), sep = "/"))
 
 ### Dwelling units by energy efficiency
 var <- "stock_building"
@@ -489,6 +491,10 @@ plot_clustered_barplot(df,
   angle_x_label = 90,
   save_path = paste(save_dir, paste0(run, "_dwelling_pe_year_scenario_stack.png"), sep = "/"))
 
+# save data
+write.csv(df, paste(save_dir, paste0(run, "_dwelling_pe_year_scenario_stack.csv"), sep = "/"))
+
+
 ### Space heating consumption by fuel type and scenario
 var <- "heat_kWh"
 years <- c(2015, 2030, 2050)
@@ -509,6 +515,9 @@ plot_clustered_barplot(df,
   x_order = scenarios,
   angle_x_label = 90,
   save_path = paste(save_dir, paste0(run, "_kWh_year_scenario_stack.png"), sep = "/"))
+
+# save data
+write.csv(df, paste(save_dir, paste0(run, "_kWh_year_scenario_stack.csv"), sep = "/"))
 
 ### Space heating emission by fuel type and scenario
 var <- "heat_tCO2"
@@ -569,6 +578,9 @@ plot_multiple_lines(filter(temp, region_bld == "EU"),
     presentation = presentation,
     line_order = unname(scenarios))
 
+# save data
+write.csv(filter(temp, region_bld == "EU"), paste(save_dir, paste0(run, "_heat_kWh_eu.csv"), sep = "/"))
+
 
 ##### Electricity consumption
 temp <- data %>%
@@ -609,6 +621,9 @@ plot_multiple_lines(filter(temp, region_bld == "EU"),
     legend = legend,
     presentation = presentation,
     line_order = unname(scenarios))
+
+# save data
+write.csv(filter(temp, region_bld == "EU"), paste(save_dir, paste0(run, "_heat_kWh_electricity_eu.csv"), sep = "/"))
 
 ##### Standard consumption
 temp <- data %>%
@@ -680,6 +695,10 @@ plot_multiple_lines(filter(temp, region_bld == "EU"),
     y_label_suffix = "MtCO2",
     presentation = presentation,
     line_order = unname(scenarios))
+
+# save data
+write.csv(filter(temp, region_bld == "EU"), paste(save_dir, paste0(run, "_heat_tCO2_eu.csv"), sep = "/"))
+
 
 #### Number of renovations cumulated
 temp <- data %>%
@@ -1167,7 +1186,7 @@ plot_multiple_lines(temp,
     y_label_suffix = "%")
 
 legend <- FALSE
-presentation <- TRUE
+presentation <- FALSE
 plot_multiple_lines(filter(temp, region_bld == "EU"),
     x_column = "year",
     y_column = "value",
@@ -1184,6 +1203,9 @@ plot_multiple_lines(filter(temp, region_bld == "EU"),
     presentation = presentation,
     line_types = line_styles_scenarios,
     line_order = unname(scenarios))
+
+  # save data
+write.csv(filter(temp, region_bld == "EU"), paste(save_dir, paste0(run, "_energy_poverty_eu.csv"), sep = "/"))
 
 #### Energy poverty by income class
 temp <- data %>%

@@ -1494,6 +1494,13 @@ sobol_figures <- function(df, list_features, y, rename_feature, save_path) {
           height = plot_settings[["height"]],
           dpi = plot_settings[["dpi"]])
 
+  # save the data
+  t <- df %>%
+      select(Feature, `First Order`, `Total Order`) %>%
+      rename("First Order" = `First Order`, "Total Order" = `Total Order`)
+
+  write.csv(t, paste0(save_path, ".csv"), row.names = FALSE)
+
 }
 
 calculate_cost_hh <- function(df, discount = 0.05, lifetime_loan = 10,
@@ -1905,6 +1912,9 @@ make_cost_benefits <- function(data, ref, save_dir, nb_years = 30, figures = TRU
       save_path = paste0(save_dir, "/cba_eu.png"),
       color_list = color_list, y_label_suffix = "€",
       presentation = presentation, legend = legend)
+
+    # save data
+    write.csv(filter(df, region_bld == "EU"), paste0(save_dir, "/cba_eu.csv"), row.names = FALSE)
 
     stacked_plots(filter(df, region_bld == "EU"),
       save_path = paste0(save_dir, "/cba_eu_horizontal.png"),

@@ -58,6 +58,12 @@ run_scenario <- function(run,
   print("Functions loaded.")
   # --------------------------------------------------------------
   print("Load data")
+
+  path_out_detail <- NULL
+  if (run == "EU") {
+    path_out_detail <- path_out
+  }
+
   # Loading categories
   path_in_csv <- paste0(path_in, "./input_csv/")
   cat <- read_categories(path_in_csv, sector, region)
@@ -67,6 +73,23 @@ run_scenario <- function(run,
     file_scenarios, sector, run, param)
   d <- temp$d
   param <- temp$param
+
+  if (!is.null(path_out_detail)){
+    # Calculate linear evolution of d$income between start and end year
+    temp <- d$income %>%
+      filter(year %in% c(yrs[[1]], yrs[[length(yrs)]])) %>%
+      group_by(region_bld, inc_cl, year) %>%
+      summarize(income = mean(income)) %>%
+      ungroup() %>%
+      pivot_wider(names_from = year, values_from = income) %>%
+      mutate(evolution_rate =
+        (`2050` / `2015`)^(1 / (yrs[[length(yrs)]] - yrs[[1]])) - 1) %>%
+      select(-c(`2015`, `2050`))
+
+    write.csv(temp, file.path(path_out_detail, "income_evolution.csv"),
+      row.names = FALSE)
+
+  }
 
   # Multiple cost by cost_factor if cost_invest_heat do not have cost_factor
   if (!"region_bld" %in% names(d$cost_invest_heat)) {
@@ -144,7 +167,7 @@ run_scenario <- function(run,
   print("Load energy prices")
   price_en <- read_energy_prices(d$energy_prices_ini,
     d$energy_prices_projections,
-    cat$geo_data, yrs[[1]], yrs[[length(yrs)]], path_out = NULL)
+    cat$geo_data, yrs[[1]], yrs[[length(yrs)]], path_out = path_out_detail)
 
   # Loading emission factors
   print("Load emission factors")
@@ -371,7 +394,8 @@ run_scenario <- function(run,
       en_method = en_method,
       path_out = path_out,
       alpha = alpha,
-      short_term_price_elasticity = param$short_term_price_elasticity
+      short_term_price_elasticity = param$short_term_price_elasticity,
+      factor_energy_behavior = param$factor_energy_behavior
     )
     en_m2_scen_heat <- temp$en_m2_scen_heat
     en_m2_scen_cool <- temp$en_m2_scen_cool
@@ -468,6 +492,9 @@ run_scenario <- function(run,
           ungroup())
     }
 
+    # report_input <- 
+    # d$energy_prices_ini, d$rate_shell_ren_exo, d$hdd
+    
     print("End of initialization")
     # --------------------------------------------------------------
     # Loop over timesteps
@@ -610,7 +637,8 @@ run_scenario <- function(run,
         bill_rebates = bill_rebates,
         en_method = en_method,
         alpha = alpha,
-        short_term_price_elasticity = param$short_term_price_elasticity
+        short_term_price_elasticity = param$short_term_price_elasticity,
+        factor_energy_behavior = param$factor_energy_behavior
       )
       en_m2_scen_heat <- temp$en_m2_scen_heat
       en_m2_scen_cool <- temp$en_m2_scen_cool

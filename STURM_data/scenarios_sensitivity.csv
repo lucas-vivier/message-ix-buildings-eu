@@ -1,0 +1,7 @@
+scenario_id,scenario_name,carbon_tax,_objective_renovation,sub_heat,learning_rate_heat,_success_objective_renovation,_realization_rate_renovation,_remove_barriers_renovation,_factor_energy_behavior
+1,EU,,,,constant,1,1,FALSE,
+2,EU_reno,,deep_renovation,,constant,1,1,FALSE,
+3,EU_lowuse,,,,constant,1,1,FALSE,0.5
+4,EU_lowuse_reno,,deep_renovation,,constant,1,1,FALSE,0.5
+5,EU_highuse,,,,constant,1,1,FALSE,1.5
+6,EU_highuse_reno,,deep_renovation,,constant,1,1,FALSE,1.5

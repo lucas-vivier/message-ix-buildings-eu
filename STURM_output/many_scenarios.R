@@ -1,12 +1,5 @@
----
-output: reprex::reprex_document
-knit: reprex::reprex_render
----
-
-Notebook to run STURM Ouput.
 
 
-```{r}
 library(tidyverse)
 library(dplyr)
 library(ggplot2)
@@ -68,9 +61,9 @@ data <- data %>%
     mutate(groups = "Policy mix") %>%
     mutate(descr = "Policy mix") %>%
     mutate(descr = ifelse(scenario_name == ref, "Baseline", descr))
-```
 
-```{r}
+
+
 # Define specific scenarios for energy renovation
 
 data <- data %>%
@@ -160,9 +153,7 @@ scenarios_shape <- c(
     "HeatPumpLearning+MidSub" = 18
 )
 
-```
 
-```{r}
 # Scenario to assess
 scenarios_heat_pumps <- c("Baseline", "HeatPumpLearning", "HeatPumpLearning+MidSub", "HeatPumpLearning+HighSub")
 scenarios_heat_pumps_names <- data %>%
@@ -181,13 +172,10 @@ scenario_renovation_names <- data %>%
     select(scenario_name, descr)
 scenario_renovation_names <- setNames(scenario_renovation_names$descr, scenario_renovation_names$scenario_name)
 
-```
-
-
 
 #------------------------------------------------------------------------------
 ##### Sobol - Identification of key policies
-```{r}
+
 # Sobol analysis
 source("STURM_output/C00_plots.R")
 
@@ -231,13 +219,16 @@ y <- "Energy poverty (Million)"
 save_path <- paste(save_dir, "sobol_analysis_energy_poverty.png", sep = "/")
 sobol_figures(df, list_policies, y, rename_policies, save_path)
 
-```
 
 
 
 #------------------------------------------------------------------------------
 ##### Scatter plot - Relationship between two key outcomes
-```{r}
+
+# save data
+write.csv(data, paste(save_dir, "scatter_plot.csv", sep = "/"), row.names = FALSE)
+
+
 source("STURM_output/C00_plots.R")
 x_column <- "Delta total cost (euro/hh/year)"
 y_column <- "Emission saving (%)"
@@ -268,10 +259,7 @@ scatter_plots(temp,
             legend = TRUE,
             presentation = FALSE)
 
-```
 
-```{r}
-source("STURM_output/C00_plots.R")
 x_column <- "Delta total cost (euro/hh/year)"
 y_column <- "Emission saving (%)"
 #color_column <- "descr"
@@ -301,10 +289,10 @@ scatter_plots(temp,
             legend = TRUE,
             presentation = FALSE)
 
-```
 
 
-```{r}
+
+
 x_column <- "Delta total cost (euro/hh/year)"
 y_column <- "Consumption electricity variation (%)"
 
@@ -332,9 +320,9 @@ scatter_plots(temp,
             x_label = "Total social cost (€/hh/year)",
             legend = TRUE,
             presentation = FALSE)
-```
 
-```{r}
+
+
 x_column <- "Consumption electricity variation (%)"
 y_column <- "Emission saving (%)"
 
@@ -361,9 +349,9 @@ scatter_plots(temp,
             x_label = "Electricity use variation (%)",
             legend = TRUE,
             presentation = FALSE)
-```
 
-```{r}
+
+
 x_column <- "Consumption saving (%)"
 y_column <- "Emission saving (%)"
 
@@ -391,9 +379,9 @@ scatter_plots(temp,
             legend = TRUE,
             presentation = FALSE)
 
-```
 
-```{r}
+
+
 x_column <- "Energy poverty (Percent)"
 y_column <- "Emission saving (%)"
 
@@ -421,13 +409,13 @@ scatter_plots(temp,
             legend = TRUE,
             presentation = FALSE)
 
-```
+
 
 
 #------------------------------------------------------------------------------
 #### Analysis by countries
 
-```{r}
+
 file <- "STURM_data/input_csv/input_resid/decision/cost_factor_countries_EU.csv"
 cost_factor <- read.csv(file,  check.names = FALSE, stringsAsFactors = FALSE, header = TRUE, row.names = NULL) %>%
     mutate(region_bld = rename_countries[region_bld]) %>%
@@ -468,14 +456,12 @@ file <- paste(input_dir, file, sep = "/")
 result_eu <- read.csv(file,  check.names = FALSE, stringsAsFactors = FALSE, header = TRUE, row.names = NULL) %>%
     rename(name = `Member states`) %>%
     mutate(name = ifelse(name == "Czech Republic", "Czechia", name))
-```
+
 
 #-----------------------------------------------------------------------------------------
 #### Maps
 
 ## Heat pumps scenarios
-```{r}
-source("STURM_output/C00_plots.R")
 
 df <- data_eu %>%
     select(c("scenario_name", "Share fossil-fuels (Percent)", "name")) %>%
@@ -499,10 +485,6 @@ plot_map(df,
         subplot_column = "scenario_name",
         ncol = 4,
         key = "name")
-```
-
-```{r}
-source("STURM_output/C00_plots.R")
 
 temp <- data_eu %>%
     select(c("scenario_name", "name", "Emission saving (%)")) %>%
@@ -525,10 +507,10 @@ plot_map(temp,
         subplot_column = "scenario_name",
         ncol = 4,
         key = "name")
-```
 
-```{r}
-source("STURM_output/C00_plots.R")
+# save data
+write.csv(temp, paste(save_dir, "maps_emission_countries_heatpump.csv", sep = "/"), row.names = FALSE)
+
 
 
 temp <- data_eu %>%
@@ -553,14 +535,15 @@ plot_map(temp,
         subplot_column = "scenario_name",
         ncol = 4,
         key = "name")
-```
+
+# save data
+write.csv(temp, paste(save_dir, "maps_electricity_countries_heatpump.csv", sep = "/"), row.names = FALSE)
 
 #-----------------------------------------------------------------------------------------
 # Renovation
 
 # 1. Cost-benefits analysis
 
-```{r}
 var <- "Delta total cost (euro/hh/year)"
 df <- result_eu %>%
     select(c("scenario_name", "name", "variable", "value")) %>%
@@ -580,13 +563,6 @@ df <- df %>%
     select(c("scenario_name", "name", "variable", "value"))
 
 
-```
-
-
-
-
-```{r}
-source("STURM_output/C00_plots.R")
 
 make_scatter_countries <- function(df,
     y_label_suffix = "€",
@@ -682,7 +658,7 @@ make_scatter_countries <- function(df,
             aes(y = value, xmin = as.numeric(shortname) - 0.15, xmax = as.numeric(shortname) + 0.15),
             height = 0.1,
             color = "darkorange"
-    )
+        )
 
 
     if (highlight_negatives) {
@@ -723,25 +699,26 @@ make_scatter_countries <- function(df,
     ggsave(save_path, plot = p, width = plot_settings[["width"]],
             height = plot_settings[["height"]],
             dpi = plot_settings[["dpi"]])
-    }
-```
 
-```{r}
+        # save data used for the plot
+    save_path <- paste0(save_path, ".csv")
+    write.csv(temp, save_path, row.names = FALSE)
+
+    }
+
+
 make_scatter_countries(df,
     y_label_suffix = "€",
     y_label = "Total social cost (€/hh/year)",
     save_path = "scatter_cba_renovation.png",
     hline = 0)
 
-
-
-
-```
-
-```{r}
-source("STURM_output/C00_plots.R")
+# save data
+write.csv(df, paste(save_dir, "scatter_cba_renovation.csv", sep = "/"), row.names = FALSE)
 
 save_path <- paste(save_dir, "maps_cba_renovation.png", sep = "/")
+
+df <- filter(df, scenario_name %in% c("MidSubRenovation", "HighSubRenovation", "MidSubDeepRenovation"))
 
 plot_map(df,
         limits = NULL,
@@ -753,19 +730,9 @@ plot_map(df,
         reverse_colormap = TRUE,
         ncol = 3,
         key = "name")
-```
-
-
-```{r}
-
-
-
-```
-
 
 ## 2. Electricity consumption
 
-```{r}
 var <- "Space heating consumption electricity (TWh)"
 df <- result_eu %>%
     select(c("scenario_name", "name", "variable", "value")) %>%
@@ -797,13 +764,7 @@ make_scatter_countries(df,
     save_path = "scatter_electricity_renovation.png",
     hline = 0)
 
-```
-
 # 3. Energy poverty
-
-```{r}
-source("STURM_output/C00_plots.R")
-
 
 scenarios_poverty <- c("Initial", "HeatPumpLearning+HighSub", "MidSubDeepRenovation+ImprovedRealization")
 temp <- data_eu %>%
@@ -830,12 +791,14 @@ plot_map(temp,
         subplot_column = "scenario_name",
         ncol = 4,
         key = "name")
-```
+
+# save data
+write.csv(temp, paste(save_dir, "maps_poverty_renovation.csv", sep = "/"), row.names = FALSE)
+
 
 #----------------------------------
 # Maximum scenario by EU member states
 
-```{r}
 scenario <- data %>%
     select(c("scenario_name", "carbon_tax", "_objective_renovation",
         "sub_heat", "learning_rate_heat", "_success_objective_renovation",
@@ -861,14 +824,9 @@ df <- result_eu %>%
 save_path <- "maps_countries_policy_mix_optimal_scenario.png"
 make_national_policy_mix(df, scenario, save_path)
 
-print(filter(df, region_bld == "EU"))
-df <- df %>%
-    filter(region_bld != "EU")
+write.csv(filter(df, region_bld != "EU"), paste(save_dir, "optimal_scenario.csv", sep = "/"), row.names = FALSE)
 
-write.csv(df, paste(save_dir, "optimal_scenario.csv", sep = "/"), row.names = FALSE)
-````
 
-```{r}
 df <- result_eu %>%
     filter(carbon_tax == "EUETS") %>%
     filter(`_remove_barriers_renovation` == FALSE) %>%
@@ -889,17 +847,8 @@ save_path <- "maps_countries_policy_mix_constraint_scenario.png"
 make_national_policy_mix(df, scenario, save_path)
 
 write.csv(df, paste(save_dir, "constraint_scenario.csv", sep = "/"), row.names = FALSE)
-```
 
-
-
-
-#----------------------------------------------------------------------------------------------------
-#----------------------------------------------------------------------------------------------------
-#----------------------------------------------------------------------------------------------------
-
-```{r}
-source("STURM_output/C00_plots.R")
+#---------------------------------------------------------------
 
 temp <- data_eu %>%
     select(c("scenario_name", "name", "Consumption electricity variation (%)")) %>%
@@ -921,11 +870,8 @@ plot_map(temp,
         subplot_column = "scenario_name",
         ncol = 3,
         key = "name")
-```
 
 
-```{r}
-source("STURM_output/C00_plots.R")
 
 cost_heat_pump_max <- data_eu %>%
     filter(scenario_name == "Heat pumps max") %>%
@@ -951,11 +897,11 @@ plot_map(temp,
         subplot_column = "scenario_name",
         ncol = 3,
         key = "name")
-```
 
 
 
-```{r}
+
+
 source("STURM_output/C00_plots.R")
 
 temp <- df %>%
@@ -976,9 +922,9 @@ plot_map(temp,
         subplot_column = "scenario_name",
         ncol = 3,
         key = "name")
-```
 
-```{r}
+
+
 source("STURM_output/C00_plots.R")
 
 temp <- df %>%
@@ -1000,10 +946,10 @@ plot_map(temp,
         subplot_column = "scenario_name",
         ncol = 3,
         key = "name")
-```
+
 
 ### Calculate difference compared to the S1 the counterfactual
-```{r}
+
 
 rename_variable <- c("Space heating consumption (TWh)" = "Energy consumption",
     "Emission (MtCO2)" = "Emission",
@@ -1020,9 +966,9 @@ diff_counterfactual_eu <- data_eu %>%
     pivot_wider(names_from = "scenario_name", values_from = "value") %>%
     mutate(value = (.data[[best_scenario]] - .data[["S1"]]) / .data[["S1"]]) %>%
     mutate(variable = rename_variable[variable])
-```
 
-```{r}
+
+
 limits <- c(-1, 0)
 save_path <- paste(save_dir, "effort_countries.png", sep = "/")
 
@@ -1034,11 +980,11 @@ plot_map(diff_counterfactual_eu,
         subplot_column = "variable",
         ncol = 4,
         key = "name")
-```
 
 
 
-```{r}
+
+
 rename_variable <- c("Emission saving (%)" = "Emission saving",
     "Consumption saving (%)" = "Emission",
     "Cost renovation (Billion EUR)" = "Renovation investment",
@@ -1060,11 +1006,11 @@ diff_avg_eu <- data_eu %>%
     mutate(variable = rename_variable[variable])
 
 
-```
+
 
 
 ### Calculate difference compared to the S1 the counterfactual
-```{r}
+
 
 rename_variable <- c("Space heating consumption (MWh/capita)" = "Energy reduction effort",
     "Emission (tCO2/capita)" = "Emission reduction effort",
@@ -1086,9 +1032,9 @@ diff_counterfactual_eu <- data_eu %>%
     ungroup() %>%
     mutate(value = effort / avg_effort) %>%
     mutate(variable = ifelse(variable %in% names(rename_variable), rename_variable[variable], variable))
-```
 
-```{r}
+
+
 limits <- c(-2, 2)
 save_path <- paste(save_dir, "effort_countries.png", sep = "/")
 
@@ -1101,11 +1047,11 @@ plot_map(diff_counterfactual_eu,
         ncol = 2,
         key = "name")
 
-```
+
 
 #------------------------------------------------------------------------------
 #### Old: Identification of policies that are in the target
-```{r}
+
 # Identify the policies that are in the target
 
 
@@ -1160,8 +1106,8 @@ ggsave(save_path, plot = p, width = plot_settings[["width"]],
         height = plot_settings[["height"]],
         dpi = plot_settings[["dpi"]])
 
-``` 
-```{r}
+ 
+
 # Calculate the average cost accoss scenarios
 
 # temp <- data_eu %>%
@@ -1182,9 +1128,9 @@ ggsave(save_path, plot = p, width = plot_settings[["width"]],
 
 # write.csv(temp, paste(save_dir, "scenario_target_countries.csv", sep = "/"), row.names = FALSE)
 
-```
 
-```{r}
+
+
 source("STURM_output/C00_plots.R")
 var <- "Total cost"
 ref_maps <- "Heat pumps max"
@@ -1241,10 +1187,10 @@ plot_map(temp,
   save_path = save_path,
   key = "name")
 
-```
 
 
-```{r}
+
+
 source("STURM_output/C00_plots.R")
 file <- "data_cba_country.csv"
 file <- paste(input_dir, file, sep = "/")
@@ -1254,10 +1200,10 @@ data_cba_eu <- read.csv(file,  check.names = FALSE, stringsAsFactors = FALSE, he
     mutate(name = ifelse(name %in% names(rename_countries), rename_countries[name], name)) %>%
     mutate(scenario_name = ifelse(scenario_name %in% names(scenarios_heat_pumps_names), scenarios_heat_pumps_names[scenario_name], scenario_name)) %>%
     mutate(scenario_name = ifelse(scenario_name %in% names(scenario_renovation_names), scenario_renovation_names[scenario_name], scenario_name))
-```
+
 
 ##### Histogram - Distribution of key outcomes across scenarios
-```{r}
+
 source("STURM_output/C00_plots.R")
 
 column <- "Consumption saving (%)"
@@ -1278,4 +1224,3 @@ plot_histogram(data, column, save_path)
 
 
 # TODO: histogram cost-efficient strategies
-```
