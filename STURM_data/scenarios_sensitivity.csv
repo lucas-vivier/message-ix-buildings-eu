@@ -1,4 +1,4 @@
 scenario_id,scenario_name,carbon_tax,_objective_renovation,sub_heat,learning_rate_heat,_success_objective_renovation,_realization_rate_renovation,_remove_barriers_renovation,eff_heat ,_short_term_price_elasticity,cost_invest_ren_shell
 1,EU,,,,constant,1,1,FALSE,,,
-9,EU_priceelaslow,,,,,,,,,,high
-10,EU_priceelaslow_reno,,deep_renovation,,constant,1,1,FALSE,,,high
+9,EU_priceelaslow,,,,,,,,,,-0.3
+10,EU_priceelaslow_reno,,deep_renovation,,constant,1,1,FALSE,,,-0.3

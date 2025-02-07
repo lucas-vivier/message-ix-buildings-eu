@@ -7,5 +7,5 @@ scenario_id,scenario_name,carbon_tax,_objective_renovation,sub_heat,learning_rat
 6,EU_priceelaslow_reno,,deep_renovation,,constant,1,1,FALSE,,-0.1,
 7,EU_costlow,,,,,,,,,,low
 8,EU_costlow_reno,,deep_renovation,,constant,1,1,FALSE,,,low
-9,EU_priceelaslow,,,,,,,,,,high
-10,EU_priceelaslow_reno,,deep_renovation,,constant,1,1,FALSE,,,high
+9,EU_priceelaslow,,,,,,,,,-0.3,
+10,EU_priceelaslow_reno,,deep_renovation,,constant,1,1,FALSE,,-0.3,
