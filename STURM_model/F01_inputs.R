@@ -255,6 +255,13 @@ read_parameters <- function(scen_param, param) {
     param$factor_energy_behavior <- as.numeric(factor_energy_behavior)
   }
 
+  if ("_short_term_price_elasticity" %in% scen_param$name_parameter) {
+    short_term_price_elasticity <- scen_param %>%
+      filter(name_parameter == "_short_term_price_elasticity") %>%
+      pull(scenario)
+    param$short_term_price_elasticity <- as.numeric(short_term_price_elasticity)
+  }
+
   return(param)
 
 }

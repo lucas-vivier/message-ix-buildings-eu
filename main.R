@@ -29,7 +29,7 @@ parser$add_argument("-a", "--all_scenarios", default = FALSE,
 
 # Parse the arguments
 args <- parser$parse_args()
-# args <- list("scenarios_file" = "scenarios_sensitivity.csv", "all_scenarios" = FALSE)
+# args <- list("scenarios_file" = "scenarios_sensitivity.csv", "all_scenarios" = TRUE)
 
 # Set num_cores based on the argument or use the default value
 parallel <- TRUE
@@ -100,12 +100,12 @@ step_year <- 5
 # configuration file STURM
 region <- c("WEU", "EEU")
 sector <- "resid"
-file_inputs <- "input_list_resid_EU.csv"
+file_inputs <- "input_list_resid_EU_no_calibration.csv" # TODO: change to input_list_resid_EU.csv
 en_method <- "TABULA"
 energy_efficiency <- "endogenous"
 run <- "policies"
 
-runs <- c("EU_lowuse")
+runs <- c("EU_effhp")
 if (args$all_scenarios) {
     runs <- "all"
 }

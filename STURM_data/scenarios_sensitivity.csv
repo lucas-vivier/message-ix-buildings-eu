@@ -1,7 +1,9 @@
-scenario_id,scenario_name,carbon_tax,_objective_renovation,sub_heat,learning_rate_heat,_success_objective_renovation,_realization_rate_renovation,_remove_barriers_renovation,_factor_energy_behavior
-1,EU,,,,constant,1,1,FALSE,
-2,EU_reno,,deep_renovation,,constant,1,1,FALSE,
-3,EU_lowuse,,,,constant,1,1,FALSE,0.5
-4,EU_lowuse_reno,,deep_renovation,,constant,1,1,FALSE,0.5
-5,EU_highuse,,,,constant,1,1,FALSE,1.5
-6,EU_highuse_reno,,deep_renovation,,constant,1,1,FALSE,1.5
+scenario_id,scenario_name,carbon_tax,_objective_renovation,sub_heat,learning_rate_heat,_success_objective_renovation,_realization_rate_renovation,_remove_barriers_renovation,eff_heat ,_short_term_price_elasticity,cost_invest_heat
+1,EU,,,,constant,1,1,FALSE,,,
+2,EU_reno,,deep_renovation,,constant,1,1,FALSE,,,
+3,EU_effhp,,,,constant,1,1,FALSE,hp_high,,
+4,EU_effhp_reno,,deep_renovation,,constant,1,1,FALSE,hp_high,,
+5,EU_priceelas,,,,,,,,,-0.1,
+6,EU_priceelas_reno,,deep_renovation,,constant,1,1,FALSE,,-0.1,
+7,EU_costlow,,,,,,,,,,low
+8,EU_costlow_reno,,deep_renovation,,constant,1,1,FALSE,,,low
