@@ -29,7 +29,7 @@ parser$add_argument("-a", "--all_scenarios", default = FALSE,
 
 # Parse the arguments
 args <- parser$parse_args()
-# args <- list("scenarios_file" = "scenarios_sensitivity.csv", "all_scenarios" = TRUE)
+#args <- list("scenarios_file" = "scenarios_sensitivity.csv", "all_scenarios" = FALSE)
 
 # Set num_cores based on the argument or use the default value
 parallel <- TRUE
@@ -105,7 +105,7 @@ en_method <- "TABULA"
 energy_efficiency <- "endogenous"
 run <- "policies"
 
-runs <- c("EU_effhp")
+runs <- c("EU_costlow")
 if (args$all_scenarios) {
     runs <- "all"
 }
