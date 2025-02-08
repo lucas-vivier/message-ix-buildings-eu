@@ -72,7 +72,7 @@ param <- list(subsidies_renovation_type = "ad_valorem",
             nzeb = FALSE,
             realization_rate_renovation = 1,
             renovation_intensity = NULL,
-            success_objective_renovation = 1,
+            success_objective_renovation = 1,#
             repartition_renovation = NULL,
             elasticity_renovation = -1,
             elasticity_heat_pump = -1,
@@ -105,7 +105,7 @@ en_method <- "TABULA"
 energy_efficiency <- "endogenous"
 run <- "policies"
 
-runs <- c("EU_costlow")
+runs <- c("EU") #
 if (args$all_scenarios) {
     runs <- "all"
 }

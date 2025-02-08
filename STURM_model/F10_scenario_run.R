@@ -738,11 +738,11 @@ run_scenario <- function(run,
                           d$discount_rate_renovation,
                           param$social_discount_rate,
                           d$income,
+                          elasticity_renovation = param$elasticity_renovation,
                           credit_constraint = param$credit_constraint
                         )
         }
       }
-
       if (param$remove_barriers_renovation) {
         print("Removing barriers for renovation")
         # Assigning constant value of "std" to "adv" parameters
@@ -755,7 +755,6 @@ run_scenario <- function(run,
           mutate(discount_rate = min(discount_rate)) %>%
           ungroup()
       }
-
       # Calculating renovation decisions
       if (energy_efficiency == "endogenous") {
         print("2.1 Calculation of renovation rate")

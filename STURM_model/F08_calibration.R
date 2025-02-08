@@ -130,6 +130,7 @@ fun_calibration_ren_shell <- function(yrs,
                           discount_ren,
                           social_discount_rate,
                           income,
+                          elasticity_renovation = -1,
                           credit_constraint = NULL) {
     
     start_calibration <- Sys.time()
@@ -293,7 +294,7 @@ fun_calibration_ren_shell <- function(yrs,
     root <- multiroot(objective_function, start = x,
         maxiter = 1e3, utility = u, tgt = t,
         b_mfh = b_mfh, b_rent = b_rent,
-        elasticity = param$elasticity_renovation, scale = NULL,
+        elasticity = elasticity_renovation, scale = NULL,
         bld = b)
     print("Initial calibration done")
 
