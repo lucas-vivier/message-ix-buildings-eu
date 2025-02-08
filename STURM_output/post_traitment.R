@@ -26,7 +26,7 @@ parser$add_argument("-f", "--figures", default = TRUE,
 
 # Parse the arguments
 args <- parser$parse_args()
-args <- list(path = "2025-02-07_183312", names_scenarios = "STURM_data/scenarios_sensitivity.csv", figures = TRUE, counterfactual="EU")
+#args <- list(path = "2025-02-07_183312", names_scenarios = "STURM_data/scenarios_sensitivity.csv", figures = TRUE, counterfactual="EU")
 
 # Rename the scenarios
 scenarios <- c("EU" = "Counterfactual",
