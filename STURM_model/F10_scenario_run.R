@@ -1177,6 +1177,7 @@ run_scenario <- function(run,
                               bld_det_i_sw = bld_det_i_sw,
                               report_turnover = report_turnover,
                               alpha = alpha,
+                              short_term_price_elasticity = param$short_term_price_elasticity,
                               utility_money = distinct(select(parameters_renovation, c(region_bld, scaling_factor))))
 
 

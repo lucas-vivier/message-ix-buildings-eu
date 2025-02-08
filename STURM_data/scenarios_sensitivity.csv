@@ -1,11 +1,6 @@
 scenario_id,scenario_name,_objective_renovation,sub_heat,learning_rate_heat,_success_objective_renovation,_realization_rate_renovation,_remove_barriers_renovation,eff_heat ,_short_term_price_elasticity,cost_invest_ren_shell,_elasticity_renovation
 1,EU,,,constant,0.5,1,FALSE,,,,
-2,EU_renoslight,deep_renovation,,constant,0.25,1,FALSE,,,,
 3,EU_priceelaslow,,,constant,0.5,1,FALSE,,-0.15,,
 4,EU_priceelaslow_reno,deep_renovation,,constant,0.5,1,FALSE,,-0.15,,
 5,EU_priceelashigh,,,constant,0.5,1,FALSE,,-0.25,,
 6,EU_priceelashigh_reno,deep_renovation,,constant,0.5,1,FALSE,,-0.25,,
-7,EU_elasrenohigh,,,constant,0.5,1,FALSE,,,,-1.2
-8,EU_elasrenohigh_reno,deep_renovation,,constant,0.5,1,FALSE,,,,-1.2
-9,EU_elasrenolow,,,constant,0.5,1,FALSE,,,,-0.8
-10,EU_elasrenolow_reno,deep_renovation,,constant,0.5,1,FALSE,,,,-0.8

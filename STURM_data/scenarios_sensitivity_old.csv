@@ -13,3 +13,11 @@ scenario_id,scenario_name,_objective_renovation,sub_heat,learning_rate_heat,_suc
 14,EU_elasrenohigh_reno,deep_renovation,,constant,0.5,1,FALSE,,,,-1.2
 15,EU_nobarriers,,,constant,0.5,1,TRUE,,,,
 16,EU_nobarriers_reno,deep_renovation,,constant,0.5,1,TRUE,,,,
+,EU_priceelaslow,,,constant,0.5,1,FALSE,,-0.15,,
+,EU_priceelaslow_reno,deep_renovation,,constant,0.5,1,FALSE,,-0.15,,
+,EU_priceelashigh,,,constant,0.5,1,FALSE,,-0.25,,
+,EU_priceelashigh_reno,deep_renovation,,constant,0.5,1,FALSE,,-0.25,,
+,EU_elasrenohigh,,,constant,0.5,1,FALSE,,,,-1.2
+,EU_elasrenohigh_reno,deep_renovation,,constant,0.5,1,FALSE,,,,-1.2
+,EU_elasrenolow,,,constant,0.5,1,FALSE,,,,-0.8
+,EU_elasrenolow_reno,deep_renovation,,constant,0.5,1,FALSE,,,,-0.8
