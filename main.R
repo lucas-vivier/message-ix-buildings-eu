@@ -12,6 +12,11 @@ options(dplyr.width = Inf)
 options(dplyr.summarise.inform = FALSE)
 options(dplyr.show_progress = FALSE)
 
+if (getRversion() != "4.3.0") {
+    print("This script is only tested with R version 4.3.0")
+}
+
+
 start_script_time <- Sys.time()
 
 # Create a parser object
@@ -100,7 +105,7 @@ step_year <- 5
 # configuration file STURM
 region <- c("WEU", "EEU")
 sector <- "resid"
-file_inputs <- "input_list_resid_EU_no_calibration.csv" # TODO: change to input_list_resid_EU.csv
+file_inputs <- "input_list_resid_EU.csv"
 en_method <- "TABULA"
 energy_efficiency <- "endogenous"
 run <- "policies"
